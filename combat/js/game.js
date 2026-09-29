@@ -821,12 +821,12 @@ function drawFight() {
       text(w.ch.name + ' — ' + w.ch.title, W / 2, 190, 26, '#fff');
       drawFighter(w, W / 2, 420, 1.6);
     }
-    text('ENTRÉE : rejouer   —   ÉCHAP : menu', W / 2, H - 40, 22, '#fff');
+    text(isTouch ? 'Touche en bas : rejouer  —  en haut : menu' : 'ENTRÉE : rejouer   —   ÉCHAP : menu', W / 2, H - 40, 22, '#fff');
   }
   if (m.paused) {
     ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, W, H);
     banner('PAUSE', 80, '#fff', 200);
-    text('P / ENTRÉE : reprendre   —   ÉCHAP : quitter', W / 2, 300, 24, '#ddd');
+    text(isTouch ? 'Haut : reprendre  —  Bas : quitter' : 'P / ENTRÉE : reprendre   —   ÉCHAP : quitter', W / 2, 300, 24, '#ddd');
   }
 }
 
@@ -1033,7 +1033,29 @@ cv.addEventListener('pointerdown', e => {
   ensureAudio();
   const p = canvasPos(e);
   if (G.scene === 'title' && G.showControls) { G.showControls = false; return; }
+  if (G.scene === 'fight') {
+    const m = G.match;
+    if (m.phase === 'match') { if (p.y > H - 80) startMatch(); else if (p.y < 60) G.scene = 'title'; return; }
+    if (m.paused) { if (p.y > H / 2) G.scene = 'title'; else m.paused = false; return; }
+    return;
+  }
   for (const c of G.clickables) if (p.x >= c.x && p.x <= c.x + c.w && p.y >= c.y && p.y <= c.y + c.h) { c.fn(); return; }
+});
+
+/* ---------------------------------------------------------------- commandes tactiles */
+const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+if (isTouch) document.body.classList.add('touch');
+document.querySelectorAll('#touch button').forEach(b => {
+  const hold = b.dataset.k, tap = b.dataset.a;
+  const down = e => {
+    e.preventDefault(); ensureAudio(); b.classList.add('on');
+    if (hold) keys[hold] = true;
+    else if (G.scene === 'fight') onPress(tap);
+  };
+  const up = e => { e.preventDefault(); b.classList.remove('on'); if (hold) keys[hold] = false; };
+  b.addEventListener('pointerdown', down);
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => b.addEventListener(t, up));
+  b.addEventListener('contextmenu', e => e.preventDefault());
 });
 
 /* ---------------------------------------------------------------- boucle principale */
@@ -1054,6 +1076,7 @@ function frame(now) {
     acc -= 1000 / 60; G.t++;
     if (G.scene === 'fight') updateFight();
   }
+  document.body.dataset.scene = G.scene;
   render();
   requestAnimationFrame(frame);
 }
