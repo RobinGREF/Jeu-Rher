@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSymbolDeck, canPlayOn, newGame, play, playablePiles, tops } from './engine';
+import { buildSymbolDeck, canPlayOn, newGame, play, playablePiles, toggleSignal, tops } from './engine';
 
 const seeded = (seed: number) => () => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296);
 
@@ -123,5 +123,47 @@ test('missions : que des X et/ou Y, symboles différents', () => {
 test('missions : chaque mission a un dessin', () => {
   for (const d of buildMissionDefs()) {
     assert.ok(d.visual.kind === 'row' ? d.visual.items.length >= 3 : true, d.label);
+  }
+});
+
+test('signaux : poser, retirer, refuser une cible invalide', () => {
+  let s = newGame(3, seeded(3));
+  const m = s.missions[0].id;
+  s = toggleSignal(s, { player: 1, kind: 'help', mission: m });
+  assert.equal(s.signals.length, 1);
+  s = toggleSignal(s, { player: 1, kind: 'help', mission: m });
+  assert.equal(s.signals.length, 0);
+  assert.equal(toggleSignal(s, { player: 1, kind: 'help', mission: 'inconnue' }), s);
+  assert.equal(toggleSignal(s, { player: 1, kind: 'good', pile: 4 }), s);
+  assert.equal(toggleSignal(s, { player: 3, kind: 'good', pile: 0 }), s);
+});
+
+test('signaux : bonne carte et ne jouez pas s\'excluent pour un même joueur et un même tas', () => {
+  let s = newGame(3, seeded(3));
+  s = toggleSignal(s, { player: 1, kind: 'good', pile: 2 });
+  s = toggleSignal(s, { player: 1, kind: 'stop', pile: 2 });
+  assert.deepEqual(s.signals.map((g) => g.kind), ['stop']);
+  s = toggleSignal(s, { player: 2, kind: 'good', pile: 2 });
+  assert.equal(s.signals.length, 2);
+});
+
+test('signaux : effacés quand le tas est recouvert ou la mission remplacée', () => {
+  for (let seed = 1; seed <= 100; seed++) {
+    const rng = seeded(seed);
+    let s = newGame(3, rng);
+    let guard = 0;
+    while (!s.over && guard++ < 5000) {
+      for (let pile = 0; pile < 4; pile++) s = toggleSignal(s, { player: (s.current + 1) % 3, kind: 'good', pile });
+      for (const m of s.missions) s = toggleSignal(s, { player: (s.current + 2) % 3, kind: 'help', mission: m.id });
+      const moves = s.hands[s.current].flatMap((c) => playablePiles(s, c).map((p) => [c.id, p] as const));
+      const [id, p] = moves[Math.floor(rng() * moves.length)];
+      const r = play(s, id, p, rng);
+      assert.ok(r.ok);
+      if (!r.ok) return;
+      assert.ok(!r.state.signals.some((g) => g.kind !== 'help' && g.pile === p), 'signal resté sur le tas joué');
+      for (const g of r.state.signals.filter((x) => x.kind === 'help'))
+        assert.ok(r.state.missions.some((m) => m.id === g.mission), 'signal sur une mission disparue');
+      s = r.state;
+    }
   }
 });
