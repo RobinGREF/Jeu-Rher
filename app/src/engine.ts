@@ -174,3 +174,30 @@ export function findMissionMoves(s: GameState, player: number): MissionMove[] {
   }
   return moves.sort((a, b) => b.missions.length - a.missions.length);
 }
+
+export type Move = { cardId: number; pile: number };
+
+/**
+ * Coup d'un joueur machine : celui qui réussit le plus de missions, en évitant de bloquer
+ * le joueur suivant (ce qui terminerait la partie). Simule chaque coup avec `play`.
+ */
+export function botMove(s: GameState, player: number, rng: Rng = Math.random): Move | null {
+  if (s.over || s.current !== player) return null;
+  let best: Move | null = null;
+  let bestScore = -Infinity;
+  for (const card of s.hands[player]) {
+    for (const pile of playablePiles(s, card)) {
+      const r = play(s, card.id, pile, rng);
+      if (!r.ok) continue;
+      const score = (r.state.completed - s.completed) * 100 - (r.state.over && r.state.completed < 50 ? 1000 : 0) + rng();
+      if (score > bestScore) { bestScore = score; best = { cardId: card.id, pile }; }
+    }
+  }
+  return best;
+}
+
+/** Les machines annoncent « je peux réussir une mission » quand elles le peuvent (les autres annonces sont conservées). */
+export function syncBotAnnouncements(s: GameState, bots: number[]): GameState {
+  const canDo = [...s.canDo.filter((p) => !bots.includes(p)), ...bots.filter((p) => findMissionMoves(s, p).length > 0)].sort();
+  return { ...s, canDo };
+}

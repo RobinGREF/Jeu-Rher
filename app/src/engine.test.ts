@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSymbolDeck, canPlayOn, newGame, play, playablePiles, toggleCanDo, tops, findMissionMoves } from './engine';
+import { buildSymbolDeck, canPlayOn, newGame, play, playablePiles, toggleCanDo, tops, findMissionMoves, botMove, syncBotAnnouncements } from './engine';
 
 const seeded = (seed: number) => () => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296);
 
@@ -176,4 +176,74 @@ test('coup de pouce : chaque coup proposé réussit bien ses missions, tous les 
     }
   }
   assert.ok(proposed > 0, 'aucun coup de pouce rencontré : test sans valeur');
+});
+
+function playBots(seed: number, players: number, chooser: 'bot' | 'random') {
+  const rng = seeded(seed);
+  let s = newGame(players, rng);
+  let guard = 0;
+  while (!s.over && guard++ < 5000) {
+    let mv;
+    if (chooser === 'bot') mv = botMove(s, s.current, rng);
+    else {
+      const moves = s.hands[s.current].flatMap((c) => playablePiles(s, c).map((p) => ({ cardId: c.id, pile: p })));
+      mv = moves[Math.floor(rng() * moves.length)];
+    }
+    assert.ok(mv, 'un joueur non bloqué doit avoir un coup');
+    const r = play(s, mv!.cardId, mv!.pile, rng);
+    assert.ok(r.ok);
+    if (r.ok) s = r.state;
+  }
+  assert.ok(s.over);
+  return s.completed;
+}
+
+test('machines : ne jouent que des coups légaux, terminent la partie, et font mieux que le hasard', () => {
+  let bots = 0, random = 0;
+  for (let seed = 1; seed <= 150; seed++) {
+    bots += playBots(seed, 3, 'bot');
+    random += playBots(seed, 3, 'random');
+  }
+  assert.ok(bots > random, `machines ${bots / 150} contre hasard ${random / 150}`);
+});
+
+test('machines : prennent une mission quand elles le peuvent, et refusent de jouer hors de leur tour', () => {
+  const rng = seeded(11);
+  let checked = 0;
+  for (let seed = 1; seed <= 100; seed++) {
+    const r0 = seeded(seed);
+    let s = newGame(3, r0);
+    let guard = 0;
+    while (!s.over && guard++ < 5000) {
+      const hint = findMissionMoves(s, s.current);
+      const mv = botMove(s, s.current, r0)!;
+      assert.equal(botMove(s, (s.current + 1) % 3, r0), null);
+      const r = play(s, mv.cardId, mv.pile, r0);
+      assert.ok(r.ok);
+      if (r.ok) {
+        if (hint.length) {
+          checked++;
+          const gain = r.state.completed - s.completed;
+          if (gain < hint[0].missions.length) {
+            // Seule raison de renoncer à une mission : le coup gagnant aurait bloqué le joueur suivant.
+            const alt = play(s, hint[0].cardId, hint[0].pile, r0);
+            assert.ok(alt.ok && alt.state.over, `seed ${seed} : mission refusée sans raison`);
+          }
+        }
+        s = r.state;
+      }
+    }
+  }
+  assert.ok(checked > 0);
+  void rng;
+});
+
+test('machines : annoncent « je peux » seulement si elles le peuvent, sans toucher aux annonces humaines', () => {
+  for (let seed = 1; seed <= 60; seed++) {
+    let s = newGame(3, seeded(seed));
+    s = toggleCanDo(s, 0);
+    s = syncBotAnnouncements(s, [1, 2]);
+    assert.ok(s.canDo.includes(0));
+    for (const b of [1, 2]) assert.equal(s.canDo.includes(b), findMissionMoves(s, b).length > 0);
+  }
 });

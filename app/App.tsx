@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { findMissionMoves, missionsLeft, newGame, play, playablePiles, toggleCanDo, tops, type GameState } from './src/engine';
+import { botMove, findMissionMoves, missionsLeft, newGame, play, playablePiles, syncBotAnnouncements, toggleCanDo, tops, type GameState } from './src/engine';
 import { MissionToken } from './src/MissionToken';
 import { SYMBOLS } from './src/symbols';
 import type { Card } from './src/types';
@@ -19,6 +19,8 @@ function CardView({ card, selected, dim, glow, onPress }: { card: Card; selected
 const MEDAL = { bronze: '🥉 Bronze', argent: '🥈 Argent', or: '🥇 Or' } as const;
 
 export default function App() {
+  const [mode, setMode] = useState<'solo' | 'together'>('solo');
+  const [bots, setBots] = useState(2);
   const [players, setPlayers] = useState(2);
   const [game, setGame] = useState<GameState | null>(null);
   const [revealed, setRevealed] = useState(false);
@@ -27,30 +29,75 @@ export default function App() {
   const [selected, setSelected] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [textFor, setTextFor] = useState<string | null>(null);
+  const [log, setLog] = useState('');
+  const solo = mode === 'solo';
+  const botSeats = (n: number) => Array.from({ length: n - 1 }, (_, i) => i + 1);
   const { width } = useWindowDimensions();
   const tokenSize = Math.min(170, (width - 48) / 2);
+
+  // Tour d'une machine : une courte pause pour qu'on voie ce qui se passe, puis elle joue.
+  useEffect(() => {
+    if (!game || !solo || game.over || game.current === 0) return;
+    const id = setTimeout(() => {
+      const who = game.current;
+      const mv = botMove(game, who);
+      if (!mv) return;
+      const card = game.hands[who].find((c) => c.id === mv.cardId)!;
+      const r = play(game, mv.cardId, mv.pile);
+      if (!r.ok) return;
+      const gained = r.state.completed - game.completed;
+      setLog(`Joueur ${who + 1} (machine) : ${card.value}${SYMBOLS[card.symbol].emoji} sur le tas ${mv.pile + 1}${gained ? ` · 🎯 +${gained} mission${gained > 1 ? 's' : ''}` : ''}`);
+      setGame(syncBotAnnouncements(r.state, botSeats(game.players)));
+    }, 1300);
+    return () => clearTimeout(id);
+  }, [game, solo]);
 
   if (!game) {
     return (
       <SafeAreaView style={s.root}>
         <StatusBar style="light" />
         <Text style={s.title}>50 Missions</Text>
-        <Text style={s.sub}>Jeu coopératif · un seul téléphone</Text>
-        <Text style={s.label}>Nombre de joueurs</Text>
+        <Text style={s.sub}>Jeu coopératif</Text>
         <View style={s.row}>
-          {[1, 2, 3, 4].map((n) => (
-            <Pressable key={n} onPress={() => setPlayers(n)} style={[s.chip, players === n && s.chipOn]}>
-              <Text style={s.chipTxt}>{n}</Text>
-            </Pressable>
-          ))}
+          <Pressable onPress={() => setMode('solo')} style={[s.opt, solo && s.optOn]}>
+            <Text style={[s.optTitle, solo && s.optTitleOn]}>Seul avec des machines</Text>
+            <Text style={[s.optSub, solo && s.optTitleOn]}>Tu joues, les autres joueurs sont simulés.</Text>
+          </Pressable>
+          <Pressable onPress={() => setMode('together')} style={[s.opt, !solo && s.optOn]}>
+            <Text style={[s.optTitle, !solo && s.optTitleOn]}>À plusieurs, un téléphone</Text>
+            <Text style={[s.optSub, !solo && s.optTitleOn]}>On se passe le téléphone.</Text>
+          </Pressable>
         </View>
-        <Pressable onPress={() => setOpenHands(!openHands)} style={s.toggle}>
-          <View style={[s.box, openHands && s.boxOn]}>{openHands && <Text style={s.tick}>✓</Text>}</View>
-          <View style={{ flex: 1 }}>
-            <Text style={s.toggleTitle}>Mains visibles (mode test)</Text>
-            <Text style={s.toggleSub}>Toutes les mains sont affichées, sans passer le téléphone.</Text>
-          </View>
-        </Pressable>
+        {solo ? (
+          <>
+            <Text style={s.label}>Joueurs machine</Text>
+            <View style={s.row}>
+              {[1, 2, 3].map((n) => (
+                <Pressable key={n} onPress={() => setBots(n)} style={[s.chip, bots === n && s.chipOn]}>
+                  <Text style={s.chipTxt}>{n}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        ) : (
+          <>
+            <Text style={s.label}>Nombre de joueurs</Text>
+            <View style={s.row}>
+              {[1, 2, 3, 4].map((n) => (
+                <Pressable key={n} onPress={() => setPlayers(n)} style={[s.chip, players === n && s.chipOn]}>
+                  <Text style={s.chipTxt}>{n}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Pressable onPress={() => setOpenHands(!openHands)} style={s.toggle}>
+              <View style={[s.box, openHands && s.boxOn]}>{openHands && <Text style={s.tick}>✓</Text>}</View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.toggleTitle}>Mains visibles (mode test)</Text>
+                <Text style={s.toggleSub}>Toutes les mains sont affichées, sans passer le téléphone.</Text>
+              </View>
+            </Pressable>
+          </>
+        )}
         <Pressable onPress={() => setHelpOn(!helpOn)} style={s.toggle}>
           <View style={[s.box, helpOn && s.boxOn]}>{helpOn && <Text style={s.tick}>✓</Text>}</View>
           <View style={{ flex: 1 }}>
@@ -58,7 +105,11 @@ export default function App() {
             <Text style={s.toggleSub}>Le jeu montre à chaque joueur les cartes qui réussissent une ou plusieurs missions.</Text>
           </View>
         </Pressable>
-        <Pressable style={s.btn} onPress={() => { setGame(newGame(players)); setRevealed(false); setSelected(null); }}>
+        <Pressable style={s.btn} onPress={() => {
+          const g = newGame(solo ? bots + 1 : players);
+          setGame(solo ? syncBotAnnouncements(g, botSeats(g.players)) : g);
+          setRevealed(false); setSelected(null); setLog(''); setError('');
+        }}>
           <Text style={s.btnTxt}>Commencer</Text>
         </Pressable>
       </SafeAreaView>
@@ -83,13 +134,15 @@ export default function App() {
     );
   }
 
-  const hand = game.hands[game.current];
+  const me = solo ? 0 : game.current;
+  const hand = game.hands[me];
   const sel = hand.find((c) => c.id === selected) ?? null;
   const ok = sel ? playablePiles(game, sel) : [];
   const t = tops(game);
-  const handShown = openHands || revealed;
+  const handShown = solo || openHands || revealed;
+  const seat = (p: number) => `Joueur ${p + 1}${solo && p > 0 ? ' (machine)' : ''}`;
   const hintsOf = (p: number) => (helpOn ? findMissionMoves(game, p) : []);
-  const myHints = hintsOf(game.current);
+  const myHints = hintsOf(me);
   const hintCards = (p: number) => new Set(hintsOf(p).map((m) => m.cardId));
   const hintPiles = new Set(myHints.filter((m) => m.cardId === selected).map((m) => m.pile));
   const hintText = (p: number) => {
@@ -102,22 +155,29 @@ export default function App() {
 
   const drop = (pile: number) => {
     if (!handShown) return setError("Affiche d'abord ta main");
+    if (solo && game.current !== 0) return setError("Ce n'est pas encore ton tour");
     if (!sel) return setError("Choisis d'abord une carte");
     const r = play(game, sel.id, pile);
     if (!r.ok) return setError(r.error);
-    setError(''); setSelected(null); setRevealed(false); setGame(r.state);
+    const gained = r.state.completed - game.completed;
+    if (solo) setLog(`Toi : ${sel.value}${SYMBOLS[sel.symbol].emoji} sur le tas ${pile + 1}${gained ? ` · 🎯 +${gained} mission${gained > 1 ? 's' : ''}` : ''}`);
+    setError(''); setSelected(null); setRevealed(false);
+    setGame(solo ? syncBotAnnouncements(r.state, botSeats(game.players)) : r.state);
   };
 
   return (
     <SafeAreaView style={s.root}>
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }}>
-        <Text style={s.title}>Joueur {game.current + 1}</Text>
+        <Text style={s.title}>
+          {solo ? (game.current === 0 ? 'À toi de jouer' : `${seat(game.current)} joue…`) : `Joueur ${game.current + 1}`}
+        </Text>
         {status}
+        {!!log && <Text style={s.log}>{log}</Text>}
         {game.canDo.length > 0 && (
           <View style={s.banner}>
             <Text style={s.bannerTxt}>
-              🙋 {game.canDo.map((p) => `Joueur ${p + 1}`).join(' et ')} {game.canDo.length > 1 ? 'peuvent' : 'peut'} réussir une mission
+              🙋 {game.canDo.map(seat).join(' et ')} {game.canDo.length > 1 ? 'peuvent' : 'peut'} réussir une mission
             </Text>
           </View>
         )}
@@ -144,16 +204,18 @@ export default function App() {
           <>
             <Text style={s.label}>Je peux réussir une mission</Text>
             <View style={s.row}>
-              {game.hands.map((_, i) => {
+              {(solo ? [0] : game.hands.map((_, i) => i)).map((i) => {
                 const on = game.canDo.includes(i);
                 return (
                   <Pressable key={i} onPress={() => setGame(toggleCanDo(game, i))} style={[s.mode, on && s.modeOn]}>
-                    <Text style={[s.modeTxt, on && s.modeTxtOn]}>🙋 Joueur {i + 1}</Text>
+                    <Text style={[s.modeTxt, on && s.modeTxtOn]}>{solo ? '🙋 Je peux réussir une mission' : `🙋 Joueur ${i + 1}`}</Text>
                   </Pressable>
                 );
               })}
             </View>
-            <Text style={s.hint}>Tu peux le dire à tout moment, même hors de ton tour. On ne dit pas laquelle ni avec quelle carte. Touche encore pour retirer.</Text>
+            <Text style={s.hint}>
+              {solo ? 'Les machines l\'annoncent toutes seules. ' : ''}À dire à tout moment, même hors de ton tour, sans préciser laquelle ni avec quelle carte. Touche encore pour retirer.
+            </Text>
           </>
         )}
 
@@ -172,13 +234,13 @@ export default function App() {
               </View>
             </View>
           ))
-        ) : revealed ? (
+        ) : handShown ? (
           <>
-            <Text style={s.label}>Ta main · pioche : {game.symbolDeck.length}</Text>
-            {hintText(game.current) && <Text style={s.hintOn}>{hintText(game.current)} · touche-la pour voir le tas</Text>}
+            <Text style={s.label}>Ta main · pioche : {game.symbolDeck.length}{solo && game.current === 0 ? ' · à toi' : ''}</Text>
+            {hintText(me) && <Text style={s.hintOn}>{hintText(me)} · touche-la pour voir le tas</Text>}
             <View style={s.row}>
               {hand.map((c) => (
-                <CardView key={c.id} card={c} glow={hintCards(game.current).has(c.id)} selected={c.id === selected} onPress={() => { setSelected(c.id); setError(''); }} />
+                <CardView key={c.id} card={c} glow={hintCards(me).has(c.id)} selected={c.id === selected} onPress={() => { setSelected(c.id); setError(''); }} />
               ))}
             </View>
           </>
@@ -226,6 +288,12 @@ const s = StyleSheet.create({
   cardGlow: { borderColor: '#facc15', shadowColor: '#facc15', shadowOpacity: 0.9, shadowRadius: 10, shadowOffset: { width: 0, height: 0 }, elevation: 8 },
   pileNo: { color: '#94a3b8', fontSize: 12 },
   hintOn: { color: '#facc15', fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  opt: { flex: 1, minWidth: 150, backgroundColor: '#1e293b', borderRadius: 12, padding: 14, gap: 4 },
+  optOn: { backgroundColor: '#f59e0b' },
+  optTitle: { color: '#f8fafc', fontSize: 16, fontWeight: '800' },
+  optTitleOn: { color: '#111827' },
+  optSub: { color: '#94a3b8', fontSize: 13 },
+  log: { color: '#cbd5e1', fontSize: 14, textAlign: 'center', fontStyle: 'italic' },
   hint: { color: '#94a3b8', fontSize: 13, textAlign: 'center' },
   cover: { backgroundColor: '#1e293b', borderRadius: 12, padding: 16, gap: 8 },
   tokens: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12 },
