@@ -155,3 +155,22 @@ export function toggleCanDo(prev: GameState, player: number): GameState {
   const canDo = prev.canDo.includes(player) ? prev.canDo.filter((p) => p !== player) : [...prev.canDo, player].sort();
   return { ...prev, canDo };
 }
+
+export type MissionMove = { cardId: number; pile: number; missions: string[] };
+
+/**
+ * Coup de pouce : les coups de la main d'un joueur qui réussiraient au moins une mission
+ * immédiatement, des plus rentables aux moins. Valable à tout moment, même hors de son tour.
+ */
+export function findMissionMoves(s: GameState, player: number): MissionMove[] {
+  const moves: MissionMove[] = [];
+  for (const card of s.hands[player] ?? []) {
+    for (const pile of playablePiles(s, card)) {
+      const t = tops(s);
+      t[pile] = card;
+      const missions = s.missions.filter((m) => m.check(t)).map((m) => m.id);
+      if (missions.length) moves.push({ cardId: card.id, pile, missions });
+    }
+  }
+  return moves.sort((a, b) => b.missions.length - a.missions.length);
+}

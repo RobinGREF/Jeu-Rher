@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { missionsLeft, newGame, play, playablePiles, toggleCanDo, tops, type GameState } from './src/engine';
+import { findMissionMoves, missionsLeft, newGame, play, playablePiles, toggleCanDo, tops, type GameState } from './src/engine';
 import { MissionToken } from './src/MissionToken';
 import { SYMBOLS } from './src/symbols';
 import type { Card } from './src/types';
 
 
-function CardView({ card, selected, dim, onPress }: { card: Card; selected?: boolean; dim?: boolean; onPress?: () => void }) {
+function CardView({ card, selected, dim, glow, onPress }: { card: Card; selected?: boolean; dim?: boolean; glow?: boolean; onPress?: () => void }) {
   return (
-    <Pressable onPress={onPress} style={[s.card, { borderColor: SYMBOLS[card.symbol].color }, selected && s.cardSel, dim && { opacity: 0.35 }]}>
+    <Pressable onPress={onPress} style={[s.card, { borderColor: SYMBOLS[card.symbol].color }, selected && s.cardSel, glow && s.cardGlow, dim && { opacity: 0.35 }]}>
       <Text style={[s.cardVal, { color: SYMBOLS[card.symbol].color }]}>{card.value}</Text>
       <Text style={[s.cardSym, { color: SYMBOLS[card.symbol].color }]}>{SYMBOLS[card.symbol].emoji}</Text>
     </Pressable>
@@ -23,6 +23,7 @@ export default function App() {
   const [game, setGame] = useState<GameState | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [openHands, setOpenHands] = useState(false);
+  const [helpOn, setHelpOn] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [textFor, setTextFor] = useState<string | null>(null);
@@ -48,6 +49,13 @@ export default function App() {
           <View style={{ flex: 1 }}>
             <Text style={s.toggleTitle}>Mains visibles (mode test)</Text>
             <Text style={s.toggleSub}>Toutes les mains sont affichées, sans passer le téléphone.</Text>
+          </View>
+        </Pressable>
+        <Pressable onPress={() => setHelpOn(!helpOn)} style={s.toggle}>
+          <View style={[s.box, helpOn && s.boxOn]}>{helpOn && <Text style={s.tick}>✓</Text>}</View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.toggleTitle}>💡 Coup de pouce</Text>
+            <Text style={s.toggleSub}>Le jeu montre à chaque joueur les cartes qui réussissent une ou plusieurs missions.</Text>
           </View>
         </Pressable>
         <Pressable style={s.btn} onPress={() => { setGame(newGame(players)); setRevealed(false); setSelected(null); }}>
@@ -80,6 +88,18 @@ export default function App() {
   const ok = sel ? playablePiles(game, sel) : [];
   const t = tops(game);
   const handShown = openHands || revealed;
+  const hintsOf = (p: number) => (helpOn ? findMissionMoves(game, p) : []);
+  const myHints = hintsOf(game.current);
+  const hintCards = (p: number) => new Set(hintsOf(p).map((m) => m.cardId));
+  const hintPiles = new Set(myHints.filter((m) => m.cardId === selected).map((m) => m.pile));
+  const hintText = (p: number) => {
+    const h = hintsOf(p);
+    if (!h.length) return null;
+    const best = Math.max(...h.map((m) => m.missions.length));
+    const cards = new Set(h.map((m) => m.cardId)).size;
+    return `💡 ${cards} carte${cards > 1 ? 's' : ''} réussi${cards > 1 ? 'ssent' : 't'} une mission${best > 1 ? ` (jusqu'à ${best} d'un coup)` : ''}`;
+  };
+
   const drop = (pile: number) => {
     if (!handShown) return setError("Affiche d'abord ta main");
     if (!sel) return setError("Choisis d'abord une carte");
@@ -113,7 +133,10 @@ export default function App() {
         <Text style={s.label}>Tas</Text>
         <View style={s.row}>
           {t.map((c, i) => (
-            <CardView key={i} card={c} dim={!!sel && !ok.includes(i)} onPress={() => drop(i)} />
+            <View key={i} style={{ alignItems: 'center', gap: 4 }}>
+              <CardView card={c} dim={!!sel && !ok.includes(i)} glow={hintPiles.has(i)} onPress={() => drop(i)} />
+              <Text style={s.pileNo}>tas {i + 1}</Text>
+            </View>
           ))}
         </View>
 
@@ -140,9 +163,10 @@ export default function App() {
               <Text style={s.label}>
                 Joueur {i + 1}{i === game.current ? ' · à toi de jouer' : ''}{i === 0 ? ` · pioche : ${game.symbolDeck.length}` : ''}
               </Text>
+              {hintText(i) && <Text style={s.hintOn}>{hintText(i)}</Text>}
               <View style={s.row}>
                 {h.map((c) => (
-                  <CardView key={c.id} card={c} selected={i === game.current && c.id === selected}
+                  <CardView key={c.id} card={c} glow={hintCards(i).has(c.id)} selected={i === game.current && c.id === selected}
                     onPress={i === game.current ? () => { setSelected(c.id); setError(''); } : undefined} />
                 ))}
               </View>
@@ -151,9 +175,10 @@ export default function App() {
         ) : revealed ? (
           <>
             <Text style={s.label}>Ta main · pioche : {game.symbolDeck.length}</Text>
+            {hintText(game.current) && <Text style={s.hintOn}>{hintText(game.current)} · touche-la pour voir le tas</Text>}
             <View style={s.row}>
               {hand.map((c) => (
-                <CardView key={c.id} card={c} selected={c.id === selected} onPress={() => { setSelected(c.id); setError(''); }} />
+                <CardView key={c.id} card={c} glow={hintCards(game.current).has(c.id)} selected={c.id === selected} onPress={() => { setSelected(c.id); setError(''); }} />
               ))}
             </View>
           </>
@@ -198,6 +223,9 @@ const s = StyleSheet.create({
   modeTxtOn: { color: '#111827' },
   banner: { backgroundColor: '#f59e0b', borderRadius: 12, padding: 12 },
   bannerTxt: { color: '#111827', fontSize: 16, fontWeight: '800', textAlign: 'center' },
+  cardGlow: { borderColor: '#facc15', shadowColor: '#facc15', shadowOpacity: 0.9, shadowRadius: 10, shadowOffset: { width: 0, height: 0 }, elevation: 8 },
+  pileNo: { color: '#94a3b8', fontSize: 12 },
+  hintOn: { color: '#facc15', fontSize: 14, fontWeight: '700', textAlign: 'center' },
   hint: { color: '#94a3b8', fontSize: 13, textAlign: 'center' },
   cover: { backgroundColor: '#1e293b', borderRadius: 12, padding: 16, gap: 8 },
   tokens: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12 },

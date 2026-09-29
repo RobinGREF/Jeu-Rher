@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSymbolDeck, canPlayOn, newGame, play, playablePiles, toggleCanDo, tops } from './engine';
+import { buildSymbolDeck, canPlayOn, newGame, play, playablePiles, toggleCanDo, tops, findMissionMoves } from './engine';
 
 const seeded = (seed: number) => () => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296);
 
@@ -146,4 +146,34 @@ test('annonce « je peux » : possible hors tour, effacée dès qu\'une carte es
   const r = play(s, c.id, playablePiles(s, c)[0]);
   assert.ok(r.ok);
   if (r.ok) assert.deepEqual(r.state.canDo, []);
+});
+
+test('coup de pouce : chaque coup proposé réussit bien ses missions, tous les joueurs, hors tour compris', () => {
+  let proposed = 0;
+  for (let seed = 1; seed <= 150; seed++) {
+    const rng = seeded(seed);
+    let s = newGame(3, rng);
+    let guard = 0;
+    while (!s.over && guard++ < 5000) {
+      for (let p = 0; p < 3; p++) {
+        for (const mv of findMissionMoves(s, p)) {
+          proposed++;
+          assert.ok(mv.missions.length >= 1);
+          // On fait jouer ce joueur à la place du joueur courant pour vérifier la promesse.
+          const alt = { ...s, current: p };
+          const r = play(alt, mv.cardId, mv.pile, rng);
+          assert.ok(r.ok);
+          if (r.ok) assert.ok(r.state.completed - s.completed >= mv.missions.length, `seed ${seed}`);
+        }
+      }
+      const sorted = findMissionMoves(s, s.current).map((m) => m.missions.length);
+      assert.deepEqual(sorted, [...sorted].sort((a, b) => b - a));
+      const moves = s.hands[s.current].flatMap((c) => playablePiles(s, c).map((p) => [c.id, p] as const));
+      const [id, p] = moves[Math.floor(rng() * moves.length)];
+      const r = play(s, id, p, rng);
+      if (!r.ok) return assert.fail(r.error);
+      s = r.state;
+    }
+  }
+  assert.ok(proposed > 0, 'aucun coup de pouce rencontré : test sans valeur');
 });
