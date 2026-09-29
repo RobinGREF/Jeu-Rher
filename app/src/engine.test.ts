@@ -56,3 +56,24 @@ test('partie jouée au hasard : se termine, jamais d\'état incohérent', () => 
     assert.equal(total, 56);
   }
 });
+
+import { buildMissionDefs } from './missions';
+const C = (symbol: 0 | 1 | 2 | 3, value: number) => ({ id: 0, symbol, value });
+
+test('missions : 50, ids uniques, plausibles', () => {
+  const defs = buildMissionDefs();
+  assert.equal(defs.length, 50);
+  assert.equal(new Set(defs.map((d) => d.id)).size, 50);
+  assert.equal(new Set(defs.map((d) => d.label)).size, 50);
+});
+
+test('missions : quelques conditions', () => {
+  const by = (label: string) => buildMissionDefs().find((d) => d.label === label)!;
+  assert.ok(by('Somme des 4 cartes = 10').check([C(0, 1), C(1, 2), C(2, 3), C(3, 4)]));
+  assert.ok(!by('Somme des 4 cartes = 10').check([C(0, 1), C(1, 2), C(2, 3), C(3, 5)]));
+  assert.ok(by('Toutes les cartes impaires').check([C(0, 1), C(1, 3), C(2, 5), C(3, 7)]));
+  assert.ok(by('Exactement 3 Opinels').check([C(3, 1), C(3, 2), C(3, 3), C(0, 4)]));
+  assert.ok(!by('Exactement 3 Opinels').check([C(3, 1), C(3, 2), C(3, 3), C(3, 4)]));
+  assert.ok(by('Symboles en alternance (A-B-A-B)').check([C(0, 1), C(1, 2), C(0, 3), C(1, 4)]));
+  assert.ok(by('Parité en alternance (pair-impair-pair-impair)').check([C(0, 2), C(1, 3), C(0, 4), C(1, 5)]));
+});

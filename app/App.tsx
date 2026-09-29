@@ -2,16 +2,15 @@ import { useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { missionsLeft, newGame, play, playablePiles, tops, type GameState } from './src/engine';
+import { SYMBOLS } from './src/symbols';
 import type { Card } from './src/types';
 
-const SYMBOLS = ['♠', '♥', '♦', '♣'];
-const COLORS = ['#1f2937', '#dc2626', '#2563eb', '#16a34a'];
 
 function CardView({ card, selected, dim, onPress }: { card: Card; selected?: boolean; dim?: boolean; onPress?: () => void }) {
   return (
-    <Pressable onPress={onPress} style={[s.card, { borderColor: COLORS[card.symbol] }, selected && s.cardSel, dim && { opacity: 0.35 }]}>
-      <Text style={[s.cardVal, { color: COLORS[card.symbol] }]}>{card.value}</Text>
-      <Text style={[s.cardSym, { color: COLORS[card.symbol] }]}>{SYMBOLS[card.symbol]}</Text>
+    <Pressable onPress={onPress} style={[s.card, { borderColor: SYMBOLS[card.symbol].color }, selected && s.cardSel, dim && { opacity: 0.35 }]}>
+      <Text style={[s.cardVal, { color: SYMBOLS[card.symbol].color }]}>{card.value}</Text>
+      <Text style={[s.cardSym, { color: SYMBOLS[card.symbol].color }]}>{SYMBOLS[card.symbol].emoji}</Text>
     </Pressable>
   );
 }
@@ -96,7 +95,7 @@ export default function App() {
         {status}
         <Text style={s.label}>Missions</Text>
         {game.missions.map((m) => (
-          <View key={m.id} style={s.mission}><Text style={s.missionTxt}>{m.label}{m.placeholder ? '  (exemple)' : ''}</Text></View>
+          <View key={m.id} style={s.mission}><Text style={s.missionTxt}>{m.label}{m.placeholder ? '  (à vérifier)' : ''}</Text></View>
         ))}
         <Text style={s.label}>Tas (touche pour jouer dessus)</Text>
         <View style={s.row}>
