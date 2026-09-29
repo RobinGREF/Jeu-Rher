@@ -7,22 +7,14 @@ import {
   type GameState, type SignalKind,
 } from './src/engine';
 import { MissionToken } from './src/MissionToken';
+import { CardView } from './src/CardView';
+import { TableScene, type PileView } from './src/TableScene';
 import { SYMBOLS } from './src/symbols';
-import type { Card } from './src/types';
 
 type Mode = 'solo' | 'together';
 
 const MEDAL = { bronze: '🥉 Bronze', argent: '🥈 Argent', or: '🥇 Or' } as const;
 const KIND_ICON = { help: '✋', good: '👍', stop: '⛔' } as const;
-
-function CardView({ card, selected, dim, glow, onPress }: { card: Card; selected?: boolean; dim?: boolean; glow?: boolean; onPress?: () => void }) {
-  return (
-    <Pressable onPress={onPress} style={[s.card, { borderColor: SYMBOLS[card.symbol].color }, selected && s.cardSel, glow && s.cardGlow, dim && { opacity: 0.35 }]}>
-      <Text style={[s.cardVal, { color: SYMBOLS[card.symbol].color }]}>{card.value}</Text>
-      <Text style={[s.cardSym, { color: SYMBOLS[card.symbol].color }]}>{SYMBOLS[card.symbol].emoji}</Text>
-    </Pressable>
-  );
-}
 
 function Toggle({ on, title, sub, onPress }: { on: boolean; title: string; sub: string; onPress: () => void }) {
   return (
@@ -44,37 +36,6 @@ function Chips({ values, value, onChange }: { values: number[]; value: number; o
           <Text style={s.chipTxt}>{n}</Text>
         </Pressable>
       ))}
-    </View>
-  );
-}
-
-/** La table vue de dessus : qui joue, dans quel ordre, combien de joueurs, combien de cartes en main. */
-function TableView({ game, seat, solo }: { game: GameState; seat: (p: number) => string; solo: boolean }) {
-  const next = (game.current + 1) % game.players;
-  return (
-    <View style={s.table}>
-      <Text style={s.label}>Table à {game.players} joueur{game.players > 1 ? 's' : ''} · sens de jeu →</Text>
-      <View style={s.seats}>
-        {game.hands.map((h, i) => {
-          const isCurrent = i === game.current;
-          const name = solo && i === 0 ? 'Toi' : `J${i + 1}${solo ? ' 🤖' : ''}`;
-          return (
-            <View key={i} style={s.seatWrap}>
-              <View style={[s.seat, isCurrent && s.seatOn]}>
-                <Text style={[s.seatName, isCurrent && s.seatNameOn]}>{name}</Text>
-                <Text style={[s.seatSub, isCurrent && s.seatNameOn]}>
-                  {isCurrent ? '▶ joue' : i === next ? 'suivant' : `${h.length} carte${h.length > 1 ? 's' : ''}`}
-                </Text>
-                {game.canDo.includes(i) && <Text style={s.seatCan}>🙋</Text>}
-              </View>
-              {i < game.players - 1 && <Text style={s.arrow}>→</Text>}
-            </View>
-          );
-        })}
-      </View>
-      <Text style={s.hint}>
-        Ensuite : {seat(next)}. Pioche : {game.symbolDeck.length} carte{game.symbolDeck.length > 1 ? 's' : ''}.
-      </Text>
     </View>
   );
 }
@@ -253,6 +214,13 @@ export default function App() {
     setGame(sync(r.state));
   };
 
+  const pileViews: PileView[] = t.map((card, i) => ({
+    card,
+    dim: !!sel && !ok.includes(i),
+    glow: hintPiles.has(i),
+    tags: [...signalTags('good', { pile: i }), ...signalTags('stop', { pile: i })].map((text) => ({ text, stop: text.startsWith(KIND_ICON.stop) })),
+  }));
+
   const sigButtons: { key: 'play' | SignalKind; label: string }[] = [
     { key: 'play', label: 'Jouer' },
     { key: 'help', label: '✋ Je peux aider' },
@@ -270,8 +238,6 @@ export default function App() {
           {solo ? (game.current === 0 ? 'À toi de jouer' : `${seat(game.current)} joue…`) : `Joueur ${game.current + 1}`}
         </Text>
         {status}
-
-        <TableView game={game} seat={seat} solo={solo} />
 
         {shown.length > 0 && (
           <View style={s.hist}>
@@ -302,20 +268,8 @@ export default function App() {
           ))}
         </View>
 
-        <Text style={s.label}>Tas</Text>
-        <View style={s.row}>
-          {t.map((c, i) => (
-            <View key={i} style={{ alignItems: 'center', gap: 4 }}>
-              <CardView card={c} dim={!!sel && !ok.includes(i)} glow={hintPiles.has(i)} onPress={() => drop(i)} />
-              <Text style={s.pileNo}>tas {i + 1}</Text>
-              <View style={s.badges}>
-                {[...signalTags('good', { pile: i }), ...signalTags('stop', { pile: i })].map((b) => (
-                  <Text key={b} style={[s.badge, b.startsWith(KIND_ICON.stop) && s.badgeStop]}>{b}</Text>
-                ))}
-              </View>
-            </View>
-          ))}
-        </View>
+        <TableScene game={game} solo={solo} piles={pileViews} onPile={drop} />
+        <Text style={s.hint}>Ensuite : {seat((game.current + 1) % game.players)}. Pioche : {game.symbolDeck.length} carte{game.symbolDeck.length > 1 ? 's' : ''}.</Text>
 
         {game.players > 1 && (
           <>
