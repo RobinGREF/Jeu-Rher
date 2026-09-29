@@ -1,7 +1,34 @@
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { CardView } from './CardView';
 import type { GameState } from './engine';
+import { SYMBOLS } from './symbols';
 import type { Card } from './types';
+
+/** Dernier coup joué : la carte vient se poser sur celle qu'elle recouvre. */
+export type LastPlay = { key: number; seat: number; card: Card; covered: Card; pile: number; gained: number };
+
+/** Fait glisser son contenu depuis `from` (décalage en px) jusqu'à sa place. */
+function Flying({ from, children }: { from: { x: number; y: number }; children: React.ReactNode }) {
+  const v = useRef(new Animated.ValueXY(from)).current;
+  useEffect(() => {
+    Animated.timing(v, { toValue: { x: 0, y: 0 }, duration: 700, useNativeDriver: false }).start();
+  }, []);
+  return <Animated.View style={{ transform: v.getTranslateTransform(), zIndex: 5 }}>{children}</Animated.View>;
+}
+
+/** Barre qui se vide pendant la durée d'affichage. */
+function Countdown({ ms }: { ms: number }) {
+  const w = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    Animated.timing(w, { toValue: 0, duration: ms, useNativeDriver: false }).start();
+  }, []);
+  return (
+    <View style={s.countTrack}>
+      <Animated.View style={[s.countBar, { width: w.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} />
+    </View>
+  );
+}
 
 export type PileView = { card: Card; dim: boolean; glow: boolean; tags: { text: string; stop?: boolean }[] };
 
@@ -52,6 +79,7 @@ type Props = {
   /** Joueur dont la main est affichée en bas (toi en solo, le joueur courant sinon). */
   meIndex: number; hand: Card[]; handShown: boolean; selectedId: number | null; hintCards: Set<number>; hintLine: string | null;
   onSelect: (id: number) => void; onReveal: () => void; revealAll: boolean; scale: number;
+  lastPlay: LastPlay | null; pauseMs: number; onSkip: () => void; who: (i: number) => string;
 };
 
 /**
@@ -77,6 +105,15 @@ export function TableScene(p: Props) {
   };
   const me = p.meIndex;
   const meCurrent = me === game.current;
+  const lp = p.lastPlay;
+  // D'où vient la carte : du siège du joueur, vu depuis la table.
+  const fromSeat = (seat: number) => {
+    const rel = (seat - me + n) % n;
+    if (rel === 0) return { x: 0, y: 190 };
+    if (n === 4) return rel === 1 ? { x: -150, y: 0 } : rel === 2 ? { x: 0, y: -150 } : { x: 150, y: 0 };
+    return n === 2 ? { x: 0, y: -150 } : { x: rel === 1 ? -70 : 70, y: -150 };
+  };
+  const cardTxt = (c: Card) => `${c.value}${SYMBOLS[c.symbol].emoji}`;
 
   return (
     <View style={s.felt}>
@@ -87,7 +124,18 @@ export function TableScene(p: Props) {
         <View style={s.center}>
           {piles.map((pv, i) => (
             <View key={i} style={s.pile}>
-              <CardView card={pv.card} w={pileW} dim={pv.dim} glow={pv.glow} onPress={() => p.onPile(i)} />
+              {lp && lp.pile === i ? (
+                <View style={{ width: pileW, height: pileW * 1.43 }}>
+                  <View style={{ position: 'absolute', left: -pileW * 0.16, top: pileW * 0.08, opacity: 0.85 }}>
+                    <CardView card={lp.covered} w={pileW} />
+                  </View>
+                  <Flying key={lp.key} from={fromSeat(lp.seat)}>
+                    <CardView card={pv.card} w={pileW} glow onPress={() => p.onPile(i)} />
+                  </Flying>
+                </View>
+              ) : (
+                <CardView card={pv.card} w={pileW} dim={pv.dim} glow={pv.glow} onPress={() => p.onPile(i)} />
+              )}
               <Text style={s.pileNo}>{i + 1}</Text>
               <View style={s.tags}>
                 {pv.tags.map((t) => <Text key={t.text} style={[s.tag, t.stop && s.tagStop]}>{t.text}</Text>)}
@@ -97,6 +145,15 @@ export function TableScene(p: Props) {
         </View>
         {rightRel.map((r) => seat(r, true))}
       </View>
+
+      {lp && (
+        <Pressable key={lp.key} onPress={p.onSkip} style={s.caption}>
+          <Text style={s.captionTxt}>
+            {p.who(lp.seat) === 'Toi' ? 'Tu poses' : `${p.who(lp.seat)} pose`} {cardTxt(lp.card)} sur {cardTxt(lp.covered)} · tas {lp.pile + 1}{lp.gained ? ` · 🎯 +${lp.gained}` : ''}
+          </Text>
+          <Countdown ms={p.pauseMs} />
+        </Pressable>
+      )}
 
       <View style={s.me}>
         <View style={s.meSeat}>
@@ -143,6 +200,10 @@ const s = StyleSheet.create({
   name: { color: '#f0fdf4', fontWeight: '800', fontSize: 13 },
   nameOn: { color: '#fbbf24' },
   sub: { color: '#bbf7d0', fontSize: 11, fontWeight: '700' },
+  caption: { position: 'absolute', bottom: 112, alignSelf: 'center', backgroundColor: 'rgba(15,23,42,0.92)', borderRadius: 12, paddingVertical: 6, paddingHorizontal: 12, gap: 4, zIndex: 8, borderWidth: 1, borderColor: '#f59e0b' },
+  captionTxt: { color: '#fde68a', fontWeight: '800', fontSize: 13, textAlign: 'center' },
+  countTrack: { height: 3, backgroundColor: '#334155', borderRadius: 2, overflow: 'hidden' },
+  countBar: { height: 3, backgroundColor: '#f59e0b' },
   me: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   meSeat: { width: 46, alignItems: 'center', gap: 1 },
   meHand: { flex: 1, alignItems: 'center', gap: 4 },

@@ -8,7 +8,7 @@ import {
 } from './src/engine';
 import { InfoPanel } from './src/InfoPanel';
 import { MissionToken } from './src/MissionToken';
-import { TableScene, type PileView } from './src/TableScene';
+import { TableScene, type LastPlay, type PileView } from './src/TableScene';
 import { SYMBOLS } from './src/symbols';
 
 type Mode = 'solo' | 'together';
@@ -56,6 +56,8 @@ export default function App() {
   const [textFor, setTextFor] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
   const [info, setInfo] = useState(false);
+  const [pauseMs, setPauseMs] = useState(5000);
+  const [lastPlay, setLastPlay] = useState<LastPlay | null>(null);
   const [history, setHistory] = useState<string[]>([]);
   const [sigMode, setSigMode] = useState<'play' | SignalKind>('play');
   const [speaker, setSpeaker] = useState<number | null>(null);
@@ -81,9 +83,11 @@ export default function App() {
     const mv = botMove(g, who);
     if (!mv) return;
     const card = g.hands[who].find((c) => c.id === mv.cardId)!;
+    const covered = g.piles[mv.pile][g.piles[mv.pile].length - 1];
     const r = play(g, mv.cardId, mv.pile);
     if (!r.ok) return;
     const gained = r.state.completed - g.completed;
+    setLastPlay({ key: Date.now(), seat: who, card, covered, pile: mv.pile, gained });
     log(`${seat(who)} : ${card.value}${SYMBOLS[card.symbol].emoji} sur le tas ${mv.pile + 1}${gained ? ` · 🎯 +${gained} mission${gained > 1 ? 's' : ''}` : ''}`);
     setGame(sync(r.state));
   };
@@ -92,16 +96,23 @@ export default function App() {
   useEffect(() => {
     if (!game || game.over) return;
     if (!solo || game.current === 0) return;
-    const id = setTimeout(() => doBotMove(game), 1300);
+    const id = setTimeout(() => doBotMove(game), pauseMs);
     return () => clearTimeout(id);
-  }, [game, mode]);
+  }, [game, mode, pauseMs]);
+
+  // La carte posée reste mise en évidence le temps choisi, puis la vue se remet à plat.
+  useEffect(() => {
+    if (!lastPlay) return;
+    const id = setTimeout(() => setLastPlay((cur) => (cur && cur.key === lastPlay.key ? null : cur)), pauseMs);
+    return () => clearTimeout(id);
+  }, [lastPlay, pauseMs]);
 
   const start = () => {
     const n = solo ? bots + 1 : players;
     const g = newGame(n);
     setGame(sync(g));
     setRevealed(false); setSelected(null); setHistory([]); setError('');
-    setSigMode('play'); setSpeaker(null); setMenu(false); setInfo(false); setTextFor(null);
+    setSigMode('play'); setSpeaker(null); setMenu(false); setInfo(false); setTextFor(null); setLastPlay(null);
   };
 
   if (!game) {
@@ -131,6 +142,16 @@ export default function App() {
               <Toggle on={openHands} onPress={() => setOpenHands(!openHands)} title="Mains visibles (mode test)" sub="Toutes les mains sont affichées, sans passer le téléphone." />
             </>
           )}
+
+          <Text style={s.label}>Pause entre les coups</Text>
+          <View style={s.row}>
+            {([5000, 2000, 1000] as const).map((ms) => (
+              <Pressable key={ms} onPress={() => setPauseMs(ms)} style={[s.mode, pauseMs === ms && s.modeOn]}>
+                <Text style={[s.modeTxt, pauseMs === ms && s.modeTxtOn]}>{ms / 1000} s</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={s.hint}>Temps pendant lequel on voit la carte se poser sur celle qu'elle recouvre. Touche l'annonce pour passer plus vite.</Text>
 
           <Text style={s.label}>Options</Text>
           <Toggle on={helpOn} onPress={() => setHelpOn(!helpOn)} title="💡 Coup de pouce" sub="Le jeu montre les cartes qui réussissent une ou plusieurs missions." />
@@ -208,9 +229,11 @@ export default function App() {
     if (!handShown) return setError("Affiche d'abord ta main");
     if (solo && game.current !== 0) return setError("Ce n'est pas encore ton tour");
     if (!sel) return setError("Choisis d'abord une carte");
+    const covered = game.piles[pile][game.piles[pile].length - 1];
     const r = play(game, sel.id, pile);
     if (!r.ok) return setError(r.error);
     const gained = r.state.completed - game.completed;
+    setLastPlay({ key: Date.now(), seat: game.current, card: sel, covered, pile, gained });
     log(`${solo ? 'Toi' : seat(game.current)} : ${sel.value}${SYMBOLS[sel.symbol].emoji} sur le tas ${pile + 1}${gained ? ` · 🎯 +${gained} mission${gained > 1 ? 's' : ''}` : ''}`);
     setError(''); setSelected(null); setRevealed(false); setSpeaker(null); setSigMode('play');
     setGame(sync(r.state));
@@ -234,7 +257,7 @@ export default function App() {
 
       <View style={s.head}>
         <Text style={s.headTitle} numberOfLines={1}>{turnTitle}</Text>
-        <Text style={s.headStat}>🎯 {game.completed}/50{game.medal ? ` ${MEDAL[game.medal]}` : ''} · pioche {game.symbolDeck.length}</Text>
+        <Text style={s.headStat} numberOfLines={1}>🎯 {game.completed}/50{game.medal ? ` ${MEDAL[game.medal].split(' ')[0]}` : ''} · 📚 {game.symbolDeck.length}</Text>
         <Pressable onPress={() => { setInfo(true); setMenu(false); }} style={s.menuBtn} accessibilityLabel="Infos sur la partie"><Text style={s.menuTxt}>ℹ️</Text></Pressable>
         <Pressable onPress={() => setMenu(!menu)} style={s.menuBtn} accessibilityLabel="Menu"><Text style={s.menuTxt}>☰</Text></Pressable>
       </View>
@@ -252,7 +275,9 @@ export default function App() {
         <TableScene game={game} solo={solo} piles={pileViews} onPile={drop}
           meIndex={me} hand={hand} handShown={handShown} selectedId={selected} hintCards={hintCards} hintLine={hintLine}
           onSelect={(id) => { setSelected(id); setError(''); setSigMode('play'); }}
-          onReveal={() => { setRevealed(true); setSigMode('play'); }} revealAll={openHands} scale={scale} />
+          onReveal={() => { setRevealed(true); setSigMode('play'); }} revealAll={openHands} scale={scale}
+          lastPlay={lastPlay} pauseMs={pauseMs} who={(i) => (solo && i === 0 ? 'Toi' : `J${i + 1}${solo ? ' (machine)' : ''}`)}
+          onSkip={() => { if (solo && game.current !== 0) doBotMove(game); else setLastPlay(null); }} />
         {!!missionText && (
           <Pressable onPress={() => setTextFor(null)} style={s.tip}><Text style={s.tipTxt}>{missionText}</Text></Pressable>
         )}
@@ -311,7 +336,7 @@ const s = StyleSheet.create({
   game: { flex: 1, backgroundColor: '#0f172a', paddingLeft: 16, paddingRight: 16, paddingTop: 6, paddingBottom: 8, gap: 6 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headTitle: { color: '#fff', fontSize: 17, fontWeight: '800', flexShrink: 1 },
-  headStat: { color: '#cbd5e1', fontSize: 12, flex: 1, textAlign: 'right' },
+  headStat: { color: '#cbd5e1', fontSize: 12, flexShrink: 0, marginLeft: 'auto' },
   menuBtn: { paddingHorizontal: 6, paddingVertical: 2 },
   menuTxt: { color: '#f8fafc', fontSize: 20 },
   missRow: { flexDirection: 'row', justifyContent: 'space-between' },
