@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSymbolDeck, canPlayOn, newGame, play, playablePiles, toggleCanDo, tops, findMissionMoves, botMove, syncBotAnnouncements } from './engine';
+import { buildSymbolDeck, canPlayOn, newGame, play, playablePiles, toggleCanDo, tops, findMissionMoves, botMove, syncBotAnnouncements, reachableMissions } from './engine';
 
 const seeded = (seed: number) => () => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296);
 
@@ -246,4 +246,19 @@ test('machines : annoncent « je peux » seulement si elles le peuvent, sans tou
     assert.ok(s.canDo.includes(0));
     for (const b of [1, 2]) assert.equal(s.canDo.includes(b), findMissionMoves(s, b).length > 0);
   }
+});
+
+test('missions visées : celles du coup de pouce, sans doublon, toutes présentes sur le tapis', () => {
+  let seen = 0;
+  for (let seed = 1; seed <= 100; seed++) {
+    const s = newGame(3, seeded(seed));
+    for (let p = 0; p < 3; p++) {
+      const r = reachableMissions(s, p);
+      assert.equal(new Set(r).size, r.length);
+      for (const id of r) assert.ok(s.missions.some((m) => m.id === id));
+      assert.equal(r.length > 0, findMissionMoves(s, p).length > 0);
+      seen += r.length;
+    }
+  }
+  assert.ok(seen > 0);
 });

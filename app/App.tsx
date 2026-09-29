@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { botMove, findMissionMoves, missionsLeft, newGame, play, playablePiles, syncBotAnnouncements, toggleCanDo, tops, type GameState } from './src/engine';
+import { botMove, findMissionMoves, missionsLeft, reachableMissions, newGame, play, playablePiles, syncBotAnnouncements, toggleCanDo, tops, type GameState } from './src/engine';
 import { MissionToken } from './src/MissionToken';
 import { SYMBOLS } from './src/symbols';
 import type { Card } from './src/types';
@@ -153,6 +153,12 @@ export default function App() {
     return `💡 ${cards} carte${cards > 1 ? 's' : ''} réussi${cards > 1 ? 'ssent' : 't'} une mission${best > 1 ? ` (jusqu'à ${best} d'un coup)` : ''}`;
   };
 
+  // Qui peut réussir quelle mission : les machines toujours (mode solo), toi avec le coup de pouce.
+  const badgesFor = (id: string) => [
+    ...(helpOn && reachableMissions(game, me).includes(id) ? [solo ? '💡 Toi' : `💡 J${me + 1}`] : []),
+    ...(solo ? botSeats(game.players).filter((b) => reachableMissions(game, b).includes(id)).map((b) => `🙋 J${b + 1}`) : []),
+  ];
+
   const drop = (pile: number) => {
     if (!handShown) return setError("Affiche d'abord ta main");
     if (solo && game.current !== 0) return setError("Ce n'est pas encore ton tour");
@@ -183,9 +189,10 @@ export default function App() {
         )}
 
         <Text style={s.label}>Missions (touche un jeton pour lire le texte)</Text>
+        {solo && <Text style={s.hint}>Les pastilles montrent quelles missions les machines peuvent réussir (visible en mode solo seulement).</Text>}
         <View style={s.tokens}>
           {game.missions.map((m) => (
-            <MissionToken key={m.id} def={m} size={tokenSize} showText={textFor === m.id}
+            <MissionToken key={m.id} def={m} size={tokenSize} showText={textFor === m.id} badges={badgesFor(m.id)}
               onPress={() => setTextFor(textFor === m.id ? null : m.id)} />
           ))}
         </View>

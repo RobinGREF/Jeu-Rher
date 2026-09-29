@@ -201,3 +201,8 @@ export function syncBotAnnouncements(s: GameState, bots: number[]): GameState {
   const canDo = [...s.canDo.filter((p) => !bots.includes(p)), ...bots.filter((p) => findMissionMoves(s, p).length > 0)].sort();
   return { ...s, canDo };
 }
+
+/** Missions qu'un joueur pourrait réussir d'un seul coup avec sa main actuelle. */
+export const reachableMissions = (s: GameState, player: number): string[] => [
+  ...new Set(findMissionMoves(s, player).flatMap((m) => m.missions)),
+];

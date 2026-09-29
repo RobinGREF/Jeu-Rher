@@ -50,7 +50,7 @@ function TermView({ t, size }: { t: Term; size: number }) {
 }
 
 /** Jeton rond de mission, dessiné comme sur la carte du jeu. Touche pour lire le texte. */
-export function MissionToken({ def, size, showText, onPress }: { def: MissionDef; size: number; showText: boolean; onPress: () => void }) {
+export function MissionToken({ def, size, showText, badges = [], onPress }: { def: MissionDef; size: number; showText: boolean; badges?: string[]; onPress: () => void }) {
   const v = def.visual;
   return (
     <Pressable onPress={onPress} accessibilityLabel={def.label} style={{ width: size, alignItems: 'center', gap: 6 }}>
@@ -69,6 +69,11 @@ export function MissionToken({ def, size, showText, onPress }: { def: MissionDef
           </View>
         )}
       </View>
+      {badges.length > 0 && (
+        <View style={s.badges}>
+          {badges.map((b) => <Text key={b} style={s.badge}>{b}</Text>)}
+        </View>
+      )}
       {showText && <Text style={s.caption}>{def.label}</Text>}
     </Pressable>
   );
@@ -79,5 +84,7 @@ const s = StyleSheet.create({
   ring: { position: 'absolute', top: 5, left: 5, right: 5, bottom: 5, borderWidth: 3, borderColor: '#fbbf24' },
   mini: { backgroundColor: CREAM, borderWidth: 2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   vals: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
+  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, justifyContent: 'center' },
+  badge: { backgroundColor: '#f59e0b', color: '#111827', fontWeight: '800', fontSize: 12, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, overflow: 'hidden' },
   caption: { color: '#e2e8f0', fontSize: 12, textAlign: 'center' },
 });
