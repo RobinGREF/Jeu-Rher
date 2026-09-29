@@ -35,6 +35,18 @@ window.GAME_CONFIG = {
   roundTime: 60,      // secondes par round
   roundsToWin: 2,     // rounds pour gagner le match (2 = meilleur des 3)
 
+  // Difficulté de l'ordinateur (index 1 = choix par défaut)
+  //   react   : délai de réaction (×, plus petit = plus vif)
+  //   block   : chance de parer une attaque qui arrive
+  //   aggr    : agressivité (chance d'enchaîner les coups)
+  //   special : chance d'utiliser le spécial quand la jauge est pleine
+  //   speed   : vitesse de déplacement (×)
+  difficulties: [
+    { name: 'FACILE',    react: 2.2, block: 0.12, aggr: 0.5,  special: 0.2,  speed: 0.85 },
+    { name: 'NORMAL',    react: 1.0, block: 0.5,  aggr: 0.85, special: 0.6,  speed: 1.0 },
+    { name: 'DIFFICILE', react: 0.55, block: 0.85, aggr: 1.0, special: 0.95, speed: 1.1 }
+  ],
+
   characters: [
     {
       name: 'KAITO', title: 'Le Poing Ardent',

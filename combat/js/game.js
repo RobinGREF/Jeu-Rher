@@ -84,8 +84,10 @@ const SPECIAL_NAMES = { fireball: 'projectile', dash: 'charge', uppercut: 'coup 
 
 /* ---------------------------------------------------------------- état global */
 const keys = {};
+let savedDiff = 1;
+try { savedDiff = parseInt(localStorage.getItem('rf_diff'), 10); } catch (e) {}
 const G = {
-  scene: 'title', menuIdx: 0, showControls: false, mode: 1,
+  scene: 'title', menuIdx: 0, showControls: false, mode: 1, difficulty: (savedDiff >= 0 && savedDiff < CFG.difficulties.length) ? savedDiff : 1,
   sel: { cursor: 0, step: 0 }, picks: [0, 1], stageCursor: 0, stageIdx: 0,
   match: null, clickables: [], hover: null, t: 0, mouse: { x: -1, y: -1 }
 };
@@ -162,6 +164,7 @@ function startAttack(f, name) {
 
 function freeAct(f, o) {
   const inp = f.inp, c = f.ch, air = f.y > 0;
+  const spd = c.speed * (f.cpu ? curDiff().speed : 1);
   if (!air) f.face = o.x >= f.x ? 1 : -1;
   if (f.buf.special > 0 && f.gauge >= 100 && !air) {
     f.gauge = 0; f.buf.special = 0; f.buf.punch = f.buf.kick = 0;
@@ -174,12 +177,12 @@ function freeAct(f, o) {
   }
   if (air) { S(f, 'jump'); return; }
   if (inp.up) {
-    f.vy = c.jump; f.vx = (inp.right ? 1 : inp.left ? -1 : 0) * c.speed * 1.15;
+    f.vy = c.jump; f.vx = (inp.right ? 1 : inp.left ? -1 : 0) * spd * 1.15;
     S(f, 'jump'); sfx('jump'); return;
   }
   if (inp.down) { S(f, 'crouch'); f.vx = 0; return; }
   const dir = inp.right ? 1 : inp.left ? -1 : 0;
-  f.vx = dir * c.speed; S(f, dir ? 'walk' : 'idle');
+  f.vx = dir * spd; S(f, dir ? 'walk' : 'idle');
 }
 
 function hitboxOf(f, d) {
@@ -323,7 +326,9 @@ function updateProjectiles() {
 }
 
 /* ---------------------------------------------------------------- IA */
+function curDiff() { return CFG.difficulties[G.difficulty] || CFG.difficulties[0]; }
 function aiThink(f, o) {
+  const D = curDiff();
   const ai = f.ai, inp = f.inp;
   inp.left = inp.right = inp.up = inp.down = false;
   const dx = o.x - f.x, dist = Math.abs(dx);
@@ -332,11 +337,13 @@ function aiThink(f, o) {
     const r = Math.random();
     const threat = (o.state === 'attack' && dist < 170) || G.match.proj.some(p => p.owner !== f && Math.abs(p.x - f.x) < 220);
     ai.d = 0;
-    if (threat && r < 0.5) { ai.plan = 'block'; ai.t = 18; ai.low = Math.random() < 0.3; }
-    else if (f.gauge >= 100 && f.y <= 0 && ((f.ch.special.type === 'fireball' && dist > 200 && r < 0.6) || (f.ch.special.type !== 'fireball' && dist < 260 && dist > 90 && r < 0.6))) { ai.plan = 'special'; ai.t = 20; }
+    if (threat && r < D.block) { ai.plan = 'block'; ai.t = 18; ai.low = Math.random() < 0.3; }
+    else if (f.gauge >= 100 && f.y <= 0 && ((f.ch.special.type === 'fireball' && dist > 200 && Math.random() < D.special) || (f.ch.special.type !== 'fireball' && dist < 260 && dist > 90 && Math.random() < D.special))) { ai.plan = 'special'; ai.t = 20; }
     else if (dist > 260) { ai.plan = r < 0.7 ? 'approach' : r < 0.85 ? 'jumpin' : 'wait'; ai.t = 14 + rand(0, 14); }
     else if (dist > 120) { ai.plan = r < 0.5 ? 'approach' : r < 0.7 ? 'kick' : r < 0.82 ? 'jumpin' : r < 0.9 ? 'ckick' : 'wait'; ai.t = 8 + rand(0, 10); }
     else { ai.plan = r < 0.28 ? 'punch' : r < 0.5 ? 'kick' : r < 0.6 ? 'cpunch' : r < 0.68 ? 'ckick' : r < 0.8 ? 'retreat' : r < 0.9 ? 'block' : 'jumpin'; ai.t = 8 + rand(0, 12); ai.low = false; }
+    if (['punch', 'kick', 'cpunch', 'ckick'].includes(ai.plan) && Math.random() > D.aggr) ai.plan = 'wait';
+    ai.t = Math.ceil(ai.t * D.react);
     ai.fired = false;
   }
   const press = k => { if (!ai.fired) { f.buf[k] = 6; ai.fired = true; } };
@@ -761,7 +768,7 @@ function drawHUD() {
     hg.addColorStop(0, low ? '#ff8a8a' : '#8dff7a'); hg.addColorStop(1, low ? '#c81818' : '#1fa83a');
     ctx.fillStyle = hg; ctx.fillRect(px(w2), by, w2, 22);
     ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(px(w2), by, w2, 6);
-    text(f.ch.name + (f.cpu ? ' (CPU)' : ''), left ? bx : bx + bw, by + 42, 20, '#fff', left ? 'left' : 'right');
+    text(f.ch.name + (f.cpu ? ' (CPU ' + curDiff().name + ')' : ''), left ? bx : bx + bw, by + 42, 20, '#fff', left ? 'left' : 'right');
     // manches gagnées
     for (let i = 0; i < need; i++) {
       const cx = left ? bx + bw - 10 - i * 22 : bx + 10 + i * 22, cy = by + 42;
@@ -844,12 +851,13 @@ function drawTitle() {
   text('RUMBLE', W / 2, 105 + bob, 104, '#ffd23f');
   text('FIGHTER', W / 2, 190 + bob, 84, '#ff4d4d');
   if (G.showControls) return drawControls();
-  const items = ['1 JOUEUR  (contre l\'ordinateur)', '2 JOUEURS  (même clavier)', 'COMMANDES'];
+  const items = ['1 JOUEUR  (contre l\'ordinateur)', '2 JOUEURS  (même clavier)', '◀ DIFFICULTÉ : ' + curDiff().name + ' ▶', 'COMMANDES'];
   items.forEach((it, i) => {
-    const y = 290 + i * 62, sel = G.menuIdx === i;
+    const y = 272 + i * 56, sel = G.menuIdx === i;
     if (sel) { ctx.fillStyle = 'rgba(255,210,63,0.18)'; rrect(W / 2 - 300, y - 26, 600, 52, 10); ctx.fill(); }
     text((sel ? '▶ ' : '') + it, W / 2, y, sel ? 32 : 28, sel ? '#ffd23f' : '#fff');
     clickable(W / 2 - 300, y - 26, 600, 52, () => { G.menuIdx = i; menuConfirm(); });
+    if (i === 2) { clickable(W / 2 - 300, y - 26, 150, 52, () => { G.menuIdx = 2; cycleDiff(-1); }); clickable(W / 2 + 150, y - 26, 150, 52, () => { G.menuIdx = 2; cycleDiff(1); }); }
   });
   plainText('↑ ↓ pour choisir · ENTRÉE pour valider', W / 2, H - 30, 16, 'rgba(255,255,255,0.7)', 'center');
 }
@@ -944,9 +952,15 @@ function drawStageSelect() {
 }
 
 /* ---------------------------------------------------------------- navigation */
+function cycleDiff(d) {
+  const n = CFG.difficulties.length;
+  G.difficulty = (G.difficulty + d + n) % n; sfx('menu');
+  try { localStorage.setItem('rf_diff', G.difficulty); } catch (e) {}
+}
 function menuConfirm() {
   sfx('ok');
-  if (G.menuIdx === 2) { G.showControls = true; return; }
+  if (G.menuIdx === 2) { cycleDiff(1); return; }
+  if (G.menuIdx === 3) { G.showControls = true; return; }
   G.mode = G.menuIdx === 0 ? 1 : 2;
   G.sel = { cursor: G.picks[0], step: 0 }; G.scene = 'select';
 }
@@ -973,8 +987,10 @@ function onPress(code) {
   const k = nav(code);
   if (G.scene === 'title') {
     if (G.showControls) { if (k.back || k.ok) G.showControls = false; return; }
-    if (k.U) { G.menuIdx = (G.menuIdx + 2) % 3; sfx('menu'); }
-    if (k.D) { G.menuIdx = (G.menuIdx + 1) % 3; sfx('menu'); }
+    if (k.U) { G.menuIdx = (G.menuIdx + 3) % 4; sfx('menu'); }
+    if (k.D) { G.menuIdx = (G.menuIdx + 1) % 4; sfx('menu'); }
+    if (G.menuIdx === 2 && k.L) cycleDiff(-1);
+    if (G.menuIdx === 2 && k.R) cycleDiff(1);
     if (k.ok) menuConfirm();
   } else if (G.scene === 'select') {
     const n = CFG.characters.length;

@@ -13,6 +13,8 @@ Jeu de combat 2D façon « Street Fighter », en HTML5 canvas (aucune dépendanc
 | Pied | K | G |
 | Spécial (jauge pleine) | L | H |
 
+Difficulté de l'ordinateur (Facile / Normal / Difficile) : ligne « DIFFICULTÉ » du menu, réglable dans `data.js` (`difficulties`).
+
 Sur mobile, des boutons tactiles (croix, POING, PIED, SPÉCIAL, pause) apparaissent en combat ; toucher l'écran pour valider dans les menus.
 
 Reculer = parer (accroupi pour les coups bas). `P`/Échap = pause. En mode 1 joueur, les deux jeux de touches marchent.
