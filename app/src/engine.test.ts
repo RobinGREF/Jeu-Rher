@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSymbolDeck, canPlayOn, newGame, play, playablePiles, toggleCanDo, tops, findMissionMoves, botMove, syncBotAnnouncements, reachableMissions } from './engine';
+import { buildSymbolDeck, canPlayOn, newGame, play, playablePiles, toggleCanDo, tops, findMissionMoves, botMove, syncBotAnnouncements, reachableMissions, toggleSignal, syncBotSignals } from './engine';
 
 const seeded = (seed: number) => () => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296);
 
@@ -261,4 +261,43 @@ test('missions visées : celles du coup de pouce, sans doublon, toutes présente
     }
   }
   assert.ok(seen > 0);
+});
+
+test('phrases du livret : poser, retirer, exclusion bonne carte / ne jouez pas, cibles invalides', () => {
+  let s = newGame(3, seeded(3));
+  const m = s.missions[0].id;
+  s = toggleSignal(s, { player: 1, kind: 'help', mission: m });
+  assert.equal(s.signals.length, 1);
+  s = toggleSignal(s, { player: 1, kind: 'help', mission: m });
+  assert.equal(s.signals.length, 0);
+  assert.equal(toggleSignal(s, { player: 1, kind: 'help', mission: 'inconnue' }), s);
+  assert.equal(toggleSignal(s, { player: 1, kind: 'good', pile: 4 }), s);
+  s = toggleSignal(s, { player: 1, kind: 'good', pile: 2 });
+  s = toggleSignal(s, { player: 1, kind: 'stop', pile: 2 });
+  assert.deepEqual(s.signals.map((g) => g.kind), ['stop']);
+  s = toggleSignal(s, { player: 2, kind: 'good', pile: 2 });
+  assert.equal(s.signals.length, 2);
+});
+
+test('phrases du livret : effacées quand le tas est recouvert ou la mission remplacée ; machines cohérentes', () => {
+  for (let seed = 1; seed <= 80; seed++) {
+    const rng = seeded(seed);
+    let s = newGame(3, rng);
+    let guard = 0;
+    while (!s.over && guard++ < 5000) {
+      s = syncBotSignals(s, [1, 2]);
+      for (const g of s.signals) {
+        if (g.kind === 'help') assert.ok(reachableMissions(s, g.player).includes(g.mission!));
+        if (g.kind === 'good') assert.ok(findMissionMoves(s, g.player).some((m) => m.pile === g.pile));
+      }
+      s = toggleSignal(s, { player: s.current, kind: 'stop', pile: (s.current + 1) % 4 });
+      const mv = botMove(s, s.current, rng)!;
+      const r = play(s, mv.cardId, mv.pile, rng);
+      assert.ok(r.ok);
+      if (!r.ok) return;
+      assert.ok(!r.state.signals.some((g) => g.kind !== 'help' && g.pile === mv.pile));
+      for (const g of r.state.signals.filter((x) => x.kind === 'help')) assert.ok(r.state.missions.some((m) => m.id === g.mission));
+      s = r.state;
+    }
+  }
 });

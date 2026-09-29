@@ -3,6 +3,10 @@ import type { Card, Medal, Symbol } from './types';
 
 type MissionDeckItem = { kind: 'mission'; def: MissionDef } | { kind: 'medal'; medal: Medal };
 
+/** Phrases du livret (variante) : « Je peux aider pour cette Mission », « J'ai une bonne carte ici », « Ne jouez pas ici ». */
+export type SignalKind = 'help' | 'good' | 'stop';
+export type Signal = { player: number; kind: SignalKind; mission?: string; pile?: number };
+
 export type GameState = {
   players: number;
   current: number;
@@ -14,6 +18,7 @@ export type GameState = {
   missionDeck: MissionDeckItem[];
   /** Joueurs ayant annoncé « je peux réussir une mission » (sans dire laquelle). */
   canDo: number[];
+  signals: Signal[];
   completed: number;
   medal: Medal | null;
   goldReached: boolean;
@@ -100,7 +105,7 @@ export function newGame(players: number, rng: Rng = Math.random): GameState {
   const hands: Card[][] = Array.from({ length: players }, () => []);
   const s: GameState = {
     players, current: 0, hands, piles, symbolDeck, missions, missionDeck: items,
-    canDo: [], completed: 0, medal: null, goldReached: false, over: false,
+    canDo: [], signals: [], completed: 0, medal: null, goldReached: false, over: false,
   };
   refill(s);
   resolveMissions(s, rng);
@@ -121,6 +126,7 @@ export function play(prev: GameState, cardId: number, pile: number, rng: Rng = M
     missions: [...prev.missions],
     missionDeck: [...prev.missionDeck],
     canDo: [],
+    signals: [...prev.signals],
   };
   const hand = s.hands[s.current];
   const ci = hand.findIndex((c) => c.id === cardId);
@@ -133,7 +139,9 @@ export function play(prev: GameState, cardId: number, pile: number, rng: Rng = M
   refill(s);
   resolveMissions(s, rng);
 
-  // L'annonce portait sur l'ancienne situation : elle est effacée dès qu'une carte est posée.
+  // Les annonces portaient sur l'ancienne situation : effacées dès qu'une carte est posée.
+  // Une phrase du livret ne vaut que pour sa cible : tas recouvert, mission remplacée.
+  s.signals = s.signals.filter((g) => (g.kind === 'help' ? s.missions.some((m) => m.id === g.mission) : g.pile !== pile));
 
   if (s.completed >= 50) s.over = true;
   else {
@@ -206,3 +214,29 @@ export function syncBotAnnouncements(s: GameState, bots: number[]): GameState {
 export const reachableMissions = (s: GameState, player: number): string[] => [
   ...new Set(findMissionMoves(s, player).flatMap((m) => m.missions)),
 ];
+
+const sameTarget = (a: Signal, b: Signal) => a.player === b.player && a.mission === b.mission && a.pile === b.pile;
+
+/** Pose ou retire une phrase du livret. « Bonne carte » et « ne jouez pas » s'excluent pour un même joueur et un même tas. */
+export function toggleSignal(prev: GameState, sig: Signal): GameState {
+  if (prev.over || sig.player < 0 || sig.player >= prev.players) return prev;
+  const valid = sig.kind === 'help'
+    ? prev.missions.some((m) => m.id === sig.mission)
+    : sig.pile !== undefined && sig.pile >= 0 && sig.pile < prev.piles.length;
+  if (!valid) return prev;
+  const same = (g: Signal) => g.kind === sig.kind && sameTarget(g, sig);
+  const signals = prev.signals.some(same)
+    ? prev.signals.filter((g) => !same(g))
+    : [...prev.signals.filter((g) => !(g.kind !== 'help' && sig.kind !== 'help' && g.kind !== sig.kind && sameTarget(g, sig))), sig];
+  return { ...prev, signals };
+}
+
+/** Phrases des machines : « je peux aider » sur les missions à leur portée, « bonne carte » sur les tas où elles réussissent une mission. */
+export function syncBotSignals(s: GameState, bots: number[]): GameState {
+  const signals: Signal[] = s.signals.filter((g) => !bots.includes(g.player));
+  for (const b of bots) {
+    for (const mission of reachableMissions(s, b)) signals.push({ player: b, kind: 'help', mission });
+    for (const pile of new Set(findMissionMoves(s, b).map((m) => m.pile))) signals.push({ player: b, kind: 'good', pile });
+  }
+  return { ...s, signals };
+}
