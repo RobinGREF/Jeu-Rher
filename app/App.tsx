@@ -10,13 +10,10 @@ import { MissionToken } from './src/MissionToken';
 import { SYMBOLS } from './src/symbols';
 import type { Card } from './src/types';
 
-type Mode = 'solo' | 'sim' | 'together';
-type Speed = 'slow' | 'normal' | 'fast';
+type Mode = 'solo' | 'together';
 
 const MEDAL = { bronze: '🥉 Bronze', argent: '🥈 Argent', or: '🥇 Or' } as const;
 const KIND_ICON = { help: '✋', good: '👍', stop: '⛔' } as const;
-const SPEED_MS: Record<Speed, number> = { slow: 1800, normal: 900, fast: 250 };
-const SPEED_LABEL: Record<Speed, string> = { slow: 'Lent', normal: 'Normal', fast: 'Rapide' };
 
 function CardView({ card, selected, dim, glow, onPress }: { card: Card; selected?: boolean; dim?: boolean; glow?: boolean; onPress?: () => void }) {
   return (
@@ -51,10 +48,40 @@ function Chips({ values, value, onChange }: { values: number[]; value: number; o
   );
 }
 
+/** La table vue de dessus : qui joue, dans quel ordre, combien de joueurs, combien de cartes en main. */
+function TableView({ game, seat, solo }: { game: GameState; seat: (p: number) => string; solo: boolean }) {
+  const next = (game.current + 1) % game.players;
+  return (
+    <View style={s.table}>
+      <Text style={s.label}>Table à {game.players} joueur{game.players > 1 ? 's' : ''} · sens de jeu →</Text>
+      <View style={s.seats}>
+        {game.hands.map((h, i) => {
+          const isCurrent = i === game.current;
+          const name = solo && i === 0 ? 'Toi' : `J${i + 1}${solo ? ' 🤖' : ''}`;
+          return (
+            <View key={i} style={s.seatWrap}>
+              <View style={[s.seat, isCurrent && s.seatOn]}>
+                <Text style={[s.seatName, isCurrent && s.seatNameOn]}>{name}</Text>
+                <Text style={[s.seatSub, isCurrent && s.seatNameOn]}>
+                  {isCurrent ? '▶ joue' : i === next ? 'suivant' : `${h.length} carte${h.length > 1 ? 's' : ''}`}
+                </Text>
+                {game.canDo.includes(i) && <Text style={s.seatCan}>🙋</Text>}
+              </View>
+              {i < game.players - 1 && <Text style={s.arrow}>→</Text>}
+            </View>
+          );
+        })}
+      </View>
+      <Text style={s.hint}>
+        Ensuite : {seat(next)}. Pioche : {game.symbolDeck.length} carte{game.symbolDeck.length > 1 ? 's' : ''}.
+      </Text>
+    </View>
+  );
+}
+
 export default function App() {
   const [mode, setMode] = useState<Mode>('solo');
   const [bots, setBots] = useState(2);
-  const [simPlayers, setSimPlayers] = useState(3);
   const [players, setPlayers] = useState(2);
   const [openHands, setOpenHands] = useState(false);
   const [helpOn, setHelpOn] = useState(false);
@@ -69,15 +96,12 @@ export default function App() {
   const [history, setHistory] = useState<string[]>([]);
   const [sigMode, setSigMode] = useState<'play' | SignalKind>('play');
   const [speaker, setSpeaker] = useState<number | null>(null);
-  const [playing, setPlaying] = useState(true);
-  const [speed, setSpeed] = useState<Speed>('normal');
 
   const { width } = useWindowDimensions();
   const tokenSize = Math.min(170, (width - 48) / 2);
 
   const solo = mode === 'solo';
-  const sim = mode === 'sim';
-  const botSeats = (n: number) => (sim ? Array.from({ length: n }, (_, i) => i) : solo ? Array.from({ length: n - 1 }, (_, i) => i + 1) : []);
+  const botSeats = (n: number) => (solo ? Array.from({ length: n - 1 }, (_, i) => i + 1) : []);
   const seat = (p: number) => `Joueur ${p + 1}${botSeats(99).includes(p) ? ' (machine)' : ''}`;
   /** Applique les annonces automatiques des machines après chaque changement du tapis. */
   const sync = (g: GameState) => {
@@ -103,18 +127,17 @@ export default function App() {
   // Tour d'une machine : une courte pause pour qu'on voie ce qui se passe, puis elle joue.
   useEffect(() => {
     if (!game || game.over) return;
-    const machineTurn = (solo && game.current !== 0) || (sim && playing);
-    if (!machineTurn) return;
-    const id = setTimeout(() => doBotMove(game), sim ? SPEED_MS[speed] : 1300);
+    if (!solo || game.current === 0) return;
+    const id = setTimeout(() => doBotMove(game), 1300);
     return () => clearTimeout(id);
-  }, [game, mode, playing, speed]);
+  }, [game, mode]);
 
   const start = () => {
-    const n = solo ? bots + 1 : sim ? simPlayers : players;
+    const n = solo ? bots + 1 : players;
     const g = newGame(n);
     setGame(sync(g));
     setRevealed(false); setSelected(null); setHistory([]); setError('');
-    setSigMode('play'); setSpeaker(null); setPlaying(true);
+    setSigMode('play'); setSpeaker(null);
   };
 
   if (!game) {
@@ -127,7 +150,6 @@ export default function App() {
           <View style={s.row}>
             {([
               ['solo', 'Seul avec des machines', 'Tu joues, les autres joueurs sont simulés.'],
-              ['sim', 'Regarder une simulation', 'Les machines jouent seules, dans l\'ordre.'],
               ['together', 'À plusieurs, un téléphone', 'On se passe le téléphone.'],
             ] as const).map(([key, title, sub]) => (
               <Pressable key={key} onPress={() => setMode(key)} style={[s.opt, mode === key && s.optOn]}>
@@ -138,7 +160,6 @@ export default function App() {
           </View>
 
           {solo && (<><Text style={s.label}>Joueurs machine</Text><Chips values={[1, 2, 3]} value={bots} onChange={setBots} /></>)}
-          {sim && (<><Text style={s.label}>Joueurs (machines)</Text><Chips values={[2, 3, 4]} value={simPlayers} onChange={setSimPlayers} /></>)}
           {mode === 'together' && (
             <>
               <Text style={s.label}>Nombre de joueurs</Text>
@@ -155,7 +176,7 @@ export default function App() {
           <Toggle on={phrasesOn} onPress={() => setPhrasesOn(!phrasesOn)} title="💬 Phrases du livret" sub="En plus de « je peux » : « je peux aider » (mission), « bonne carte ici » et « ne jouez pas ici » (tas)." />
 
           <Pressable style={s.btn} onPress={start}>
-            <Text style={s.btnTxt}>{sim ? 'Lancer la simulation' : 'Commencer'}</Text>
+            <Text style={s.btnTxt}>Commencer</Text>
           </Pressable>
         </ScrollView>
       </SafeAreaView>
@@ -177,7 +198,7 @@ export default function App() {
           {status}
           {game.completed < 50 && game.goldReached && <Text style={s.sub}>Il manquait {missionsLeft(game)} missions.</Text>}
           <Text style={s.sub}>{history.length} coups joués</Text>
-          <Pressable style={s.btn} onPress={() => setGame(null)}><Text style={s.btnTxt}>{sim ? 'Nouvelle simulation' : 'Rejouer'}</Text></Pressable>
+          <Pressable style={s.btn} onPress={() => setGame(null)}><Text style={s.btnTxt}>Rejouer</Text></Pressable>
         </ScrollView>
       </SafeAreaView>
     );
@@ -188,9 +209,9 @@ export default function App() {
   const sel = hand.find((c) => c.id === selected) ?? null;
   const ok = sel ? playablePiles(game, sel) : [];
   const t = tops(game);
-  const showAll = sim || openHands;
+  const showAll = openHands;
   const handShown = solo || showAll || revealed;
-  const canSignal = phrasesOn && !sim && game.players > 1;
+  const canSignal = phrasesOn && game.players > 1;
   // Celui qui parle : toi en solo ; sinon, par défaut, le joueur suivant.
   const who = solo ? 0 : speaker ?? (game.current + 1) % game.players;
 
@@ -215,12 +236,11 @@ export default function App() {
       showTargets && mode !== 'together'
         ? botSeats(game.players).filter((b) => !helpers.has(b) && reachableMissions(game, b).includes(id)).map((b) => `🙋 J${b + 1}`)
         : [];
-    const mine = helpOn && !sim && reachableMissions(game, me).includes(id) ? [solo ? '💡 Toi' : `💡 J${me + 1}`] : [];
+    const mine = helpOn && reachableMissions(game, me).includes(id) ? [solo ? '💡 Toi' : `💡 J${me + 1}`] : [];
     return [...mine, ...help, ...targets];
   };
 
   const drop = (pile: number) => {
-    if (sim) return;
     if (canSignal && (sigMode === 'good' || sigMode === 'stop')) return setGame(toggleSignal(game, { player: who, kind: sigMode, pile }));
     if (!handShown) return setError("Affiche d'abord ta main");
     if (solo && game.current !== 0) return setError("Ce n'est pas encore ton tour");
@@ -240,40 +260,22 @@ export default function App() {
     { key: 'stop', label: '⛔ Ne jouez pas ici' },
   ];
   const sigHint = { play: '', help: 'Touche la mission pour laquelle tu peux aider.', good: 'Touche le tas où tu as une bonne carte à jouer.', stop: 'Touche le tas sur lequel il ne faut pas jouer.' }[sigMode];
-  const shown = history.slice(0, sim ? 12 : 4);
+  const shown = history.slice(0, 4);
 
   return (
     <SafeAreaView style={s.root}>
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }}>
         <Text style={s.title}>
-          {sim ? `Simulation · coup ${history.length + 1}`
-            : solo ? (game.current === 0 ? 'À toi de jouer' : `${seat(game.current)} joue…`)
-            : `Joueur ${game.current + 1}`}
+          {solo ? (game.current === 0 ? 'À toi de jouer' : `${seat(game.current)} joue…`) : `Joueur ${game.current + 1}`}
         </Text>
         {status}
 
-        {sim && (
-          <View style={s.row}>
-            <Pressable onPress={() => setPlaying(!playing)} style={[s.mode, s.modeOn]}>
-              <Text style={s.modeTxtOn}>{playing ? '⏸ Pause' : '▶ Lecture'}</Text>
-            </Pressable>
-            {!playing && (
-              <Pressable onPress={() => doBotMove(game)} style={s.mode}>
-                <Text style={s.modeTxt}>⏭ Coup suivant</Text>
-              </Pressable>
-            )}
-            {(['slow', 'normal', 'fast'] as const).map((k) => (
-              <Pressable key={k} onPress={() => setSpeed(k)} style={[s.mode, speed === k && s.modeOn]}>
-                <Text style={[s.modeTxt, speed === k && s.modeTxtOn]}>{SPEED_LABEL[k]}</Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
+        <TableView game={game} seat={seat} solo={solo} />
 
         {shown.length > 0 && (
           <View style={s.hist}>
-            <Text style={s.label}>{sim ? 'Ordre de jeu' : 'Derniers coups'}</Text>
+            <Text style={s.label}>Derniers coups</Text>
             {shown.map((h, i) => (
               <Text key={history.length - i} style={[s.histLine, i === 0 && s.histFirst]}>
                 {history.length - i}. {h}
@@ -304,7 +306,7 @@ export default function App() {
         <View style={s.row}>
           {t.map((c, i) => (
             <View key={i} style={{ alignItems: 'center', gap: 4 }}>
-              <CardView card={c} dim={!!sel && !sim && !ok.includes(i)} glow={hintPiles.has(i)} onPress={() => drop(i)} />
+              <CardView card={c} dim={!!sel && !ok.includes(i)} glow={hintPiles.has(i)} onPress={() => drop(i)} />
               <Text style={s.pileNo}>tas {i + 1}</Text>
               <View style={s.badges}>
                 {[...signalTags('good', { pile: i }), ...signalTags('stop', { pile: i })].map((b) => (
@@ -315,7 +317,7 @@ export default function App() {
           ))}
         </View>
 
-        {!sim && game.players > 1 && (
+        {game.players > 1 && (
           <>
             <Text style={s.label}>Je peux réussir une mission</Text>
             <View style={s.row}>
@@ -366,13 +368,13 @@ export default function App() {
           game.hands.map((h, i) => (
             <View key={i} style={{ gap: 8, opacity: i === game.current ? 1 : 0.55 }}>
               <Text style={s.label}>
-                {seat(i)}{i === game.current ? (sim ? ' · joue' : ' · à toi de jouer') : ''}{i === 0 ? ` · pioche : ${game.symbolDeck.length}` : ''}
+                {seat(i)}{i === game.current ? ' · à toi de jouer' : ''}{i === 0 ? ` · pioche : ${game.symbolDeck.length}` : ''}
               </Text>
               {hintText(i) && <Text style={s.hintOn}>{hintText(i)}</Text>}
               <View style={s.row}>
                 {h.map((c) => (
-                  <CardView key={c.id} card={c} glow={hintCards(i).has(c.id)} selected={!sim && i === game.current && c.id === selected}
-                    onPress={!sim && i === game.current ? () => { setSelected(c.id); setError(''); } : undefined} />
+                  <CardView key={c.id} card={c} glow={hintCards(i).has(c.id)} selected={i === game.current && c.id === selected}
+                    onPress={i === game.current ? () => { setSelected(c.id); setError(''); } : undefined} />
                 ))}
               </View>
             </View>
@@ -397,7 +399,7 @@ export default function App() {
           </View>
         )}
         {!!error && <Text style={s.err}>{error}</Text>}
-        {(solo || sim) && (
+        {solo && (
           <Pressable onPress={() => setGame(null)} style={s.quit}><Text style={s.quitTxt}>Quitter la partie</Text></Pressable>
         )}
       </ScrollView>
@@ -446,6 +448,16 @@ const s = StyleSheet.create({
   badgeStop: { backgroundColor: '#ef4444', color: '#450a0a' },
   hintOn: { color: '#facc15', fontSize: 14, fontWeight: '700', textAlign: 'center' },
   hint: { color: '#94a3b8', fontSize: 13, textAlign: 'center' },
+  table: { backgroundColor: '#111c33', borderRadius: 12, padding: 12, gap: 8 },
+  seats: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', gap: 4 },
+  seatWrap: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  seat: { minWidth: 62, alignItems: 'center', backgroundColor: '#1e293b', borderRadius: 12, paddingVertical: 8, paddingHorizontal: 8, borderWidth: 2, borderColor: 'transparent' },
+  seatOn: { backgroundColor: '#f59e0b', borderColor: '#fde68a' },
+  seatName: { color: '#f8fafc', fontWeight: '800', fontSize: 15 },
+  seatNameOn: { color: '#111827' },
+  seatSub: { color: '#94a3b8', fontSize: 11, fontWeight: '700' },
+  seatCan: { position: 'absolute', top: -10, right: -6, fontSize: 16 },
+  arrow: { color: '#64748b', fontSize: 16 },
   hist: { backgroundColor: '#111c33', borderRadius: 12, padding: 12, gap: 4 },
   histLine: { color: '#94a3b8', fontSize: 13 },
   histFirst: { color: '#f8fafc', fontWeight: '700' },
