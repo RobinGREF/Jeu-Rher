@@ -32,5 +32,18 @@
 - Temps limité de 5 minutes, sans ordre de jeu (chacun joue quand il veut).
 - À la médaille d'or : timer remis à 5 min. Puis essayer en 4 min, puis 3 min.
 
-## Manquant
-- Le contenu des 50 cartes Mission (conditions exactes) n'est pas dans le PDF.
+## Les 50 cartes Mission (transcrites depuis les photos)
+Symboles : Jumelles (vert), Boussoles (jaune), Briquets (bleu), Couteaux (rouge). Les missions portent sur les 4 cartes du dessus des tas, de gauche à droite.
+- Par symbole (x4) : « Exactement 2 cartes sont des X et elles se touchent / ne se touchent pas / sont espacées d'une seule carte » ; « Exactement 3 des 4 cartes sont des X » (16 cartes).
+- Somme d'un symbole : Boussoles 11 et 2, Jumelles 7 et 6, Briquets 3 et 9, Couteaux 4 et 10 (8 cartes).
+- Somme des 4 cartes = 10, 15, 18 ou 20 (4 cartes).
+- Somme égale, au moins une carte de chaque : Boussoles=Jumelles, Briquets=Couteaux, Jumelles=Briquets, Couteaux=Boussoles (4 cartes).
+- Somme double, au moins une carte de chaque : Couteaux=2×Boussoles, Boussoles=2×Jumelles, Jumelles=2×Briquets, Briquets=2×Couteaux (4 cartes).
+- « Il n'y a que des cartes X et/ou Y » : Couteaux/Briquets, Jumelles/Boussoles, Briquets/Boussoles, Jumelles/Couteaux (4 cartes).
+- Valeurs : 3 cartes qui se touchent se suivent dans l'ordre ; les 4 valeurs se suivent (sans ordre) ; toutes différentes ; toutes < 4 ; toutes > 4 ; toutes impaires ; toutes paires ; exactement 2 impaires espacées d'une seule carte (8 cartes).
+- Symboles : chaque carte a un symbole différent ; chaque carte a une valeur et un symbole différents (2 cartes).
+
+## Cartes Médaille
+- Bronze : « Félicitations pour cette médaille de bronze, posez-la près de vous… »
+- Argent : « …et en avant pour la médaille d'or ».
+- Or : « Reformez une pioche avec les cartes Symbole présentes sous les 4 piles et essayez de réaliser les 50 missions ».
