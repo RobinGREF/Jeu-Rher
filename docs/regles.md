@@ -24,7 +24,8 @@
 
 ## Communication
 - On peut parler, mais jamais des valeurs ni des symboles/couleurs de sa propre main.
-- On ne parle que des Symboles exposés et des Missions. Ex. : « Ne jouez pas sur cette carte ! », « J'ai une bonne carte à jouer ici. », « Je peux aider pour cette Mission. »
+- **Règle retenue pour l'appli (exemplaire du joueur)** : la seule chose qu'on peut dire, c'est qu'on peut réussir une mission, sans dire laquelle ni avec quelle carte. Ni « bonne carte ici », ni « je peux aider ».
+- (Le PDF en ligne cite ces phrases en exemples : « Ne jouez pas sur cette carte ! », « J'ai une bonne carte à jouer ici. », « Je peux aider pour cette Mission. » L'appli suit la règle de l'exemplaire, plus stricte.)
 - Débutants : permis de regarder sous les 4 cartes exposées (cartes déjà jouées).
 - Super-pros : aucune communication.
 

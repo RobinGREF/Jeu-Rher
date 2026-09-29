@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { missionsLeft, newGame, play, playablePiles, toggleSignal, tops, type GameState, type SignalKind } from './src/engine';
+import { missionsLeft, newGame, play, playablePiles, toggleCanDo, tops, type GameState } from './src/engine';
 import { MissionToken } from './src/MissionToken';
 import { SYMBOLS } from './src/symbols';
 import type { Card } from './src/types';
@@ -16,7 +16,6 @@ function CardView({ card, selected, dim, onPress }: { card: Card; selected?: boo
   );
 }
 
-const KIND_ICON = { help: '✋', good: '👍', stop: '⛔' } as const;
 const MEDAL = { bronze: '🥉 Bronze', argent: '🥈 Argent', or: '🥇 Or' } as const;
 
 export default function App() {
@@ -27,8 +26,6 @@ export default function App() {
   const [selected, setSelected] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [textFor, setTextFor] = useState<string | null>(null);
-  const [mode, setMode] = useState<'play' | SignalKind>('play');
-  const [speaker, setSpeaker] = useState<number | null>(null);
   const { width } = useWindowDimensions();
   const tokenSize = Math.min(170, (width - 48) / 2);
 
@@ -83,37 +80,13 @@ export default function App() {
   const ok = sel ? playablePiles(game, sel) : [];
   const t = tops(game);
   const handShown = openHands || revealed;
-  // Celui qui signale n'est pas forcément le joueur dont c'est le tour : par défaut, le suivant.
-  const who = speaker ?? (game.current + 1) % game.players;
-
-  const tag = (kind: SignalKind, target: { mission?: string; pile?: number }) =>
-    game.signals
-      .filter((g) => g.kind === kind && g.mission === target.mission && g.pile === target.pile)
-      .map((g) => `${KIND_ICON[kind]} J${g.player + 1}`);
-
-  const signal = (kind: SignalKind, target: { mission?: string; pile?: number }) =>
-    setGame(toggleSignal(game, { player: who, kind, ...target }));
-
   const drop = (pile: number) => {
-    if (mode === 'good' || mode === 'stop') return signal(mode, { pile });
     if (!handShown) return setError("Affiche d'abord ta main");
     if (!sel) return setError("Choisis d'abord une carte");
     const r = play(game, sel.id, pile);
     if (!r.ok) return setError(r.error);
-    setError(''); setSelected(null); setRevealed(false); setSpeaker(null); setMode('play'); setGame(r.state);
+    setError(''); setSelected(null); setRevealed(false); setGame(r.state);
   };
-
-  const modes: { key: 'play' | SignalKind; label: string }[] = [
-    { key: 'play', label: 'Jouer' },
-    ...(game.players > 1
-      ? [
-          { key: 'help' as const, label: '✋ Je peux aider' },
-          { key: 'good' as const, label: '👍 Bonne carte ici' },
-          { key: 'stop' as const, label: '⛔ Ne jouez pas ici' },
-        ]
-      : []),
-  ];
-  const hint = { play: '', help: 'Touche la mission pour laquelle tu peux aider.', good: "Touche le tas où tu as une bonne carte à jouer.", stop: 'Touche le tas sur lequel il ne faut pas jouer.' }[mode];
 
   return (
     <SafeAreaView style={s.root}>
@@ -121,48 +94,43 @@ export default function App() {
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }}>
         <Text style={s.title}>Joueur {game.current + 1}</Text>
         {status}
+        {game.canDo.length > 0 && (
+          <View style={s.banner}>
+            <Text style={s.bannerTxt}>
+              🙋 {game.canDo.map((p) => `Joueur ${p + 1}`).join(' et ')} {game.canDo.length > 1 ? 'peuvent' : 'peut'} réussir une mission
+            </Text>
+          </View>
+        )}
 
         <Text style={s.label}>Missions (touche un jeton pour lire le texte)</Text>
         <View style={s.tokens}>
           {game.missions.map((m) => (
-            <MissionToken key={m.id} def={m} size={tokenSize} showText={textFor === m.id} badges={tag('help', { mission: m.id })}
-              onPress={() => (mode === 'help' ? signal('help', { mission: m.id }) : setTextFor(textFor === m.id ? null : m.id))} />
+            <MissionToken key={m.id} def={m} size={tokenSize} showText={textFor === m.id}
+              onPress={() => setTextFor(textFor === m.id ? null : m.id)} />
           ))}
         </View>
 
         <Text style={s.label}>Tas</Text>
         <View style={s.row}>
           {t.map((c, i) => (
-            <View key={i} style={s.pile}>
-              <CardView card={c} dim={mode === 'play' && !!sel && !ok.includes(i)} onPress={() => drop(i)} />
-              <View style={s.badges}>
-                {[...tag('good', { pile: i }), ...tag('stop', { pile: i })].map((b) => (
-                  <Text key={b} style={[s.badge, b.startsWith(KIND_ICON.stop) && s.badgeStop]}>{b}</Text>
-                ))}
-              </View>
-            </View>
+            <CardView key={i} card={c} dim={!!sel && !ok.includes(i)} onPress={() => drop(i)} />
           ))}
         </View>
 
-        <Text style={s.label}>Signaler aux autres joueurs</Text>
-        <View style={s.row}>
-          {modes.map((m) => (
-            <Pressable key={m.key} onPress={() => setMode(m.key)} style={[s.mode, mode === m.key && s.modeOn]}>
-              <Text style={[s.modeTxt, mode === m.key && s.modeTxtOn]}>{m.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-        {mode !== 'play' && (
+        {game.players > 1 && (
           <>
-            <Text style={s.hint}>{hint} Touche à nouveau pour retirer ton signal.</Text>
+            <Text style={s.label}>Je peux réussir une mission</Text>
             <View style={s.row}>
-              <Text style={s.hint}>Qui parle ?</Text>
-              {game.hands.map((_, i) => (
-                <Pressable key={i} onPress={() => setSpeaker(i)} style={[s.who, who === i && s.whoOn]}>
-                  <Text style={[s.modeTxt, who === i && s.modeTxtOn]}>J{i + 1}</Text>
-                </Pressable>
-              ))}
+              {game.hands.map((_, i) => {
+                const on = game.canDo.includes(i);
+                return (
+                  <Pressable key={i} onPress={() => setGame(toggleCanDo(game, i))} style={[s.mode, on && s.modeOn]}>
+                    <Text style={[s.modeTxt, on && s.modeTxtOn]}>🙋 Joueur {i + 1}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
+            <Text style={s.hint}>Tu peux le dire à tout moment, même hors de ton tour. On ne dit pas laquelle ni avec quelle carte. Touche encore pour retirer.</Text>
           </>
         )}
 
@@ -185,14 +153,14 @@ export default function App() {
             <Text style={s.label}>Ta main · pioche : {game.symbolDeck.length}</Text>
             <View style={s.row}>
               {hand.map((c) => (
-                <CardView key={c.id} card={c} selected={c.id === selected} onPress={() => { setSelected(c.id); setError(''); setMode('play'); }} />
+                <CardView key={c.id} card={c} selected={c.id === selected} onPress={() => { setSelected(c.id); setError(''); }} />
               ))}
             </View>
           </>
         ) : (
           <View style={s.cover}>
             <Text style={s.sub}>Passe le téléphone au joueur {game.current + 1}, puis touche pour voir ta main.</Text>
-            <Pressable style={s.btn} onPress={() => { setRevealed(true); setMode('play'); }}>
+            <Pressable style={s.btn} onPress={() => { setRevealed(true); }}>
               <Text style={s.btnTxt}>Voir ma main</Text>
             </Pressable>
           </View>
@@ -224,16 +192,12 @@ const s = StyleSheet.create({
   tick: { color: '#111827', fontWeight: '900' },
   toggleTitle: { color: '#f8fafc', fontSize: 16, fontWeight: '700' },
   toggleSub: { color: '#94a3b8', fontSize: 13 },
-  pile: { alignItems: 'center', gap: 6 },
-  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, justifyContent: 'center', minHeight: 22 },
-  badge: { backgroundColor: '#22c55e', color: '#052e16', fontWeight: '800', fontSize: 12, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, overflow: 'hidden' },
-  badgeStop: { backgroundColor: '#ef4444', color: '#450a0a' },
   mode: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, backgroundColor: '#1e293b' },
   modeOn: { backgroundColor: '#f59e0b' },
   modeTxt: { color: '#e2e8f0', fontWeight: '700', fontSize: 14 },
   modeTxtOn: { color: '#111827' },
-  who: { width: 44, paddingVertical: 8, borderRadius: 10, backgroundColor: '#1e293b', alignItems: 'center' },
-  whoOn: { backgroundColor: '#f59e0b' },
+  banner: { backgroundColor: '#f59e0b', borderRadius: 12, padding: 12 },
+  bannerTxt: { color: '#111827', fontSize: 16, fontWeight: '800', textAlign: 'center' },
   hint: { color: '#94a3b8', fontSize: 13, textAlign: 'center' },
   cover: { backgroundColor: '#1e293b', borderRadius: 12, padding: 16, gap: 8 },
   tokens: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12 },

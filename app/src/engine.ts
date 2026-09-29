@@ -3,11 +3,6 @@ import type { Card, Medal, Symbol } from './types';
 
 type MissionDeckItem = { kind: 'mission'; def: MissionDef } | { kind: 'medal'; medal: Medal };
 
-/** Ce qu'un joueur peut dire sans révéler sa main (voir les règles, « Communication »). */
-export type SignalKind = 'help' | 'good' | 'stop';
-/** `help` vise une mission (« Je peux aider pour cette Mission »), `good`/`stop` un tas. */
-export type Signal = { player: number; kind: SignalKind; mission?: string; pile?: number };
-
 export type GameState = {
   players: number;
   current: number;
@@ -17,7 +12,8 @@ export type GameState = {
   symbolDeck: Card[];
   missions: MissionDef[];
   missionDeck: MissionDeckItem[];
-  signals: Signal[];
+  /** Joueurs ayant annoncé « je peux réussir une mission » (sans dire laquelle). */
+  canDo: number[];
   completed: number;
   medal: Medal | null;
   goldReached: boolean;
@@ -104,7 +100,7 @@ export function newGame(players: number, rng: Rng = Math.random): GameState {
   const hands: Card[][] = Array.from({ length: players }, () => []);
   const s: GameState = {
     players, current: 0, hands, piles, symbolDeck, missions, missionDeck: items,
-    signals: [], completed: 0, medal: null, goldReached: false, over: false,
+    canDo: [], completed: 0, medal: null, goldReached: false, over: false,
   };
   refill(s);
   resolveMissions(s, rng);
@@ -124,7 +120,7 @@ export function play(prev: GameState, cardId: number, pile: number, rng: Rng = M
     symbolDeck: [...prev.symbolDeck],
     missions: [...prev.missions],
     missionDeck: [...prev.missionDeck],
-    signals: [...prev.signals],
+    canDo: [],
   };
   const hand = s.hands[s.current];
   const ci = hand.findIndex((c) => c.id === cardId);
@@ -137,8 +133,7 @@ export function play(prev: GameState, cardId: number, pile: number, rng: Rng = M
   refill(s);
   resolveMissions(s, rng);
 
-  // Un signal ne vaut que pour la situation qu'il commente : tas recouvert, mission remplacée.
-  s.signals = s.signals.filter((g) => (g.kind === 'help' ? s.missions.some((m) => m.id === g.mission) : g.pile !== pile));
+  // L'annonce portait sur l'ancienne situation : elle est effacée dès qu'une carte est posée.
 
   if (s.completed >= 50) s.over = true;
   else {
@@ -151,21 +146,12 @@ export function play(prev: GameState, cardId: number, pile: number, rng: Rng = M
 export const missionsLeft = (s: GameState) =>
   Math.max(0, 50 - s.completed);
 
-const sameTarget = (a: Signal, b: Signal) => a.player === b.player && a.mission === b.mission && a.pile === b.pile;
-
 /**
- * Pose ou retire un signal. Possible à tout moment, y compris hors de son tour.
- * Un même joueur ne peut pas dire « bonne carte » et « ne jouez pas » sur le même tas.
+ * Annonce (ou retire l'annonce) « je peux réussir une mission », à tout moment, y compris hors de son tour.
+ * C'est la seule communication autorisée sur le jeu : on ne dit ni laquelle, ni avec quelle carte.
  */
-export function toggleSignal(prev: GameState, sig: Signal): GameState {
-  if (prev.over || sig.player < 0 || sig.player >= prev.players) return prev;
-  const valid = sig.kind === 'help'
-    ? prev.missions.some((m) => m.id === sig.mission)
-    : sig.pile !== undefined && sig.pile >= 0 && sig.pile < prev.piles.length;
-  if (!valid) return prev;
-  const same = (g: Signal) => g.kind === sig.kind && sameTarget(g, sig);
-  const signals = prev.signals.some(same)
-    ? prev.signals.filter((g) => !same(g))
-    : [...prev.signals.filter((g) => !(g.kind !== sig.kind && g.kind !== 'help' && sig.kind !== 'help' && sameTarget(g, sig))), sig];
-  return { ...prev, signals };
+export function toggleCanDo(prev: GameState, player: number): GameState {
+  if (prev.over || player < 0 || player >= prev.players) return prev;
+  const canDo = prev.canDo.includes(player) ? prev.canDo.filter((p) => p !== player) : [...prev.canDo, player].sort();
+  return { ...prev, canDo };
 }
