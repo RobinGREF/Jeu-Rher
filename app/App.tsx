@@ -22,6 +22,7 @@ export default function App() {
   const [players, setPlayers] = useState(2);
   const [game, setGame] = useState<GameState | null>(null);
   const [revealed, setRevealed] = useState(false);
+  const [openHands, setOpenHands] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [textFor, setTextFor] = useState<string | null>(null);
@@ -42,6 +43,13 @@ export default function App() {
             </Pressable>
           ))}
         </View>
+        <Pressable onPress={() => setOpenHands(!openHands)} style={s.toggle}>
+          <View style={[s.box, openHands && s.boxOn]}>{openHands && <Text style={s.tick}>✓</Text>}</View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.toggleTitle}>Mains visibles (mode test)</Text>
+            <Text style={s.toggleSub}>Toutes les mains sont affichées, sans passer le téléphone.</Text>
+          </View>
+        </Pressable>
         <Pressable style={s.btn} onPress={() => { setGame(newGame(players)); setRevealed(false); setSelected(null); }}>
           <Text style={s.btnTxt}>Commencer</Text>
         </Pressable>
@@ -67,7 +75,7 @@ export default function App() {
     );
   }
 
-  if (!revealed) {
+  if (!revealed && !openHands) {
     return (
       <SafeAreaView style={s.root}>
         <StatusBar style="light" />
@@ -110,12 +118,30 @@ export default function App() {
             <CardView key={i} card={c} dim={!!sel && !ok.includes(i)} onPress={() => drop(i)} />
           ))}
         </View>
-        <Text style={s.label}>Ta main · pioche : {game.symbolDeck.length}</Text>
-        <View style={s.row}>
-          {hand.map((c) => (
-            <CardView key={c.id} card={c} selected={c.id === selected} onPress={() => { setSelected(c.id); setError(''); }} />
-          ))}
-        </View>
+        {openHands ? (
+          game.hands.map((h, i) => (
+            <View key={i} style={{ gap: 8, opacity: i === game.current ? 1 : 0.55 }}>
+              <Text style={s.label}>
+                Joueur {i + 1}{i === game.current ? ' · à toi de jouer' : ''}{i === 0 ? ` · pioche : ${game.symbolDeck.length}` : ''}
+              </Text>
+              <View style={s.row}>
+                {h.map((c) => (
+                  <CardView key={c.id} card={c} selected={i === game.current && c.id === selected}
+                    onPress={i === game.current ? () => { setSelected(c.id); setError(''); } : undefined} />
+                ))}
+              </View>
+            </View>
+          ))
+        ) : (
+          <>
+            <Text style={s.label}>Ta main · pioche : {game.symbolDeck.length}</Text>
+            <View style={s.row}>
+              {hand.map((c) => (
+                <CardView key={c.id} card={c} selected={c.id === selected} onPress={() => { setSelected(c.id); setError(''); }} />
+              ))}
+            </View>
+          </>
+        )}
         {!!error && <Text style={s.err}>{error}</Text>}
       </ScrollView>
     </SafeAreaView>
@@ -137,6 +163,12 @@ const s = StyleSheet.create({
   cardSel: { transform: [{ translateY: -10 }], borderWidth: 5 },
   cardVal: { fontSize: 32, fontWeight: '800' },
   cardSym: { fontSize: 26 },
+  toggle: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#1e293b', padding: 14, borderRadius: 12 },
+  box: { width: 26, height: 26, borderRadius: 6, borderWidth: 2, borderColor: '#94a3b8', alignItems: 'center', justifyContent: 'center' },
+  boxOn: { backgroundColor: '#f59e0b', borderColor: '#f59e0b' },
+  tick: { color: '#111827', fontWeight: '900' },
+  toggleTitle: { color: '#f8fafc', fontSize: 16, fontWeight: '700' },
+  toggleSub: { color: '#94a3b8', fontSize: 13 },
   tokens: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12 },
   mission: { backgroundColor: '#1e293b', padding: 12, borderRadius: 10 },
   missionTxt: { color: '#f8fafc', fontSize: 15 },
