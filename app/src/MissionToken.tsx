@@ -53,12 +53,12 @@ function TermView({ t, size }: { t: Term; size: number }) {
 export function MissionToken({ def, size, showText, badges = [], onPress }: { def: MissionDef; size: number; showText: boolean; badges?: string[]; onPress: () => void }) {
   const v = def.visual;
   return (
-    <Pressable onPress={onPress} accessibilityLabel={def.label} style={{ width: size, alignItems: 'center', gap: 6 }}>
+    <Pressable onPress={onPress} accessibilityLabel={def.label} style={{ width: size, alignItems: 'center', gap: 3 }}>
       <View style={[s.token, { width: size, height: size, borderRadius: size / 2 }]}>
         <View style={[s.ring, { borderRadius: size / 2 }]} />
         {v.kind === 'row' ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-            {v.items.map((it, i) => <Item key={i} it={it} w={size * (v.items.length > 4 ? 0.135 : 0.175)} />)}
+            {v.items.map((it, i) => <Item key={i} it={it} w={size * (v.items.length > 4 ? 0.14 : 0.185)} />)}
           </View>
         ) : (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: size * 0.03 }}>
@@ -69,11 +69,9 @@ export function MissionToken({ def, size, showText, badges = [], onPress }: { de
           </View>
         )}
       </View>
-      {badges.length > 0 && (
-        <View style={s.badges}>
-          {badges.map((b) => <Text key={b} style={s.badge}>{b}</Text>)}
-        </View>
-      )}
+      <View style={s.badges}>
+        {badges.map((b) => <Text key={b} style={s.badge}>{b}</Text>)}
+      </View>
       {showText && <Text style={s.caption}>{def.label}</Text>}
     </Pressable>
   );
@@ -84,7 +82,7 @@ const s = StyleSheet.create({
   ring: { position: 'absolute', top: 5, left: 5, right: 5, bottom: 5, borderWidth: 3, borderColor: '#fbbf24' },
   mini: { backgroundColor: CREAM, borderWidth: 2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   vals: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
-  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, justifyContent: 'center' },
-  badge: { backgroundColor: '#f59e0b', color: '#111827', fontWeight: '800', fontSize: 12, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, overflow: 'hidden' },
+  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, justifyContent: 'center', minHeight: 18 },
+  badge: { backgroundColor: '#f59e0b', color: '#111827', fontWeight: '800', fontSize: 11, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 9, overflow: 'hidden' },
   caption: { color: '#e2e8f0', fontSize: 12, textAlign: 'center' },
 });

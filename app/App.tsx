@@ -7,7 +7,6 @@ import {
   type GameState, type SignalKind,
 } from './src/engine';
 import { MissionToken } from './src/MissionToken';
-import { CardView } from './src/CardView';
 import { TableScene, type PileView } from './src/TableScene';
 import { SYMBOLS } from './src/symbols';
 
@@ -54,12 +53,14 @@ export default function App() {
   const [selected, setSelected] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [textFor, setTextFor] = useState<string | null>(null);
+  const [menu, setMenu] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
   const [sigMode, setSigMode] = useState<'play' | SignalKind>('play');
   const [speaker, setSpeaker] = useState<number | null>(null);
 
-  const { width } = useWindowDimensions();
-  const tokenSize = Math.min(170, (width - 48) / 2);
+  const { width, height } = useWindowDimensions();
+  const tokenSize = Math.min(96, (width - 32 - 3 * 6) / 4);
+  const scale = Math.min(1, Math.max(0.72, (height - 200) / 560));
 
   const solo = mode === 'solo';
   const botSeats = (n: number) => (solo ? Array.from({ length: n - 1 }, (_, i) => i + 1) : []);
@@ -98,7 +99,7 @@ export default function App() {
     const g = newGame(n);
     setGame(sync(g));
     setRevealed(false); setSelected(null); setHistory([]); setError('');
-    setSigMode('play'); setSpeaker(null);
+    setSigMode('play'); setSpeaker(null); setMenu(false); setTextFor(null);
   };
 
   if (!game) {
@@ -170,22 +171,21 @@ export default function App() {
   const sel = hand.find((c) => c.id === selected) ?? null;
   const ok = sel ? playablePiles(game, sel) : [];
   const t = tops(game);
-  const showAll = openHands;
-  const handShown = solo || showAll || revealed;
+  const handShown = solo || openHands || revealed;
   const canSignal = phrasesOn && game.players > 1;
   // Celui qui parle : toi en solo ; sinon, par défaut, le joueur suivant.
   const who = solo ? 0 : speaker ?? (game.current + 1) % game.players;
 
   const hintsOf = (p: number) => (helpOn ? findMissionMoves(game, p) : []);
-  const hintCards = (p: number) => new Set(hintsOf(p).map((m) => m.cardId));
+  const hintCards = new Set(hintsOf(me).map((m) => m.cardId));
   const hintPiles = new Set(hintsOf(me).filter((m) => m.cardId === selected).map((m) => m.pile));
-  const hintText = (p: number) => {
-    const h = hintsOf(p);
+  const hintLine = (() => {
+    const h = hintsOf(me);
     if (!h.length) return null;
     const best = Math.max(...h.map((m) => m.missions.length));
     const cards = new Set(h.map((m) => m.cardId)).size;
-    return `💡 ${cards} carte${cards > 1 ? 's' : ''} réussi${cards > 1 ? 'ssent' : 't'} une mission${best > 1 ? ` (jusqu'à ${best} d'un coup)` : ''}`;
-  };
+    return `💡 ${cards} carte${cards > 1 ? 's' : ''} réussi${cards > 1 ? 'ssent' : 't'} une mission${best > 1 ? ` (jusqu'à ${best})` : ''}`;
+  })();
 
   const signalTags = (kind: SignalKind, target: { mission?: string; pile?: number }) =>
     game.signals.filter((g) => g.kind === kind && g.mission === target.mission && g.pile === target.pile).map((g) => `${KIND_ICON[kind]} J${g.player + 1}`);
@@ -195,9 +195,9 @@ export default function App() {
     const helpers = new Set(game.signals.filter((g) => g.kind === 'help' && g.mission === id).map((g) => g.player));
     const targets =
       showTargets && mode !== 'together'
-        ? botSeats(game.players).filter((b) => !helpers.has(b) && reachableMissions(game, b).includes(id)).map((b) => `🙋 J${b + 1}`)
+        ? botSeats(game.players).filter((b) => !helpers.has(b) && reachableMissions(game, b).includes(id)).map((b) => `🙋J${b + 1}`)
         : [];
-    const mine = helpOn && reachableMissions(game, me).includes(id) ? [solo ? '💡 Toi' : `💡 J${me + 1}`] : [];
+    const mine = helpOn && reachableMissions(game, me).includes(id) ? [solo ? '💡Toi' : `💡J${me + 1}`] : [];
     return [...mine, ...help, ...targets];
   };
 
@@ -221,147 +221,102 @@ export default function App() {
     tags: [...signalTags('good', { pile: i }), ...signalTags('stop', { pile: i })].map((text) => ({ text, stop: text.startsWith(KIND_ICON.stop) })),
   }));
 
-  const sigButtons: { key: 'play' | SignalKind; label: string }[] = [
-    { key: 'play', label: 'Jouer' },
-    { key: 'help', label: '✋ Je peux aider' },
-    { key: 'good', label: '👍 Bonne carte ici' },
-    { key: 'stop', label: '⛔ Ne jouez pas ici' },
-  ];
-  const sigHint = { play: '', help: 'Touche la mission pour laquelle tu peux aider.', good: 'Touche le tas où tu as une bonne carte à jouer.', stop: 'Touche le tas sur lequel il ne faut pas jouer.' }[sigMode];
-  const shown = history.slice(0, 4);
+  const missionText = game.missions.find((m) => m.id === textFor)?.label;
+  const sigHint = { play: '', help: 'Touche la mission pour laquelle tu peux aider', good: 'Touche le tas où tu as une bonne carte', stop: 'Touche le tas où il ne faut pas jouer' }[sigMode];
+  const toggleSig = (k: SignalKind) => setSigMode(sigMode === k ? 'play' : k);
+  const turnTitle = solo ? (game.current === 0 ? 'À toi de jouer' : `${seat(game.current)} joue…`) : `Joueur ${game.current + 1} joue`;
 
   return (
-    <SafeAreaView style={s.root}>
+    <SafeAreaView style={s.game}>
       <StatusBar style="light" />
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }}>
-        <Text style={s.title}>
-          {solo ? (game.current === 0 ? 'À toi de jouer' : `${seat(game.current)} joue…`) : `Joueur ${game.current + 1}`}
-        </Text>
-        {status}
 
-        {shown.length > 0 && (
-          <View style={s.hist}>
-            <Text style={s.label}>Derniers coups</Text>
-            {shown.map((h, i) => (
-              <Text key={history.length - i} style={[s.histLine, i === 0 && s.histFirst]}>
-                {history.length - i}. {h}
-              </Text>
+      <View style={s.head}>
+        <Text style={s.headTitle} numberOfLines={1}>{turnTitle}</Text>
+        <Text style={s.headStat}>🎯 {game.completed}/50{game.medal ? ` ${MEDAL[game.medal]}` : ''} · pioche {game.symbolDeck.length}</Text>
+        <Pressable onPress={() => setMenu(!menu)} style={s.menuBtn}><Text style={s.menuTxt}>☰</Text></Pressable>
+      </View>
+
+      <View style={s.missRow}>
+        {game.missions.map((m) => (
+          <MissionToken key={m.id} def={m} size={tokenSize} showText={false} badges={missionBadges(m.id)}
+            onPress={() => (canSignal && sigMode === 'help'
+              ? setGame(toggleSignal(game, { player: who, kind: 'help', mission: m.id }))
+              : setTextFor(textFor === m.id ? null : m.id))} />
+        ))}
+      </View>
+
+      <View style={s.tableWrap}>
+        <TableScene game={game} solo={solo} piles={pileViews} onPile={drop}
+          meIndex={me} hand={hand} handShown={handShown} selectedId={selected} hintCards={hintCards} hintLine={hintLine}
+          onSelect={(id) => { setSelected(id); setError(''); setSigMode('play'); }}
+          onReveal={() => { setRevealed(true); setSigMode('play'); }} revealAll={openHands} scale={scale} />
+        {!!missionText && (
+          <Pressable onPress={() => setTextFor(null)} style={s.tip}><Text style={s.tipTxt}>{missionText}</Text></Pressable>
+        )}
+      </View>
+
+      <View style={s.bar}>
+        {!!error ? <Text style={s.barErr} numberOfLines={1}>{error}</Text>
+          : sigMode !== 'play' ? <Text style={s.barTxt} numberOfLines={1}>{sigHint}</Text>
+          : <Text style={s.barTxt} numberOfLines={1}>{history[0] ?? 'À toi de commencer'}</Text>}
+        <View style={s.barRow}>
+          {(solo ? [0] : game.hands.map((_, i) => i)).map((i) => {
+            const on = game.canDo.includes(i);
+            return (
+              <Pressable key={i} onPress={() => setGame(toggleCanDo(game, i))} style={[s.mode, s.grow, on && s.modeOn]}>
+                <Text style={[s.modeTxt, on && s.modeTxtOn]} numberOfLines={1}>{solo ? '🙋 Je peux réussir une mission' : `🙋 J${i + 1}`}</Text>
+              </Pressable>
+            );
+          })}
+          {canSignal && (['help', 'good', 'stop'] as const).map((k) => (
+            <Pressable key={k} onPress={() => toggleSig(k)} style={[s.mode, sigMode === k && s.modeOn]}>
+              <Text style={[s.modeTxt, sigMode === k && s.modeTxtOn]}>{KIND_ICON[k]}</Text>
+            </Pressable>
+          ))}
+        </View>
+        {canSignal && !solo && sigMode !== 'play' && (
+          <View style={s.barRow}>
+            <Text style={s.barTxt}>Qui parle ?</Text>
+            {game.hands.map((_, i) => (
+              <Pressable key={i} onPress={() => setSpeaker(i)} style={[s.who, who === i && s.modeOn]}>
+                <Text style={[s.modeTxt, who === i && s.modeTxtOn]}>J{i + 1}</Text>
+              </Pressable>
             ))}
           </View>
         )}
+      </View>
 
-        {game.canDo.length > 0 && (
-          <View style={s.banner}>
-            <Text style={s.bannerTxt}>
-              🙋 {game.canDo.map(seat).join(' et ')} {game.canDo.length > 1 ? 'peuvent' : 'peut'} réussir une mission
-            </Text>
-          </View>
-        )}
-
-        <Text style={s.label}>Missions (touche un jeton pour lire le texte)</Text>
-        <View style={s.tokens}>
-          {game.missions.map((m) => (
-            <MissionToken key={m.id} def={m} size={tokenSize} showText={textFor === m.id} badges={missionBadges(m.id)}
-              onPress={() => (canSignal && sigMode === 'help'
-                ? setGame(toggleSignal(game, { player: who, kind: 'help', mission: m.id }))
-                : setTextFor(textFor === m.id ? null : m.id))} />
+      {menu && (
+        <View style={s.menu}>
+          <Text style={s.label}>Derniers coups</Text>
+          {history.slice(0, 8).map((h, i) => (
+            <Text key={history.length - i} style={[s.histLine, i === 0 && s.histFirst]}>{history.length - i}. {h}</Text>
           ))}
-        </View>
-
-        <TableScene game={game} solo={solo} piles={pileViews} onPile={drop} />
-        <Text style={s.hint}>Ensuite : {seat((game.current + 1) % game.players)}. Pioche : {game.symbolDeck.length} carte{game.symbolDeck.length > 1 ? 's' : ''}.</Text>
-
-        {game.players > 1 && (
-          <>
-            <Text style={s.label}>Je peux réussir une mission</Text>
-            <View style={s.row}>
-              {(solo ? [0] : game.hands.map((_, i) => i)).map((i) => {
-                const on = game.canDo.includes(i);
-                return (
-                  <Pressable key={i} onPress={() => setGame(toggleCanDo(game, i))} style={[s.mode, on && s.modeOn]}>
-                    <Text style={[s.modeTxt, on && s.modeTxtOn]}>{solo ? '🙋 Je peux réussir une mission' : `🙋 Joueur ${i + 1}`}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Text style={s.hint}>
-              {solo ? 'Les machines l\'annoncent toutes seules. ' : ''}À dire à tout moment, même hors de ton tour, sans préciser laquelle ni avec quelle carte. Touche encore pour retirer.
-            </Text>
-          </>
-        )}
-
-        {canSignal && (
-          <>
-            <Text style={s.label}>Phrases du livret</Text>
-            <View style={s.row}>
-              {sigButtons.map((b) => (
-                <Pressable key={b.key} onPress={() => setSigMode(b.key)} style={[s.mode, sigMode === b.key && s.modeOn]}>
-                  <Text style={[s.modeTxt, sigMode === b.key && s.modeTxtOn]}>{b.label}</Text>
-                </Pressable>
-              ))}
-            </View>
-            {sigMode !== 'play' && (
-              <>
-                <Text style={s.hint}>{sigHint} Touche à nouveau pour retirer.</Text>
-                {!solo && (
-                  <View style={s.row}>
-                    <Text style={s.hint}>Qui parle ?</Text>
-                    {game.hands.map((_, i) => (
-                      <Pressable key={i} onPress={() => setSpeaker(i)} style={[s.who, who === i && s.modeOn]}>
-                        <Text style={[s.modeTxt, who === i && s.modeTxtOn]}>J{i + 1}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                )}
-              </>
-            )}
-          </>
-        )}
-
-        {showAll ? (
-          game.hands.map((h, i) => (
-            <View key={i} style={{ gap: 8, opacity: i === game.current ? 1 : 0.55 }}>
-              <Text style={s.label}>
-                {seat(i)}{i === game.current ? ' · à toi de jouer' : ''}{i === 0 ? ` · pioche : ${game.symbolDeck.length}` : ''}
-              </Text>
-              {hintText(i) && <Text style={s.hintOn}>{hintText(i)}</Text>}
-              <View style={s.row}>
-                {h.map((c) => (
-                  <CardView key={c.id} card={c} glow={hintCards(i).has(c.id)} selected={i === game.current && c.id === selected}
-                    onPress={i === game.current ? () => { setSelected(c.id); setError(''); } : undefined} />
-                ))}
-              </View>
-            </View>
-          ))
-        ) : handShown ? (
-          <>
-            <Text style={s.label}>Ta main · pioche : {game.symbolDeck.length}{solo && game.current === 0 ? ' · à toi' : ''}</Text>
-            {hintText(me) && <Text style={s.hintOn}>{hintText(me)} · touche-la pour voir le tas</Text>}
-            <View style={s.row}>
-              {hand.map((c) => (
-                <CardView key={c.id} card={c} glow={hintCards(me).has(c.id)} selected={c.id === selected}
-                  onPress={() => { setSelected(c.id); setError(''); setSigMode('play'); }} />
-              ))}
-            </View>
-          </>
-        ) : (
-          <View style={s.cover}>
-            <Text style={s.sub}>Passe le téléphone au joueur {game.current + 1}, puis touche pour voir ta main.</Text>
-            <Pressable style={s.btn} onPress={() => { setRevealed(true); setSigMode('play'); }}>
-              <Text style={s.btnTxt}>Voir ma main</Text>
-            </Pressable>
-          </View>
-        )}
-        {!!error && <Text style={s.err}>{error}</Text>}
-        {solo && (
+          {history.length === 0 && <Text style={s.histLine}>Aucun coup joué.</Text>}
           <Pressable onPress={() => setGame(null)} style={s.quit}><Text style={s.quitTxt}>Quitter la partie</Text></Pressable>
-        )}
-      </ScrollView>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
+  game: { flex: 1, backgroundColor: '#0f172a', paddingLeft: 16, paddingRight: 16, paddingTop: 6, paddingBottom: 8, gap: 6 },
+  head: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headTitle: { color: '#fff', fontSize: 17, fontWeight: '800', flexShrink: 1 },
+  headStat: { color: '#cbd5e1', fontSize: 12, flex: 1, textAlign: 'right' },
+  menuBtn: { paddingHorizontal: 8, paddingVertical: 2 },
+  menuTxt: { color: '#f8fafc', fontSize: 20 },
+  missRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  tableWrap: { flex: 1 },
+  tip: { position: 'absolute', top: 6, left: 8, right: 8, backgroundColor: '#f59e0b', borderRadius: 10, padding: 8 },
+  tipTxt: { color: '#111827', fontWeight: '800', fontSize: 13, textAlign: 'center' },
+  bar: { gap: 4 },
+  barTxt: { color: '#94a3b8', fontSize: 12, textAlign: 'center' },
+  barErr: { color: '#fca5a5', fontSize: 12, textAlign: 'center', fontWeight: '700' },
+  barRow: { flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' },
+  grow: { flex: 1, alignItems: 'center' },
+  menu: { position: 'absolute', top: 40, left: 16, right: 16, backgroundColor: '#111c33', borderRadius: 12, padding: 12, gap: 4, borderWidth: 1, borderColor: '#334155' },
   root: { flex: 1, backgroundColor: '#0f172a', padding: 16, justifyContent: 'center', gap: 14 },
   setup: { gap: 14, paddingVertical: 8 },
   title: { color: '#fff', fontSize: 30, fontWeight: '800', textAlign: 'center' },
