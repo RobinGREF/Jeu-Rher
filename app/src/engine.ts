@@ -247,3 +247,11 @@ export function nextMedal(s: GameState): { medal: Medal; missionsNeeded: number 
   const item = s.missionDeck[i];
   return item && item.kind === 'medal' ? { medal: item.medal, missionsNeeded: i + 1 } : null;
 }
+
+/** Missions réussies entre deux états (avec leur place dans la rangée) et nombre total gagné, chaînes comprises. */
+export function completedBetween(before: GameState, after: GameState): { done: { def: MissionDef; idx: number }[]; gained: number } {
+  return {
+    gained: after.completed - before.completed,
+    done: before.missions.flatMap((def, idx) => (after.missions.some((m) => m.id === def.id) ? [] : [{ def, idx }])),
+  };
+}

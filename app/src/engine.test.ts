@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSymbolDeck, canPlayOn, newGame, play, playablePiles, toggleCanDo, tops, findMissionMoves, botMove, syncBotAnnouncements, reachableMissions, nextMedal, toggleSignal, syncBotSignals } from './engine';
+import { buildSymbolDeck, canPlayOn, newGame, play, playablePiles, toggleCanDo, tops, findMissionMoves, botMove, syncBotAnnouncements, reachableMissions, nextMedal, completedBetween, toggleSignal, syncBotSignals } from './engine';
 
 const seeded = (seed: number) => () => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296);
 
@@ -324,4 +324,32 @@ test('prochaine médaille : le décompte reste cohérent avec les missions réus
     }
   }
   assert.ok(seen.has('bronze'));
+});
+
+test('missions réussies entre deux états : cohérent avec le compteur, présentes avant et absentes après', () => {
+  let coups = 0, avecMission = 0, chaines = 0;
+  for (let seed = 1; seed <= 100; seed++) {
+    const rng = seeded(seed);
+    let s = newGame(3, rng);
+    let guard = 0;
+    while (!s.over && guard++ < 5000) {
+      const mv = botMove(s, s.current, rng);
+      if (!mv) break;
+      const r = play(s, mv.cardId, mv.pile, rng);
+      assert.ok(r.ok);
+      if (!r.ok) return;
+      const { done, gained } = completedBetween(s, r.state);
+      coups++;
+      assert.ok(gained >= 0);
+      assert.ok(done.length <= gained, 'plus de jetons envolés que de missions gagnées');
+      if (gained > 0) { avecMission++; assert.ok(done.length >= 1); if (done.length < gained) chaines++; }
+      for (const d of done) {
+        assert.ok(s.missions[d.idx].id === d.def.id, 'place dans la rangée');
+        assert.ok(!r.state.missions.some((m) => m.id === d.def.id));
+      }
+      s = r.state;
+    }
+  }
+  assert.ok(avecMission > 0, 'aucune mission réussie rencontrée : test sans valeur');
+  void coups; void chaines;
 });

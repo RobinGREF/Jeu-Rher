@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
-  botMove, findMissionMoves, missionsLeft, newGame, play, playablePiles, reachableMissions,
+  botMove, completedBetween, findMissionMoves, missionsLeft, newGame, play, playablePiles, reachableMissions,
   syncBotAnnouncements, syncBotSignals, toggleCanDo, toggleSignal, tops,
   type GameState, type SignalKind,
 } from './src/engine';
+import { Celebration, CELEBRATION_MS, type Celebrate } from './src/Celebration';
 import { InfoPanel } from './src/InfoPanel';
 import { MissionToken } from './src/MissionToken';
 import { TableScene, type LastPlay, type PileView } from './src/TableScene';
@@ -58,6 +59,8 @@ export default function App() {
   const [info, setInfo] = useState(false);
   const [pauseMs, setPauseMs] = useState(5000);
   const [lastPlay, setLastPlay] = useState<LastPlay | null>(null);
+  const [party, setParty] = useState<Celebrate | null>(null);
+  const [rowY, setRowY] = useState(46);
   const [history, setHistory] = useState<string[]>([]);
   const [sigMode, setSigMode] = useState<'play' | SignalKind>('play');
   const [speaker, setSpeaker] = useState<number | null>(null);
@@ -75,6 +78,13 @@ export default function App() {
     const a = syncBotAnnouncements(g, bs);
     return phrasesOn ? syncBotSignals(a, bs) : a;
   };
+  /** Fête les missions réussies entre deux états du jeu. */
+  const celebrate = (before: GameState, after: GameState) => {
+    const { done, gained } = completedBetween(before, after);
+    if (gained <= 0) return;
+    const medal = after.medal !== before.medal && after.medal ? { bronze: 'de bronze', argent: 'd\'argent', or: 'd\'or' }[after.medal] : null;
+    setParty({ key: Date.now(), done, gained, medal });
+  };
   const log = (entry: string) => setHistory((h) => [entry, ...h].slice(0, 300));
 
   /** Un coup de machine pour le joueur courant. */
@@ -88,6 +98,7 @@ export default function App() {
     if (!r.ok) return;
     const gained = r.state.completed - g.completed;
     setLastPlay({ key: Date.now(), seat: who, card, covered, pile: mv.pile, gained });
+    celebrate(g, r.state);
     log(`${seat(who)} : ${card.value}${SYMBOLS[card.symbol].emoji} sur le tas ${mv.pile + 1}${gained ? ` · 🎯 +${gained} mission${gained > 1 ? 's' : ''}` : ''}`);
     setGame(sync(r.state));
   };
@@ -99,6 +110,12 @@ export default function App() {
     const id = setTimeout(() => doBotMove(game), pauseMs);
     return () => clearTimeout(id);
   }, [game, mode, pauseMs]);
+
+  useEffect(() => {
+    if (!party) return;
+    const id = setTimeout(() => setParty((cur) => (cur && cur.key === party.key ? null : cur)), CELEBRATION_MS);
+    return () => clearTimeout(id);
+  }, [party]);
 
   // La carte posée reste mise en évidence le temps choisi, puis la vue se remet à plat.
   useEffect(() => {
@@ -112,7 +129,7 @@ export default function App() {
     const g = newGame(n);
     setGame(sync(g));
     setRevealed(false); setSelected(null); setHistory([]); setError('');
-    setSigMode('play'); setSpeaker(null); setMenu(false); setInfo(false); setTextFor(null); setLastPlay(null);
+    setSigMode('play'); setSpeaker(null); setMenu(false); setInfo(false); setTextFor(null); setLastPlay(null); setParty(null);
   };
 
   if (!game) {
@@ -234,6 +251,7 @@ export default function App() {
     if (!r.ok) return setError(r.error);
     const gained = r.state.completed - game.completed;
     setLastPlay({ key: Date.now(), seat: game.current, card: sel, covered, pile, gained });
+    celebrate(game, r.state);
     log(`${solo ? 'Toi' : seat(game.current)} : ${sel.value}${SYMBOLS[sel.symbol].emoji} sur le tas ${pile + 1}${gained ? ` · 🎯 +${gained} mission${gained > 1 ? 's' : ''}` : ''}`);
     setError(''); setSelected(null); setRevealed(false); setSpeaker(null); setSigMode('play');
     setGame(sync(r.state));
@@ -257,12 +275,12 @@ export default function App() {
 
       <View style={s.head}>
         <Text style={s.headTitle} numberOfLines={1}>{turnTitle}</Text>
-        <Text style={s.headStat} numberOfLines={1}>🎯 {game.completed}/50{game.medal ? ` ${MEDAL[game.medal].split(' ')[0]}` : ''} · 📚 {game.symbolDeck.length}</Text>
+        <Text style={[s.headStat, !!party && s.headStatOn]} numberOfLines={1}>🎯 {game.completed}/50{game.medal ? ` ${MEDAL[game.medal].split(' ')[0]}` : ''} · 📚 {game.symbolDeck.length}</Text>
         <Pressable onPress={() => { setInfo(true); setMenu(false); }} style={s.menuBtn} accessibilityLabel="Infos sur la partie"><Text style={s.menuTxt}>ℹ️</Text></Pressable>
         <Pressable onPress={() => setMenu(!menu)} style={s.menuBtn} accessibilityLabel="Menu"><Text style={s.menuTxt}>☰</Text></Pressable>
       </View>
 
-      <View style={s.missRow}>
+      <View style={s.missRow} onLayout={(e) => setRowY(e.nativeEvent.layout.y)}>
         {game.missions.map((m) => (
           <MissionToken key={m.id} def={m} size={tokenSize} showText={false} badges={missionBadges(m.id)}
             onPress={() => (canSignal && sigMode === 'help'
@@ -314,6 +332,10 @@ export default function App() {
         )}
       </View>
 
+      {party && (
+        <Celebration c={party} width={width} height={height} tokenSize={tokenSize} rowY={rowY} target={{ x: width - 126, y: 16 }} />
+      )}
+
       {info && (
         <InfoPanel game={game} solo={solo} onClose={() => setInfo(false)} options={{ help: helpOn, targets: showTargets, phrases: phrasesOn }} />
       )}
@@ -337,6 +359,7 @@ const s = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headTitle: { color: '#fff', fontSize: 17, fontWeight: '800', flexShrink: 1 },
   headStat: { color: '#cbd5e1', fontSize: 12, flexShrink: 0, marginLeft: 'auto' },
+  headStatOn: { color: '#fde047', fontWeight: '900' },
   menuBtn: { paddingHorizontal: 6, paddingVertical: 2 },
   menuTxt: { color: '#f8fafc', fontSize: 20 },
   missRow: { flexDirection: 'row', justifyContent: 'space-between' },
