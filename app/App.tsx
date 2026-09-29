@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { missionsLeft, newGame, play, playablePiles, tops, type GameState } from './src/engine';
+import { MissionToken } from './src/MissionToken';
 import { SYMBOLS } from './src/symbols';
 import type { Card } from './src/types';
 
@@ -23,6 +24,9 @@ export default function App() {
   const [revealed, setRevealed] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const [textFor, setTextFor] = useState<string | null>(null);
+  const { width } = useWindowDimensions();
+  const tokenSize = Math.min(170, (width - 48) / 2);
 
   if (!game) {
     return (
@@ -93,10 +97,13 @@ export default function App() {
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }}>
         <Text style={s.title}>Joueur {game.current + 1}</Text>
         {status}
-        <Text style={s.label}>Missions</Text>
-        {game.missions.map((m) => (
-          <View key={m.id} style={s.mission}><Text style={s.missionTxt}>{m.label}{m.placeholder ? '  (à vérifier)' : ''}</Text></View>
-        ))}
+        <Text style={s.label}>Missions (touche un jeton pour lire le texte)</Text>
+        <View style={s.tokens}>
+          {game.missions.map((m) => (
+            <MissionToken key={m.id} def={m} size={tokenSize} showText={textFor === m.id}
+              onPress={() => setTextFor(textFor === m.id ? null : m.id)} />
+          ))}
+        </View>
         <Text style={s.label}>Tas (touche pour jouer dessus)</Text>
         <View style={s.row}>
           {t.map((c, i) => (
@@ -130,6 +137,7 @@ const s = StyleSheet.create({
   cardSel: { transform: [{ translateY: -10 }], borderWidth: 5 },
   cardVal: { fontSize: 32, fontWeight: '800' },
   cardSym: { fontSize: 26 },
+  tokens: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12 },
   mission: { backgroundColor: '#1e293b', padding: 12, borderRadius: 10 },
   missionTxt: { color: '#f8fafc', fontSize: 15 },
   err: { color: '#fca5a5', textAlign: 'center' },

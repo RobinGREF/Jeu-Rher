@@ -119,3 +119,9 @@ test('missions : que des X et/ou Y, symboles différents', () => {
   assert.ok(mission('Chaque carte a une valeur et un symbole différent').check([C(BOU, 3), C(JUM, 7), C(COU, 2), C(BRI, 6)]));
   assert.ok(!mission('Chaque carte a une valeur et un symbole différent').check([C(BOU, 3), C(JUM, 3), C(COU, 2), C(BRI, 6)]));
 });
+
+test('missions : chaque mission a un dessin', () => {
+  for (const d of buildMissionDefs()) {
+    assert.ok(d.visual.kind === 'row' ? d.visual.items.length >= 3 : true, d.label);
+  }
+});
