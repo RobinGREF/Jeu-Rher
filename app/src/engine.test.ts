@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSymbolDeck, canPlayOn, newGame, play, playablePiles, toggleCanDo, tops, findMissionMoves, botMove, syncBotAnnouncements, reachableMissions, toggleSignal, syncBotSignals } from './engine';
+import { buildSymbolDeck, canPlayOn, newGame, play, playablePiles, toggleCanDo, tops, findMissionMoves, botMove, syncBotAnnouncements, reachableMissions, nextMedal, toggleSignal, syncBotSignals } from './engine';
 
 const seeded = (seed: number) => () => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296);
 
@@ -300,4 +300,28 @@ test('phrases du livret : effacées quand le tas est recouvert ou la mission rem
       s = r.state;
     }
   }
+});
+
+test('prochaine médaille : le décompte reste cohérent avec les missions réussies', () => {
+  const TOTAL = { bronze: 16, argent: 20, or: 24 } as const; // 15 cartes puis 4 puis 4, la médaille tombant à la pioche suivante
+  const seen = new Set<string>();
+  for (let seed = 1; seed <= 100; seed++) {
+    const rng = seeded(seed);
+    let s = newGame(3, rng);
+    let guard = 0;
+    while (!s.over && guard++ < 5000) {
+      const nm = nextMedal(s);
+      if (nm) {
+        seen.add(nm.medal);
+        assert.equal(s.completed + nm.missionsNeeded, TOTAL[nm.medal], `seed ${seed} ${nm.medal}`);
+        assert.ok(nm.missionsNeeded >= 1);
+      } else assert.equal(s.medal, 'or');
+      const mv = botMove(s, s.current, rng);
+      if (!mv) break;
+      const r = play(s, mv.cardId, mv.pile, rng);
+      assert.ok(r.ok);
+      if (r.ok) s = r.state;
+    }
+  }
+  assert.ok(seen.has('bronze'));
 });

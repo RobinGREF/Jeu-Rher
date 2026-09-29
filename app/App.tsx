@@ -6,6 +6,7 @@ import {
   syncBotAnnouncements, syncBotSignals, toggleCanDo, toggleSignal, tops,
   type GameState, type SignalKind,
 } from './src/engine';
+import { InfoPanel } from './src/InfoPanel';
 import { MissionToken } from './src/MissionToken';
 import { TableScene, type PileView } from './src/TableScene';
 import { SYMBOLS } from './src/symbols';
@@ -54,6 +55,7 @@ export default function App() {
   const [error, setError] = useState('');
   const [textFor, setTextFor] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
+  const [info, setInfo] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
   const [sigMode, setSigMode] = useState<'play' | SignalKind>('play');
   const [speaker, setSpeaker] = useState<number | null>(null);
@@ -99,7 +101,7 @@ export default function App() {
     const g = newGame(n);
     setGame(sync(g));
     setRevealed(false); setSelected(null); setHistory([]); setError('');
-    setSigMode('play'); setSpeaker(null); setMenu(false); setTextFor(null);
+    setSigMode('play'); setSpeaker(null); setMenu(false); setInfo(false); setTextFor(null);
   };
 
   if (!game) {
@@ -233,7 +235,8 @@ export default function App() {
       <View style={s.head}>
         <Text style={s.headTitle} numberOfLines={1}>{turnTitle}</Text>
         <Text style={s.headStat}>🎯 {game.completed}/50{game.medal ? ` ${MEDAL[game.medal]}` : ''} · pioche {game.symbolDeck.length}</Text>
-        <Pressable onPress={() => setMenu(!menu)} style={s.menuBtn}><Text style={s.menuTxt}>☰</Text></Pressable>
+        <Pressable onPress={() => { setInfo(true); setMenu(false); }} style={s.menuBtn} accessibilityLabel="Infos sur la partie"><Text style={s.menuTxt}>ℹ️</Text></Pressable>
+        <Pressable onPress={() => setMenu(!menu)} style={s.menuBtn} accessibilityLabel="Menu"><Text style={s.menuTxt}>☰</Text></Pressable>
       </View>
 
       <View style={s.missRow}>
@@ -286,6 +289,10 @@ export default function App() {
         )}
       </View>
 
+      {info && (
+        <InfoPanel game={game} solo={solo} onClose={() => setInfo(false)} options={{ help: helpOn, targets: showTargets, phrases: phrasesOn }} />
+      )}
+
       {menu && (
         <View style={s.menu}>
           <Text style={s.label}>Derniers coups</Text>
@@ -305,7 +312,7 @@ const s = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headTitle: { color: '#fff', fontSize: 17, fontWeight: '800', flexShrink: 1 },
   headStat: { color: '#cbd5e1', fontSize: 12, flex: 1, textAlign: 'right' },
-  menuBtn: { paddingHorizontal: 8, paddingVertical: 2 },
+  menuBtn: { paddingHorizontal: 6, paddingVertical: 2 },
   menuTxt: { color: '#f8fafc', fontSize: 20 },
   missRow: { flexDirection: 'row', justifyContent: 'space-between' },
   tableWrap: { flex: 1 },

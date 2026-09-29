@@ -240,3 +240,10 @@ export function syncBotSignals(s: GameState, bots: number[]): GameState {
   }
   return { ...s, signals };
 }
+
+/** Prochaine médaille à gagner et nombre de missions à réussir pour l'obtenir (null si toutes sont gagnées). */
+export function nextMedal(s: GameState): { medal: Medal; missionsNeeded: number } | null {
+  const i = s.missionDeck.findIndex((it) => it.kind === 'medal');
+  const item = s.missionDeck[i];
+  return item && item.kind === 'medal' ? { medal: item.medal, missionsNeeded: i + 1 } : null;
+}
