@@ -16,7 +16,7 @@ import { TableScene, type LastPlay, type PileView } from './src/TableScene';
 import { SYMBOLS } from './src/symbols';
 
 type Mode = 'solo' | 'together' | 'online';
-type Screen = 'home' | 'online' | 'together' | 'settings';
+type Screen = 'home' | 'together' | 'settings';
 
 const DEFAULTS = { bots: 2, pauseMs: 5000, helpOn: false, showTargets: true, phrasesOn: false, openHands: false };
 /** Réglages gardés d'une visite à l'autre (facultatif : sans stockage, on repart des valeurs par défaut). */
@@ -53,7 +53,7 @@ function Chips({ values, value, onChange }: { values: number[]; value: number; o
 
 export default function App() {
   const saved = useRef(loadSettings()).current;
-  const [mode, setMode] = useState<Mode>('solo');
+  const [mode, setMode] = useState<Mode>('online'); // en ligne par défaut
   const [screen, setScreen] = useState<Screen>('home');
   const [pendingStart, setPendingStart] = useState(false);
   const [bots, setBots] = useState(saved.bots);
@@ -193,41 +193,6 @@ export default function App() {
   if (!game) {
     const back = <Pressable onPress={() => setScreen('home')} style={s.link}><Text style={s.linkTxt}>← Retour</Text></Pressable>;
 
-    if (screen === 'online') {
-      return (
-        <SafeAreaView style={s.root}>
-          <StatusBar style="light" />
-          <ScrollView contentContainerStyle={s.home}>
-            <Text style={s.title}>En ligne</Text>
-            <Text style={s.label}>Ton prénom</Text>
-            <TextInput value={myName} onChangeText={(v) => { setMyName(v); try { localStorage.setItem('50m-name', v); } catch { /* sans stockage */ } }}
-              placeholder="Robin" placeholderTextColor="#64748b" maxLength={14} style={s.input} accessibilityLabel="Ton prénom" />
-            {!onl.kind ? (
-              <Text style={s.err}>Le mode en ligne n'est pas configuré sur cette version. Voir docs/en-ligne.md.</Text>
-            ) : (
-              <>
-                <Pressable style={s.btn} disabled={onl.busy} onPress={() => onl.create(myName)}>
-                  <Text style={s.btnTxt}>Créer une partie</Text>
-                </Pressable>
-                <Text style={s.hint}>ou rejoindre avec un code</Text>
-                <View style={s.row}>
-                  <TextInput value={codeInput} onChangeText={(v) => setCodeInput(v.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4))}
-                    placeholder="ABCD" placeholderTextColor="#64748b" autoCapitalize="characters" maxLength={4}
-                    style={[s.input, s.codeInput]} accessibilityLabel="Code du salon" />
-                  <Pressable style={[s.mode, codeInput.length === 4 && s.modeOn]} disabled={onl.busy || codeInput.length !== 4} onPress={() => onl.join(codeInput, myName)}>
-                    <Text style={[s.modeTxt, codeInput.length === 4 && s.modeTxtOn]}>Rejoindre</Text>
-                  </Pressable>
-                </View>
-                {!!onl.error && <Text style={s.err}>{onl.error}</Text>}
-                {onl.kind === 'local' && <Text style={s.hint}>Test local : les autres joueurs sont les autres onglets de ce navigateur.</Text>}
-              </>
-            )}
-            {back}
-          </ScrollView>
-        </SafeAreaView>
-      );
-    }
-
     if (screen === 'together') {
       return (
         <SafeAreaView style={s.root}>
@@ -276,19 +241,43 @@ export default function App() {
       );
     }
 
+    const createOnline = () => { setMode('online'); onl.create(myName); };
+    const joinOnline = () => { setMode('online'); onl.join(codeInput, myName); };
     return (
       <SafeAreaView style={s.root}>
         <StatusBar style="light" />
         <ScrollView contentContainerStyle={s.home}>
           <Text style={s.title}>50 Missions</Text>
-          <Text style={s.sub}>Jeu de cartes coopératif</Text>
+          <Text style={s.sub}>Jeu de cartes coopératif, en ligne avec tes amis</Text>
+
+          <Text style={s.label}>Ton prénom</Text>
+          <TextInput value={myName} onChangeText={(v) => { setMyName(v); try { localStorage.setItem('50m-name', v); } catch { /* sans stockage */ } }}
+            placeholder="Robin" placeholderTextColor="#64748b" maxLength={14} style={s.input} accessibilityLabel="Ton prénom" />
+
+          {!onl.kind ? (
+            <Text style={s.err}>Le mode en ligne n'est pas configuré sur cette version (voir docs/en-ligne.md). Tu peux jouer contre des machines.</Text>
+          ) : (
+            <>
+              <Pressable style={s.btn} disabled={onl.busy} onPress={createOnline}>
+                <Text style={s.btnTxt}>🌐 Créer une partie</Text>
+              </Pressable>
+              <View style={s.row}>
+                <TextInput value={codeInput} onChangeText={(v) => setCodeInput(v.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4))}
+                  placeholder="CODE" placeholderTextColor="#64748b" autoCapitalize="characters" maxLength={4}
+                  style={[s.input, s.codeInput]} accessibilityLabel="Code du salon" />
+                <Pressable style={[s.mode, codeInput.length === 4 && s.modeOn]} disabled={onl.busy || codeInput.length !== 4} onPress={joinOnline}>
+                  <Text style={[s.modeTxt, codeInput.length === 4 && s.modeTxtOn]}>Rejoindre</Text>
+                </Pressable>
+              </View>
+              {!!onl.error && <Text style={s.err}>{onl.error}</Text>}
+              {onl.kind === 'local' && <Text style={s.hint}>Test local : les autres joueurs sont les autres onglets de ce navigateur.</Text>}
+            </>
+          )}
+
+          <Text style={[s.label, { marginTop: 8 }]}>Autres façons de jouer</Text>
           <Pressable style={s.bigBtn} onPress={() => { setMode('solo'); setPendingStart(true); }}>
-            <Text style={s.bigTitle}>🤖 Jouer contre des machines</Text>
-            <Text style={s.bigSub}>Tout de suite, seul, avec {bots} joueur{bots > 1 ? 's' : ''} machine</Text>
-          </Pressable>
-          <Pressable style={s.bigBtn} onPress={() => { setMode('online'); setScreen('online'); }}>
-            <Text style={s.bigTitle}>🌐 Jouer en ligne</Text>
-            <Text style={s.bigSub}>Avec des amis, chacun sur son téléphone</Text>
+            <Text style={s.bigTitle}>🤖 Contre des machines</Text>
+            <Text style={s.bigSub}>Seul, avec {bots} joueur{bots > 1 ? 's' : ''} machine</Text>
           </Pressable>
           <Pressable style={s.bigBtn} onPress={() => setScreen('together')}>
             <Text style={s.bigTitle}>📱 À plusieurs, un téléphone</Text>
