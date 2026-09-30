@@ -30,6 +30,7 @@ export class Host {
   private off: (() => void) | null = null;
   private queue: Promise<void> = Promise.resolve();
   private stopped = false;
+  private rng: () => number = Math.random;
 
   private constructor(private be: Backend, private code: string, private options: Options) {}
 
@@ -38,6 +39,7 @@ export class Host {
   /** Nouvelle partie. `seats` : les joueurs humains d'abord, puis les machines. */
   static async launch(be: Backend, code: string, seats: SeatInfo[], options: Options, rng?: () => number): Promise<Host> {
     const h = new Host(be, code, options);
+    if (rng) h.rng = rng;
     h.seats = seats;
     h.g = h.sync(newGame(seats.length, rng));
     await h.start();
@@ -103,7 +105,7 @@ export class Host {
       // Feu vert d'un joueur : la machine dont c'est le tour joue maintenant.
       if (!this.waiting()) return;
       const s = this.g.current;
-      const mv = botMove(this.g, s);
+      const mv = botMove(this.g, s, this.rng);
       if (!mv || !this.apply(s, mv.cardId, mv.pile)) return;
     } else if (it.type === 'canDo') {
       this.g = setCanDo(this.g, seat, Array.isArray(it.missions) ? it.missions : []); // refusée si le joueur ne peut rien réussir
@@ -140,7 +142,7 @@ export class Host {
     if (this.stopped || this.g.over || !this.seats[this.g.current]?.bot || this.options.manual) return;
     this.timer = setTimeout(() => {
       const seat = this.g.current;
-      const mv = botMove(this.g, seat);
+      const mv = botMove(this.g, seat, this.rng);
       if (mv && this.apply(seat, mv.cardId, mv.pile)) this.enqueuePublish();
       this.scheduleBots();
     }, botDelayMs(this.options.pauseMs, this.g.canDo.some((a) => this.seats[a.player]?.bot)));

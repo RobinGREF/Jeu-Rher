@@ -1,6 +1,6 @@
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { canAnnounce, newGame, playablePiles } from '../engine';
+import { botMove, canAnnounce, newGame, play, playablePiles, type GameState } from '../engine';
 import { canRead, canWrite } from './rules';
 import { LocalStorageStore, MemoryStore, StoreBackend } from './localBackend';
 import { Host } from './host';
@@ -29,15 +29,46 @@ const world = () => {
   return { store, client: (uid: string, enforce = true) => new StoreBackend(store, uid, enforce) };
 };
 
-/** Joue un coup au hasard si c'est le tour de cette session. */
-function act(s: OnlineSession, rng: () => number): boolean {
+/** Premier coup légal du joueur (toujours le même à situation égale : les tests ne dépendent ni du hasard ni du timing). */
+function firstLegal(s: GameState, player: number) {
+  for (const c of s.hands[player]) {
+    const piles = playablePiles(s, c);
+    if (piles.length) return { cardId: c.id, pile: piles[0] };
+  }
+  return null;
+}
+
+/** Joue le premier coup légal si c'est le tour de cette session. */
+function act(s: OnlineSession): boolean {
   const { view, mySeat } = s.snapshot;
   if (!view || view.over || view.current !== mySeat) return false;
-  const moves = view.hands[mySeat].flatMap((c) => playablePiles(view, c).map((p) => [c.id, p] as const));
-  if (!moves.length) return false;
-  const [id, p] = moves[Math.floor(rng() * moves.length)];
-  s.play(id, p);
+  const mv = firstLegal(view, mySeat);
+  if (!mv) return false;
+  s.play(mv.cardId, mv.pile);
   return true;
+}
+
+/**
+ * Une donne (graine) dont la partie dure au moins `minPlays` coups quand les `humans` premiers sièges jouent
+ * leur premier coup légal et que les machines jouent comme d'habitude : une donne malchanceuse peut finir en
+ * quelques coups, ce qui rendrait les tests fragiles.
+ */
+function seedFor(players: number, humans: number, minPlays: number) {
+  for (let seed = 1; seed < 3000; seed++) {
+    const rng = seeded(seed);
+    let s = newGame(players, rng);
+    let n = 0;
+    while (!s.over && n < 500) {
+      const mv = s.current < humans ? firstLegal(s, s.current) : botMove(s, s.current, rng);
+      if (!mv) break;
+      const r = play(s, mv.cardId, mv.pile, rng);
+      if (!r.ok) break;
+      s = r.state;
+      n++;
+    }
+    if (n >= minPlays) return seed;
+  }
+  throw new Error('aucune donne assez longue');
 }
 
 test('règles d\'accès : mains privées, seul l\'hôte écrit la partie', () => {
@@ -91,14 +122,14 @@ test('salon : créer, rejoindre, refus (code inconnu, complet, partie commencée
 
 test('partie à 3 humains + 1 machine, jusqu\'au bout : confidentialité et cohérence', async () => {
   const w = world();
-  const rng = seeded(42);
+  const seed = seedFor(4, 3, 20);
   const host = await create(w.client('h'), 'Robin');
   await host.configure({ pauseMs: 2, phrases: false, manual: false });
   const code = host.snapshot.code;
   const a = await join(w.client('a'), code, 'Alice');
   const b = await join(w.client('b'), code, 'Bob');
   await until(() => host.snapshot.players.length === 3, 'salon plein');
-  await host.startGame(4);
+  await host.startGame(4, seeded(seed));
   const all = [host, a, b];
   await until(() => all.every((s) => s.snapshot.view !== null), 'tous ont leur vue');
 
@@ -127,7 +158,7 @@ test('partie à 3 humains + 1 machine, jusqu\'au bout : confidentialité et coh�
   const t0 = Date.now();
   while (!all.every((s) => s.snapshot.phase === 'over')) {
     if (Date.now() - t0 > 25000) assert.fail('la partie ne se termine pas');
-    for (const s of all) if (act(s, rng)) plays++;
+    for (const s of all) if (act(s)) plays++;
     await sleep(2);
     // à tout instant, les trois vues sont cohérentes entre elles
     const p = all.map((s) => s.snapshot.pub!);
@@ -179,18 +210,18 @@ test('un coup hors de son tour ou d\'une carte qu\'on n\'a pas est ignoré ; ann
 
 test('l\'hôte recharge la page : la partie reprend là où elle en était', async () => {
   const w = world();
-  const rng = seeded(7);
+  const seed = seedFor(2, 2, 12);
   let host = await create(w.client('h'), 'Robin');
   await host.configure({ pauseMs: 60000, phrases: false, manual: false });
   const code = host.snapshot.code;
   const a = await join(w.client('a'), code, 'Alice');
   await until(() => host.snapshot.players.length === 2, 'salon');
-  await host.startGame(2);
+  await host.startGame(2, seeded(seed));
   await until(() => host.snapshot.view !== null && a.snapshot.view !== null, 'vues');
   for (let i = 0; i < 4; i++) {
     const s = [host, a][host.snapshot.pub!.current];
     const before = host.snapshot.pub!.v;
-    assert.ok(act(s, rng));
+    assert.ok(act(s));
     await until(() => host.snapshot.pub!.v > before, 'coup publié');
     await until(() => a.snapshot.pub!.v === host.snapshot.pub!.v && a.snapshot.view !== null, 'Alice à jour');
   }
@@ -206,7 +237,7 @@ test('l\'hôte recharge la page : la partie reprend là où elle en était', asy
   // et la partie continue : le joueur dont c'est le tour peut jouer
   const s = [host, a][host.snapshot.pub!.current];
   const v = host.snapshot.pub!.v;
-  assert.ok(act(s, rng));
+  assert.ok(act(s));
   await until(() => host.snapshot.pub!.v > v, 'la partie continue');
   [host, a].forEach((x) => x.leave());
 });
@@ -217,17 +248,16 @@ test('un joueur absent est remplacé par une machine et la partie continue', asy
   await host.configure({ pauseMs: 3, phrases: false, manual: false });
   const a = await join(w.client('a'), host.snapshot.code, 'Alice');
   await until(() => host.snapshot.players.length === 2, 'salon');
-  await host.startGame(2);
+  await host.startGame(2, seeded(seedFor(2, 1, 8)));
   await until(() => host.snapshot.view !== null, 'vue');
   host.botify(1); // Alice a disparu
   await until(() => host.snapshot.pub!.seats[1].bot, 'siège 1 devenu machine');
   assert.match(host.snapshot.pub!.seats[1].name, /Alice \(machine\)/);
   // l'hôte joue ; la machine (siège 1) répond seule
-  const rng = seeded(3);
   const t0 = Date.now();
   let seat1Played = false;
   while (!seat1Played && Date.now() - t0 < 8000) {
-    act(host, rng);
+    act(host);
     await sleep(3);
     seat1Played = host.snapshot.pub!.history.some((h) => h.startsWith('Alice (machine)'));
   }
@@ -291,15 +321,14 @@ test('machines « à mon clic » : elle attend le feu vert, n\'importe quel joue
   await host.configure({ pauseMs: 2, phrases: false, manual: true });
   const a = await join(w.client('a'), host.snapshot.code, 'Alice');
   await until(() => host.snapshot.players.length === 2, 'salon');
-  await host.startGame(3); // Robin, Alice, Machine 1
+  await host.startGame(3, seeded(seedFor(3, 2, 6))); // Robin, Alice, Machine 1
   await until(() => host.snapshot.view !== null && a.snapshot.view !== null, 'vues');
-  const rng = seeded(9);
   const played = () => host.snapshot.pub!.history.length;
   // Robin puis Alice jouent ; ensuite c'est à la machine (siège 2)
   for (const who of [host, a]) {
     const before = who.snapshot.pub!.v;
     await until(() => who.snapshot.pub!.current === who.snapshot.mySeat, 'son tour');
-    assert.ok(act(who, rng));
+    assert.ok(act(who));
     await until(() => host.snapshot.pub!.v > before && a.snapshot.pub!.v === host.snapshot.pub!.v, 'coup publié');
   }
   await until(() => host.snapshot.pub!.awaitingGo === 2 && a.snapshot.pub!.awaitingGo === 2, 'la machine attend, chez tous les joueurs');
