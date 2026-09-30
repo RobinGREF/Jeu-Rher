@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
   botMove, completedBetween, findMissionMoves, missionsLeft, newGame, play, playablePiles, reachableMissions,
@@ -8,11 +8,14 @@ import {
 } from './src/engine';
 import { Celebration, CELEBRATION_MS, type Celebrate } from './src/Celebration';
 import { InfoPanel } from './src/InfoPanel';
+import { Lobby } from './src/Lobby';
+import { useOnline } from './src/online/useOnline';
+import { missionById } from './src/online/wire';
 import { MissionToken } from './src/MissionToken';
 import { TableScene, type LastPlay, type PileView } from './src/TableScene';
 import { SYMBOLS } from './src/symbols';
 
-type Mode = 'solo' | 'together';
+type Mode = 'solo' | 'together' | 'online';
 
 const MEDAL = { bronze: '🥉 Bronze', argent: '🥈 Argent', or: '🥇 Or' } as const;
 const KIND_ICON = { help: '✋', good: '👍', stop: '⛔' } as const;
@@ -50,7 +53,17 @@ export default function App() {
   const [showTargets, setShowTargets] = useState(true);
   const [phrasesOn, setPhrasesOn] = useState(false);
 
-  const [game, setGame] = useState<GameState | null>(null);
+  const [localGame, setGame] = useState<GameState | null>(null);
+  const [myName, setMyName] = useState(() => {
+    try { return localStorage.getItem('50m-name') ?? ''; } catch { return ''; }
+  });
+  const [codeInput, setCodeInput] = useState('');
+  const onl = useOnline();
+  const online = mode === 'online';
+  const osnap = online ? onl.snap : null;
+  const pub = osnap?.pub ?? null;
+  const game = online ? osnap?.view ?? null : localGame;
+  const seenPlay = useRef<number | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   const [error, setError] = useState('');
@@ -71,7 +84,8 @@ export default function App() {
 
   const solo = mode === 'solo';
   const botSeats = (n: number) => (solo ? Array.from({ length: n - 1 }, (_, i) => i + 1) : []);
-  const seat = (p: number) => `Joueur ${p + 1}${botSeats(99).includes(p) ? ' (machine)' : ''}`;
+  const seat = (p: number) => (online ? pub?.seats[p]?.name ?? `Joueur ${p + 1}` : `Joueur ${p + 1}${botSeats(99).includes(p) ? ' (machine)' : ''}`);
+  const effPause = online ? pub?.options.pauseMs ?? 5000 : pauseMs;
   /** Applique les annonces automatiques des machines après chaque changement du tapis. */
   const sync = (g: GameState) => {
     const bs = botSeats(g.players);
@@ -120,9 +134,20 @@ export default function App() {
   // La carte posée reste mise en évidence le temps choisi, puis la vue se remet à plat.
   useEffect(() => {
     if (!lastPlay) return;
-    const id = setTimeout(() => setLastPlay((cur) => (cur && cur.key === lastPlay.key ? null : cur)), pauseMs);
+    const id = setTimeout(() => setLastPlay((cur) => (cur && cur.key === lastPlay.key ? null : cur)), effPause);
     return () => clearTimeout(id);
-  }, [lastPlay, pauseMs]);
+  }, [lastPlay, effPause]);
+
+  // En ligne : la carte posée et la fête viennent du dernier coup publié par l'hôte, pour tout le monde.
+  useEffect(() => {
+    if (!pub) { seenPlay.current = null; return; }
+    const last = pub.last;
+    if (seenPlay.current === null) { seenPlay.current = last?.n ?? 0; return; } // en rejoignant, pas de coup rejoué
+    if (!last || last.n <= seenPlay.current) return;
+    seenPlay.current = last.n;
+    setLastPlay({ key: last.n, seat: last.seat, card: last.card, covered: last.covered, pile: last.pile, gained: last.gained });
+    if (last.gained > 0) setParty({ key: Date.now(), done: last.done.map((d) => ({ def: missionById(d.id), idx: d.idx })), gained: last.gained, medal: last.medal });
+  }, [pub?.v]);
 
   const start = () => {
     const n = solo ? bots + 1 : players;
@@ -131,6 +156,21 @@ export default function App() {
     setRevealed(false); setSelected(null); setHistory([]); setError('');
     setSigMode('play'); setSpeaker(null); setMenu(false); setInfo(false); setTextFor(null); setLastPlay(null); setParty(null);
   };
+
+  const quit = () => { if (online) onl.leave(); setGame(null); setMenu(false); };
+
+  if (online && osnap && osnap.phase !== 'playing' && osnap.phase !== 'over') {
+    return <Lobby snap={osnap} session={onl.session.current} onLeave={quit} local={onl.kind === 'local'} />;
+  }
+  if (online && osnap && !game) {
+    return (
+      <SafeAreaView style={s.root}>
+        <StatusBar style="light" />
+        <Text style={s.title}>Connexion à la table…</Text>
+        <Pressable onPress={quit} style={s.quit}><Text style={s.quitTxt}>Quitter</Text></Pressable>
+      </SafeAreaView>
+    );
+  }
 
   if (!game) {
     return (
@@ -143,6 +183,7 @@ export default function App() {
             {([
               ['solo', 'Seul avec des machines', 'Tu joues, les autres joueurs sont simulés.'],
               ['together', 'À plusieurs, un téléphone', 'On se passe le téléphone.'],
+              ['online', 'En ligne', 'Chacun son téléphone, avec un code de salon.'],
             ] as const).map(([key, title, sub]) => (
               <Pressable key={key} onPress={() => setMode(key)} style={[s.opt, mode === key && s.optOn]}>
                 <Text style={[s.optTitle, mode === key && s.optTitleOn]}>{title}</Text>
@@ -160,6 +201,35 @@ export default function App() {
             </>
           )}
 
+          {online && (
+            <>
+              <Text style={s.label}>Ton prénom</Text>
+              <TextInput value={myName} onChangeText={(v) => { setMyName(v); try { localStorage.setItem('50m-name', v); } catch { /* sans stockage */ } }}
+                placeholder="Robin" placeholderTextColor="#64748b" maxLength={14} style={s.input} accessibilityLabel="Ton prénom" />
+              {!onl.kind ? (
+                <Text style={s.err}>Le mode en ligne n'est pas configuré sur cette version. Voir docs/en-ligne.md.</Text>
+              ) : (
+                <>
+                  <Pressable style={s.btn} disabled={onl.busy} onPress={() => onl.create(myName)}>
+                    <Text style={s.btnTxt}>Créer une partie</Text>
+                  </Pressable>
+                  <Text style={s.hint}>ou rejoindre avec un code</Text>
+                  <View style={s.row}>
+                    <TextInput value={codeInput} onChangeText={(v) => setCodeInput(v.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4))}
+                      placeholder="ABCD" placeholderTextColor="#64748b" autoCapitalize="characters" maxLength={4}
+                      style={[s.input, s.codeInput]} accessibilityLabel="Code du salon" />
+                    <Pressable style={[s.mode, codeInput.length === 4 && s.modeOn]} disabled={onl.busy || codeInput.length !== 4} onPress={() => onl.join(codeInput, myName)}>
+                      <Text style={[s.modeTxt, codeInput.length === 4 && s.modeTxtOn]}>Rejoindre</Text>
+                    </Pressable>
+                  </View>
+                  {!!onl.error && <Text style={s.err}>{onl.error}</Text>}
+                  {onl.kind === 'local' && <Text style={s.hint}>Test local : les autres joueurs sont les autres onglets de ce navigateur.</Text>}
+                </>
+              )}
+            </>
+          )}
+
+          {!online && (<>
           <Text style={s.label}>Pause entre les coups</Text>
           <View style={s.row}>
             {([5000, 2000, 1000] as const).map((ms) => (
@@ -170,16 +240,21 @@ export default function App() {
           </View>
           <Text style={s.hint}>Temps pendant lequel on voit la carte se poser sur celle qu'elle recouvre. Touche l'annonce pour passer plus vite.</Text>
 
+          </>)}
+
           <Text style={s.label}>Options</Text>
           <Toggle on={helpOn} onPress={() => setHelpOn(!helpOn)} title="💡 Coup de pouce" sub="Le jeu montre les cartes qui réussissent une ou plusieurs missions." />
-          {mode !== 'together' && (
+          {solo && (
             <Toggle on={showTargets} onPress={() => setShowTargets(!showTargets)} title="🎯 Voir les missions visées" sub="Des pastilles montrent quelles missions chaque machine peut réussir." />
           )}
-          <Toggle on={phrasesOn} onPress={() => setPhrasesOn(!phrasesOn)} title="💬 Phrases du livret" sub="En plus de « je peux » : « je peux aider » (mission), « bonne carte ici » et « ne jouez pas ici » (tas)." />
-
-          <Pressable style={s.btn} onPress={start}>
-            <Text style={s.btnTxt}>Commencer</Text>
-          </Pressable>
+          {!online && (
+            <>
+              <Toggle on={phrasesOn} onPress={() => setPhrasesOn(!phrasesOn)} title="💬 Phrases du livret" sub="En plus de « je peux » : « je peux aider » (mission), « bonne carte ici » et « ne jouez pas ici » (tas)." />
+              <Pressable style={s.btn} onPress={start}>
+                <Text style={s.btnTxt}>Commencer</Text>
+              </Pressable>
+            </>
+          )}
         </ScrollView>
       </SafeAreaView>
     );
@@ -199,22 +274,24 @@ export default function App() {
           <Text style={s.title}>{game.completed >= 50 ? '🎉 50 missions !' : 'Fin de partie'}</Text>
           {status}
           {game.completed < 50 && game.goldReached && <Text style={s.sub}>Il manquait {missionsLeft(game)} missions.</Text>}
-          <Text style={s.sub}>{history.length} coups joués</Text>
-          <Pressable style={s.btn} onPress={() => setGame(null)}><Text style={s.btnTxt}>Rejouer</Text></Pressable>
+          <Text style={s.sub}>{online ? pub?.history.length ?? 0 : history.length} coups joués</Text>
+          <Pressable style={s.btn} onPress={quit}><Text style={s.btnTxt}>{online ? 'Quitter' : 'Rejouer'}</Text></Pressable>
         </ScrollView>
       </SafeAreaView>
     );
   }
 
-  const me = solo ? 0 : game.current;
+  const me = online ? Math.max(0, osnap?.mySeat ?? 0) : solo ? 0 : game.current;
   const hand = game.hands[me];
   const sel = hand.find((c) => c.id === selected) ?? null;
   const ok = sel ? playablePiles(game, sel) : [];
   const t = tops(game);
-  const handShown = solo || openHands || revealed;
-  const canSignal = phrasesOn && game.players > 1;
+  const handShown = online || solo || openHands || revealed;
+  const canSignal = (online ? !!pub?.options.phrases : phrasesOn) && game.players > 1;
+  const hist = online ? pub?.history ?? [] : history;
+  const session = () => onl.session.current;
   // Celui qui parle : toi en solo ; sinon, par défaut, le joueur suivant.
-  const who = solo ? 0 : speaker ?? (game.current + 1) % game.players;
+  const who = online || solo ? me : speaker ?? (game.current + 1) % game.players;
 
   const hintsOf = (p: number) => (helpOn ? findMissionMoves(game, p) : []);
   const hintCards = new Set(hintsOf(me).map((m) => m.cardId));
@@ -234,16 +311,26 @@ export default function App() {
     const help = signalTags('help', { mission: id });
     const helpers = new Set(game.signals.filter((g) => g.kind === 'help' && g.mission === id).map((g) => g.player));
     const targets =
-      showTargets && mode !== 'together'
+      showTargets && solo
         ? botSeats(game.players).filter((b) => !helpers.has(b) && reachableMissions(game, b).includes(id)).map((b) => `🙋J${b + 1}`)
         : [];
-    const mine = helpOn && reachableMissions(game, me).includes(id) ? [solo ? '💡Toi' : `💡J${me + 1}`] : [];
+    const mine = helpOn && reachableMissions(game, me).includes(id) ? [solo || online ? '💡Toi' : `💡J${me + 1}`] : [];
     return [...mine, ...help, ...targets];
   };
 
   const drop = (pile: number) => {
-    if (canSignal && (sigMode === 'good' || sigMode === 'stop')) return setGame(toggleSignal(game, { player: who, kind: sigMode, pile }));
+    if (canSignal && (sigMode === 'good' || sigMode === 'stop')) {
+      return online ? session()?.toggleSignal(sigMode, { pile }) : setGame(toggleSignal(game, { player: who, kind: sigMode, pile }));
+    }
     if (!handShown) return setError("Affiche d'abord ta main");
+    if (online) {
+      if (game.current !== me) return setError("Ce n'est pas encore ton tour");
+      if (!sel) return setError("Choisis d'abord une carte");
+      if (!ok.includes(pile)) return setError('Même symbole ou même valeur requis');
+      session()?.play(sel.id, pile);
+      setError(''); setSelected(null); setSigMode('play');
+      return;
+    }
     if (solo && game.current !== 0) return setError("Ce n'est pas encore ton tour");
     if (!sel) return setError("Choisis d'abord une carte");
     const covered = game.piles[pile][game.piles[pile].length - 1];
@@ -267,7 +354,8 @@ export default function App() {
   const missionText = game.missions.find((m) => m.id === textFor)?.label;
   const sigHint = { play: '', help: 'Touche la mission pour laquelle tu peux aider', good: 'Touche le tas où tu as une bonne carte', stop: 'Touche le tas où il ne faut pas jouer' }[sigMode];
   const toggleSig = (k: SignalKind) => setSigMode(sigMode === k ? 'play' : k);
-  const turnTitle = solo ? (game.current === 0 ? 'À toi de jouer' : `${seat(game.current)} joue…`) : `Joueur ${game.current + 1} joue`;
+  const turnTitle = solo || online ? (game.current === me ? 'À toi de jouer' : `${seat(game.current)} joue…`) : `Joueur ${game.current + 1} joue`;
+  const labels = online ? game.hands.map((_, i) => ({ name: i === me ? 'Toi' : seat(i).replace(' (machine)', ''), avatar: pub?.seats[i]?.bot ? '🤖' : i === me ? '🙂' : '👤' })) : undefined;
 
   return (
     <SafeAreaView style={s.game}>
@@ -284,17 +372,18 @@ export default function App() {
         {game.missions.map((m) => (
           <MissionToken key={m.id} def={m} size={tokenSize} showText={false} badges={missionBadges(m.id)}
             onPress={() => (canSignal && sigMode === 'help'
-              ? setGame(toggleSignal(game, { player: who, kind: 'help', mission: m.id }))
+              ? (online ? session()?.toggleSignal('help', { mission: m.id }) : setGame(toggleSignal(game, { player: who, kind: 'help', mission: m.id })))
               : setTextFor(textFor === m.id ? null : m.id))} />
         ))}
       </View>
 
       <View style={s.tableWrap}>
-        <TableScene game={game} solo={solo} piles={pileViews} onPile={drop}
+        <TableScene game={game} solo={solo} labels={labels} piles={pileViews} onPile={drop}
           meIndex={me} hand={hand} handShown={handShown} selectedId={selected} hintCards={hintCards} hintLine={hintLine}
           onSelect={(id) => { setSelected(id); setError(''); setSigMode('play'); }}
           onReveal={() => { setRevealed(true); setSigMode('play'); }} revealAll={openHands} scale={scale}
-          lastPlay={lastPlay} pauseMs={pauseMs} who={(i) => (solo && i === 0 ? 'Toi' : `J${i + 1}${solo ? ' (machine)' : ''}`)}
+          lastPlay={lastPlay} pauseMs={effPause}
+          who={(i) => (online ? (i === me ? 'Toi' : seat(i)) : solo && i === 0 ? 'Toi' : `J${i + 1}${solo ? ' (machine)' : ''}`)}
           onSkip={() => { if (solo && game.current !== 0) doBotMove(game); else setLastPlay(null); }} />
         {!!missionText && (
           <Pressable onPress={() => setTextFor(null)} style={s.tip}><Text style={s.tipTxt}>{missionText}</Text></Pressable>
@@ -304,13 +393,13 @@ export default function App() {
       <View style={s.bar}>
         {!!error ? <Text style={s.barErr} numberOfLines={1}>{error}</Text>
           : sigMode !== 'play' ? <Text style={s.barTxt} numberOfLines={1}>{sigHint}</Text>
-          : <Text style={s.barTxt} numberOfLines={1}>{history[0] ?? 'À toi de commencer'}</Text>}
+          : <Text style={s.barTxt} numberOfLines={1}>{hist[0] ?? (game.current === me ? 'À toi de commencer' : `${seat(game.current)} commence`)}</Text>}
         <View style={s.barRow}>
-          {(solo ? [0] : game.hands.map((_, i) => i)).map((i) => {
+          {(solo || online ? [me] : game.hands.map((_, i) => i)).map((i) => {
             const on = game.canDo.includes(i);
             return (
-              <Pressable key={i} onPress={() => setGame(toggleCanDo(game, i))} style={[s.mode, s.grow, on && s.modeOn]}>
-                <Text style={[s.modeTxt, on && s.modeTxtOn]} numberOfLines={1}>{solo ? '🙋 Je peux réussir une mission' : `🙋 J${i + 1}`}</Text>
+              <Pressable key={i} onPress={() => (online ? session()?.toggleCanDo() : setGame(toggleCanDo(game, i)))} style={[s.mode, s.grow, on && s.modeOn]}>
+                <Text style={[s.modeTxt, on && s.modeTxtOn]} numberOfLines={1}>{solo || online ? '🙋 Je peux réussir une mission' : `🙋 J${i + 1}`}</Text>
               </Pressable>
             );
           })}
@@ -320,7 +409,7 @@ export default function App() {
             </Pressable>
           ))}
         </View>
-        {canSignal && !solo && sigMode !== 'play' && (
+        {canSignal && !solo && !online && sigMode !== 'play' && (
           <View style={s.barRow}>
             <Text style={s.barTxt}>Qui parle ?</Text>
             {game.hands.map((_, i) => (
@@ -337,17 +426,23 @@ export default function App() {
       )}
 
       {info && (
-        <InfoPanel game={game} solo={solo} onClose={() => setInfo(false)} options={{ help: helpOn, targets: showTargets, phrases: phrasesOn }} />
+        <InfoPanel game={game} solo={solo} onClose={() => setInfo(false)} options={{ help: helpOn, targets: showTargets, phrases: online ? !!pub?.options.phrases : phrasesOn }}
+          nameOf={online ? (i) => (i === me ? 'Toi' : seat(i)) : undefined} />
       )}
 
       {menu && (
         <View style={s.menu}>
           <Text style={s.label}>Derniers coups</Text>
-          {history.slice(0, 8).map((h, i) => (
-            <Text key={history.length - i} style={[s.histLine, i === 0 && s.histFirst]}>{history.length - i}. {h}</Text>
+          {hist.slice(0, 8).map((h, i) => (
+            <Text key={i} style={[s.histLine, i === 0 && s.histFirst]}>{h}</Text>
           ))}
-          {history.length === 0 && <Text style={s.histLine}>Aucun coup joué.</Text>}
-          <Pressable onPress={() => setGame(null)} style={s.quit}><Text style={s.quitTxt}>Quitter la partie</Text></Pressable>
+          {hist.length === 0 && <Text style={s.histLine}>Aucun coup joué.</Text>}
+          {online && osnap?.isHost && pub?.seats.map((sd, i) => (i !== me && !sd.bot ? (
+            <Pressable key={i} onPress={() => { session()?.botify(i); setMenu(false); }} style={s.quit}>
+              <Text style={s.quitTxt}>Remplacer {sd.name} par une machine</Text>
+            </Pressable>
+          ) : null))}
+          <Pressable onPress={quit} style={s.quit}><Text style={s.quitTxt}>Quitter la partie</Text></Pressable>
         </View>
       )}
     </SafeAreaView>
@@ -428,6 +523,8 @@ const s = StyleSheet.create({
   cover: { backgroundColor: '#1e293b', borderRadius: 12, padding: 16, gap: 8 },
   tokens: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12 },
   err: { color: '#fca5a5', textAlign: 'center' },
+  input: { backgroundColor: '#1e293b', color: '#f8fafc', borderRadius: 12, padding: 14, fontSize: 18, fontWeight: '700', textAlign: 'center' },
+  codeInput: { width: 130, letterSpacing: 6 },
   quit: { alignSelf: 'center', padding: 10 },
   quitTxt: { color: '#94a3b8', textDecorationLine: 'underline' },
 });

@@ -6,6 +6,7 @@
     "@expo/metro-runtime": "~57.0.16",
     "expo": "~57.0.26",
     "expo-status-bar": "~57.0.1",
+    "firebase": "^12.19.0",
     "react": "19.2.3",
     "react-dom": "^19.2.3",
     "react-native": "0.86.3",
@@ -22,7 +23,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "tsx --test src/engine.test.ts",
+    "test": "tsx --test src/engine.test.ts src/online/online.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "private": true

@@ -21,12 +21,12 @@ const Line = ({ k, v }: { k: string; v: string }) => (
 );
 
 /** Infos sur la partie : avancement, joueurs, missions en cours, symboles, rappel des règles. */
-export function InfoPanel({ game, solo, options, onClose }: {
-  game: GameState; solo: boolean; onClose: () => void;
+export function InfoPanel({ game, solo, options, onClose, nameOf }: {
+  game: GameState; solo: boolean; onClose: () => void; nameOf?: (i: number) => string;
   options: { help: boolean; targets: boolean; phrases: boolean };
 }) {
   const nm = nextMedal(game);
-  const name = (i: number) => (solo ? (i === 0 ? 'Toi' : `Joueur ${i + 1} (machine)`) : `Joueur ${i + 1}`);
+  const name = (i: number) => nameOf?.(i) ?? (solo ? (i === 0 ? 'Toi' : `Joueur ${i + 1} (machine)`) : `Joueur ${i + 1}`);
   const next = (game.current + 1) % game.players;
   const buried = game.piles.reduce((a, p) => a + p.length - 1, 0);
 

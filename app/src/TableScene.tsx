@@ -80,6 +80,8 @@ type Props = {
   meIndex: number; hand: Card[]; handShown: boolean; selectedId: number | null; hintCards: Set<number>; hintLine: string | null;
   onSelect: (id: number) => void; onReveal: () => void; revealAll: boolean; scale: number;
   lastPlay: LastPlay | null; pauseMs: number; onSkip: () => void; who: (i: number) => string;
+  /** Nom et avatar de chaque siège (sinon : Toi / J2… selon `solo`). */
+  labels?: { name: string; avatar: string }[];
 };
 
 /**
@@ -97,8 +99,8 @@ export function TableScene(p: Props) {
   const inner = width - 32 - 20;
   const pileW = Math.min(64 * p.scale, (inner - (n === 4 ? 2 * 62 : 0) - 3 * 6) / 4);
   const handW = Math.min(66 * p.scale, (inner - 52 - 3 * 6) / 4);
-  const label = (i: number) => (solo && i === 0 ? 'Toi' : `J${i + 1}`);
-  const avatar = (i: number) => (solo ? (i === 0 ? '🙂' : '🤖') : '👤');
+  const label = (i: number) => p.labels?.[i]?.name ?? (solo && i === 0 ? 'Toi' : `J${i + 1}`);
+  const avatar = (i: number) => p.labels?.[i]?.avatar ?? (solo ? (i === 0 ? '🙂' : '🤖') : '👤');
   const seat = (rel: number, vertical = false) => {
     const i = at(rel);
     return <Seat key={i} game={game} i={i} name={label(i)} avatar={avatar(i)} vertical={vertical} reveal={p.revealAll} />;

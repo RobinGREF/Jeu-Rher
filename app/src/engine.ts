@@ -1,7 +1,7 @@
 import { buildMissionDefs, type MissionDef } from './missions';
 import type { Card, Medal, Symbol } from './types';
 
-type MissionDeckItem = { kind: 'mission'; def: MissionDef } | { kind: 'medal'; medal: Medal };
+export type MissionDeckItem = { kind: 'mission'; def: MissionDef } | { kind: 'medal'; medal: Medal };
 
 /** Phrases du livret (variante) : « Je peux aider pour cette Mission », « J'ai une bonne carte ici », « Ne jouez pas ici ». */
 export type SignalKind = 'help' | 'good' | 'stop';
