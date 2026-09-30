@@ -84,6 +84,46 @@ window.GAME_CONFIG = {
       skin: '#e8b98a', outfit: '#2e9e5b', outfit2: '#1b4d33', accent: '#ffd23f', hair: '#ffcc33', hairStyle: 'spiky',
       special: { type: 'uppercut', name: 'DRAGON MONTANT', desc: 'Saut-poing ascendant', color: '#5dff8a' }
     }
+    ,
+    /* ---- Personnages "photo" : le visage vient de img/faceN.jpg ----
+     * Pour changer un visage, remplace le fichier (carré, ~128 px) ou
+     * modifie `face`. Renomme-les comme tu veux (name / title). */
+    {
+      name: 'LE GRIS', title: 'Le Sage du Rivage', face: 'img/face1.jpg',
+      hp: 108, speed: 2.9, jump: 14.5, power: 1.12,
+      skin: '#d8a583', outfit: '#cdb994', outfit2: '#2d2823', accent: '#8a7a5a', hair: '#9a9a9a', hairStyle: 'bald',
+      special: { type: 'uppercut', name: 'POING DU SAGE', desc: 'Coup montant plein d\'expérience', color: '#ffb347' }
+    },
+    {
+      name: 'MISS RAYURES', title: 'La Tornade Marine', face: 'img/face2.jpg',
+      hp: 92, speed: 3.9, jump: 16.5, power: 0.95,
+      skin: '#cf9a78', outfit: '#dfe7f3', outfit2: '#e8e1d3', accent: '#2f5fa8', hair: '#2b1d16', hairStyle: 'bald',
+      special: { type: 'dash', name: 'TOURBILLON RAYÉ', desc: 'Charge rapide', color: '#6fa8ff' }
+    },
+    {
+      name: 'L\'OLIVE', title: 'Le Cool du Groupe', face: 'img/face3.jpg',
+      hp: 100, speed: 3.4, jump: 15.5, power: 1.0,
+      skin: '#dcb090', outfit: '#5f6d3d', outfit2: '#3f3a32', accent: '#f2f2f2', hair: '#2b1d16', hairStyle: 'bald',
+      special: { type: 'fireball', name: 'BOULE OLIVE', desc: 'Projectile d\'énergie verte', color: '#9be36b' }
+    },
+    {
+      name: 'LA BRUNE', title: 'Regard Solaire', face: 'img/face4.jpg',
+      hp: 94, speed: 3.6, jump: 17, power: 0.98,
+      skin: '#d9a98c', outfit: '#f3efe8', outfit2: '#2b2b33', accent: '#e05a8a', hair: '#2b1d16', hairStyle: 'bald',
+      special: { type: 'fireball', name: 'ÉCLAT DE SOLEIL', desc: 'Boule de lumière', color: '#ffd23f' }
+    },
+    {
+      name: 'LE BARBU', title: 'Le Bulldozer', face: 'img/face5.jpg',
+      hp: 118, speed: 2.8, jump: 14, power: 1.2,
+      skin: '#d3a084', outfit: '#cbb493', outfit2: '#e8e1d0', accent: '#d9542a', hair: '#2b1d16', hairStyle: 'bald',
+      special: { type: 'dash', name: 'CHARGE DU BARBU', desc: 'Fonce et projette', color: '#ff7a3a' }
+    },
+    {
+      name: 'LA BLONDE', title: 'Reine du Couchant', face: 'img/face6.jpg',
+      hp: 98, speed: 3.5, jump: 16, power: 1.05,
+      skin: '#e6bc9d', outfit: '#c8553d', outfit2: '#8a7355', accent: '#ffd23f', hair: '#e8c46a', hairStyle: 'bald',
+      special: { type: 'uppercut', name: 'DRAGON DORÉ', desc: 'Coup montant flamboyant', color: '#ffd86b' }
+    }
   ],
 
   stages: [
@@ -131,6 +171,12 @@ window.GAME_CONFIG = {
         { type: 'mountains', color: '#210805', h: 190 }
       ],
       ground: { colors: ['#3b2a2a', '#120a0a'], line: 'rgba(255,110,30,0.55)' }
+    }
+    ,
+    {
+      name: 'Coucher de Soleil', seed: 5, image: 'img/sunset.jpg',
+      sky: ['#f6a94a', '#f7c982'],
+      ground: { colors: ['#dcb98d', '#7f6244'], line: 'rgba(90,60,30,0.35)' }
     }
     /* Exemple avec une image perso :
     { name: 'Mon décor', image: 'img/mon-decor.png', ground: { colors: ['#333','#111'], line: 'rgba(255,255,255,.2)' }, sky: ['#000','#000'] }

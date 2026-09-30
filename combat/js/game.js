@@ -7,6 +7,7 @@ const CFG = window.GAME_CONFIG;
 const W = 960, H = 540, GROUND = 470, STAGE_L = 50, STAGE_R = 910, GRAV = 0.8;
 const cv = document.getElementById('game');
 const ctx = cv.getContext('2d');
+ctx.imageSmoothingQuality = 'high';
 
 /* ---------------------------------------------------------------- utils */
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -651,18 +652,35 @@ function drawFighter(f, gx, gy, sc) {
   ctx.restore();
 }
 
+function faceImage(c) {
+  if (!c.face) return null;
+  if (!c._img) { c._img = new Image(); c._img.src = c.face; }
+  return c._img.complete && c._img.naturalWidth ? c._img : null;
+}
 function drawHead(c, hx, hy, f, flash, C) {
   const skin = C(c.skin), hair = C(c.hair), acc = C(c.accent), t = f.anim;
   ctx.lineJoin = 'round';
-  if (c.hairStyle === 'long') { // queue derrière
+  if (c.hairStyle === 'long' && !c.face) { // queue derrière
     ctx.strokeStyle = hair; ctx.lineWidth = 9; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(hx - 10, hy - 8);
     ctx.quadraticCurveTo(hx - 30, hy + 6 + Math.sin(t * 0.15) * 4, hx - 34, hy + 30 + Math.sin(t * 0.15 + 1) * 5); ctx.stroke();
   }
-  if (c.hairStyle === 'band') { // ruban qui flotte
+  if (c.hairStyle === 'band' && !c.face) { // ruban qui flotte
     ctx.strokeStyle = acc; ctx.lineWidth = 4; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(hx - 12, hy - 6);
     ctx.quadraticCurveTo(hx - 24, hy - 2 + Math.sin(t * 0.2) * 4, hx - 36, hy + 6 + Math.sin(t * 0.2 + 1) * 6); ctx.stroke();
+  }
+  const img = faceImage(c);
+  if (img) { // visage photo : toujours de face, jamais inversé
+    const R = 22, cy2 = hy - 4;
+    ctx.save(); ctx.translate(hx, cy2); ctx.scale(f.face, 1);
+    ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.fillStyle = skin; ctx.fill();
+    ctx.save(); ctx.clip(); ctx.drawImage(img, -R, -R, R * 2, R * 2); ctx.restore();
+    if (flash) { ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.fill(); }
+    else if (f.state === 'hit' || f.state === 'ko' || f.state === 'down') { ctx.fillStyle = 'rgba(200,0,0,0.22)'; ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.fill(); }
+    ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.strokeStyle = '#141414'; ctx.lineWidth = 3.5; ctx.stroke();
+    ctx.restore();
+    return;
   }
   ctx.beginPath(); ctx.arc(hx, hy, 14, 0, 7); ctx.fillStyle = skin; ctx.fill();
   ctx.strokeStyle = '#141414'; ctx.lineWidth = 3; ctx.stroke();
@@ -889,28 +907,30 @@ function drawSelect() {
   text('CHOISIS TON COMBATTANT', W / 2, 44, 42, '#fff');
   const who = step === 0 ? 'JOUEUR 1' : (G.mode === 1 ? 'ADVERSAIRE (CPU)' : 'JOUEUR 2');
   text(who, W / 2, 86, 26, step === 0 ? '#ff6b6b' : '#7ad0ff');
-  const n = chars.length, cw = 138, gap = 12, x0 = (W - (n * cw + (n - 1) * gap)) / 2, y0 = 112, ch = 220;
+  const n = chars.length, cols = Math.min(6, n), rows = Math.ceil(n / cols), cw = 138, gap = 12;
+  const big = rows === 1, ch = big ? 220 : 108, fs = big ? 1 : 0.62, y00 = big ? 112 : 100;
   chars.forEach((c, i) => {
-    const x = x0 + i * (cw + gap), sel = G.sel.cursor === i;
+    const col = i % cols, row = Math.floor(i / cols), inRow = Math.min(cols, n - row * cols);
+    const x = (W - (inRow * cw + (inRow - 1) * gap)) / 2 + col * (cw + gap), y0 = y00 + row * (ch + 34), sel = G.sel.cursor === i;
     ctx.save();
     rrect(x, y0, cw, ch, 12); ctx.clip();
     const g = ctx.createLinearGradient(0, y0, 0, y0 + ch);
     g.addColorStop(0, shade(c.outfit === '#e8e8ee' ? '#7a7a90' : c.outfit, -40)); g.addColorStop(1, '#101018');
     ctx.fillStyle = g; ctx.fillRect(x, y0, cw, ch);
-    ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(x, y0 + ch - 40, cw, 40);
+    ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(x, y0 + ch - (big ? 40 : 20), cw, big ? 40 : 20);
     const dummy = { ch: c, state: 'idle', face: 1, anim: G.t + i * 20, y: 0, flash: 0, gauge: sel ? 100 : 0, stun: 0, atk: null, walkPh: 0, stateT: 0, launched: false, blockCrouch: false };
-    drawFighter(dummy, x + cw / 2, y0 + ch - 24, 1.0);
+    drawFighter(dummy, x + cw / 2, y0 + ch - (big ? 24 : 12), fs);
     ctx.restore();
     ctx.lineWidth = sel ? 5 : 2; ctx.strokeStyle = sel ? '#ffd23f' : 'rgba(255,255,255,0.35)';
     rrect(x, y0, cw, ch, 12); ctx.stroke();
-    text(c.name, x + cw / 2, y0 + ch + 18, 18, sel ? '#ffd23f' : '#fff');
+    text(c.name, x + cw / 2, y0 + ch + 18, c.name.length > 11 ? 15 : 18, sel ? '#ffd23f' : '#fff');
     if (step >= 1 && G.picks[0] === i) badge(x + 8, y0 + 8, 'J1', '#e0352b');
     if (step === 1 && sel) badge(x + cw - 44, y0 + 8, G.mode === 1 ? 'CPU' : 'J2', '#2a7de0');
     clickable(x, y0, cw, ch + 30, () => { if (G.sel.cursor === i) selectConfirm(); else { G.sel.cursor = i; sfx('menu'); } });
   });
   // fiche
-  const c = chars[G.sel.cursor], py = 384;
-  ctx.fillStyle = 'rgba(0,0,0,0.65)'; rrect(60, py, W - 120, 120, 12); ctx.fill();
+  const c = chars[G.sel.cursor], py = big ? 384 : 392;
+  ctx.fillStyle = 'rgba(0,0,0,0.65)'; rrect(60, py, W - 120, big ? 120 : 116, 12); ctx.fill();
   text(c.name, 90, py + 28, 30, '#ffd23f', 'left');
   plainText(c.title, 90, py + 58, 16, '#ddd', 'left', 'italic');
   plainText('SPÉCIAL : ' + c.special.name, 90, py + 88, 16, c.special.color, 'left', 'bold');
@@ -996,6 +1016,8 @@ function onPress(code) {
     const n = CFG.characters.length;
     if (k.L) { G.sel.cursor = (G.sel.cursor + n - 1) % n; sfx('menu'); }
     if (k.R) { G.sel.cursor = (G.sel.cursor + 1) % n; sfx('menu'); }
+    if (k.D && G.sel.cursor + 6 < n) { G.sel.cursor += 6; sfx('menu'); }
+    if (k.U && G.sel.cursor - 6 >= 0) { G.sel.cursor -= 6; sfx('menu'); }
     if (k.ok) selectConfirm();
     if (k.back) { if (G.sel.step === 1) { G.sel.step = 0; G.sel.cursor = G.picks[0]; } else G.scene = 'title'; sfx('menu'); }
   } else if (G.scene === 'stage') {
