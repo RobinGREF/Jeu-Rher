@@ -8,9 +8,11 @@ import {
 } from './src/engine';
 import { Celebration, CELEBRATION_MS, type Celebrate } from './src/Celebration';
 import { InfoPanel } from './src/InfoPanel';
-import { ScoreBoard } from './src/ScoreBoard';
+import { ScoreBoard, type SharedScores } from './src/ScoreBoard';
 import { addScore, cleanName, clearScores, loadScores, saveScores, type ScoreEntry } from './src/scores';
 import { Lobby } from './src/Lobby';
+import { getBackend } from './src/online';
+import { fetchScores } from './src/online/sharedScores';
 import { useOnline } from './src/online/useOnline';
 import { missionById } from './src/online/wire';
 import { MissionToken } from './src/MissionToken';
@@ -94,6 +96,8 @@ export default function App() {
   const [scoresOpen, setScoresOpen] = useState(false);
   const [lastRank, setLastRank] = useState<number | null>(null);
   const [lastScoreId, setLastScoreId] = useState<string | null>(null);
+  const [lastCode, setLastCode] = useState<string | null>(null); // salon de la dernière partie en ligne (pour la repérer dans le tableau partagé)
+  const [shared, setShared] = useState<SharedScores>({ status: 'off', list: [] });
   const startedAt = useRef(Date.now());
   const savedKey = useRef<string | null>(null);
   const [picking, setPicking] = useState<number | null>(null);
@@ -169,7 +173,7 @@ export default function App() {
     };
     const { list, rank } = addScore(loadScores(), entry);
     saveScores(list);
-    setScores(list); setLastRank(rank); setLastScoreId(entry.id);
+    setScores(list); setLastRank(rank); setLastScoreId(entry.id); setLastCode(online ? osnap?.code ?? null : null);
   }, [game?.over]);
 
   useEffect(() => {
@@ -213,8 +217,21 @@ export default function App() {
     startedAt.current = Date.now(); savedKey.current = null; setLastRank(null); setLastScoreId(null);
   };
 
+  /** Ouvre le tableau des scores ; s'il y a un mode en ligne, charge aussi le tableau partagé. */
+  const loadShared = () => {
+    const be = getBackend();
+    if (!be) return setShared({ status: 'off', list: [] });
+    setShared((cur) => ({ status: 'loading', list: cur.list }));
+    fetchScores(be).then(
+      (list) => setShared({ status: 'ready', list }),
+      (e) => setShared({ status: 'error', list: [], error: e instanceof Error ? e.message : String(e) }),
+    );
+  };
+  const openScores = () => { setScoresOpen(true); loadShared(); };
+
   if (scoresOpen) {
-    return <ScoreBoard list={scores} highlightId={lastScoreId} onBack={() => setScoresOpen(false)} onClear={() => { clearScores(); setScores([]); setLastRank(null); setLastScoreId(null); }} />;
+    return <ScoreBoard local={scores} shared={shared} highlightIds={[lastScoreId, lastCode].filter((x): x is string => !!x)} onBack={() => setScoresOpen(false)} onRefresh={loadShared}
+      onClear={() => { clearScores(); setScores([]); setLastRank(null); setLastScoreId(null); }} />;
   }
 
   const quit = () => { if (online) onl.leave(); setGame(null); setMenu(false); setScreen('home'); };
@@ -325,7 +342,7 @@ export default function App() {
             <Text style={s.bigSub}>On se passe le téléphone</Text>
           </Pressable>
           <View style={s.row}>
-            <Pressable onPress={() => setScoresOpen(true)} style={s.link}><Text style={s.linkTxt}>🏆 Meilleurs scores</Text></Pressable>
+            <Pressable onPress={openScores} style={s.link}><Text style={s.linkTxt}>🏆 Meilleurs scores</Text></Pressable>
             <Pressable onPress={() => setScreen('settings')} style={s.link}><Text style={s.linkTxt}>⚙️ Réglages</Text></Pressable>
           </View>
         </ScrollView>
@@ -350,7 +367,7 @@ export default function App() {
           {lastRank !== null && <Text style={s.record}>{lastRank === 1 ? '🏆 Nouveau record !' : `🏅 ${lastRank}ᵉ au classement des meilleurs scores`}</Text>}
           <Text style={s.sub}>{(online ? (pub?.seats ?? []).map((x) => x.name) : solo ? [cleanName(myName, 'Moi'), ...Array.from({ length: game.players - 1 }, (_, i) => `Machine ${i + 1}`)] : Array.from({ length: game.players }, (_, i) => `Joueur ${i + 1}`)).join(' · ')}</Text>
           <Text style={s.sub}>{online ? pub?.last?.n ?? 0 : history.length} coups joués</Text>
-          <Pressable style={s.bigBtn} onPress={() => setScoresOpen(true)}><Text style={s.bigTitle}>🏆 Meilleurs scores</Text></Pressable>
+          <Pressable style={s.bigBtn} onPress={openScores}><Text style={s.bigTitle}>🏆 Meilleurs scores</Text></Pressable>
           <Pressable style={s.btn} onPress={quit}><Text style={s.btnTxt}>{online ? 'Quitter' : 'Rejouer'}</Text></Pressable>
         </ScrollView>
       </SafeAreaView>

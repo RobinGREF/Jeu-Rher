@@ -52,3 +52,9 @@ Ces conditions sont celles de Google et peuvent changer : vérifie-les à la cr�
 - **4 joueurs maximum** ; le code (4 lettres) n'est pas un secret fort : il donne accès à l'état public de la table, pas aux mains.
 - **Application mobile native (Expo Go, iOS, Android) :** pour retrouver son identité après avoir fermé l'application, il faudra ajouter le stockage persistant de Firebase (`AsyncStorage`). Sur le web, l'identité est conservée par le navigateur.
 - Les coups sont validés par l'hôte : un joueur ne peut ni jouer hors de son tour, ni jouer une carte qu'il n'a pas, ni écrire l'état de la partie.
+
+## Tableau des scores partagé
+
+À la fin de chaque partie en ligne, l'hôte inscrit le résultat (missions, médaille, coups, noms des participants) dans le nœud `scores/<code du salon>` de la base. Une entrée ne s'écrit qu'une fois (pas de modification ni de suppression) et seul l'hôte du salon peut l'écrire. Tous les joueurs voient ce tableau dans **🏆 Meilleurs scores → 🌐 Tous les joueurs**.
+
+⚠️ Après cette mise à jour, il faut **republier les règles** : Firebase → Realtime Database → Règles → coller le contenu de `app/firebase.rules.json` → Publier. Sans cela, le tableau partagé reste vide (l'écran l'indique).

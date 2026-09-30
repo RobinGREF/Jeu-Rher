@@ -4,6 +4,7 @@ import {
 } from '../engine';
 import { SYMBOLS } from '../symbols';
 import type { Backend } from './backend';
+import { publishScore } from './sharedScores';
 import { fromWire, toWire, type LastWire, type Options, type PublicState, type SeatInfo } from './wire';
 
 /** Demande d'un joueur à l'hôte. */
@@ -30,6 +31,7 @@ export class Host {
   private off: (() => void) | null = null;
   private queue: Promise<void> = Promise.resolve();
   private stopped = false;
+  private scoreSaved = false;
   private rng: () => number = Math.random;
 
   private constructor(private be: Backend, private code: string, private options: Options) {}
@@ -172,6 +174,14 @@ export class Host {
       last: this.last, history: this.history.slice(0, 30), options: this.options,
     };
     await this.be.set(this.path('public'), { json: JSON.stringify(pub) });
+    // Fin de partie : le résultat va au tableau partagé (une seule fois ; sans effet si les règles ne l'autorisent pas encore).
+    if (g.over && !this.scoreSaved) {
+      this.scoreSaved = true;
+      await publishScore(this.be, this.code, {
+        id: this.code, at: Date.now(), completed: g.completed, medal: g.medal, plays: this.n, mode: 'online',
+        players: this.seats.map((s) => ({ name: s.name, bot: s.bot })),
+      }).catch(() => {});
+    }
     await this.be.set(this.path('hostState'), {
       json: JSON.stringify({ game: toWire(g), seats: this.seats, history: this.history, last: this.last, n: this.n, v: this.v }),
     });

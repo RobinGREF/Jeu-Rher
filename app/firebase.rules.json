@@ -10,7 +10,9 @@
         },
         "players": {
           ".read": "auth != null",
-          "$uid": { ".write": "auth != null && auth.uid === $uid" }
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid"
+          }
         },
         "public": {
           ".read": "auth != null",
@@ -31,6 +33,43 @@
         "hostState": {
           ".read": "auth != null && root.child('rooms').child($code).child('meta').child('hostUid').val() === auth.uid",
           ".write": "auth != null && root.child('rooms').child($code).child('meta').child('hostUid').val() === auth.uid"
+        }
+      }
+    },
+    "scores": {
+      ".read": "auth != null",
+      "$code": {
+        ".write": "auth != null && !data.exists() && root.child('rooms').child($code).child('meta').child('hostUid').val() === auth.uid",
+        ".validate": "newData.hasChildren(['at', 'completed', 'plays', 'players'])",
+        "at": {
+          ".validate": "newData.isNumber()"
+        },
+        "completed": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 50"
+        },
+        "plays": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() < 2000"
+        },
+        "medal": {
+          ".validate": "newData.isString() && newData.val().length < 8"
+        },
+        "players": {
+          ".validate": "newData.hasChildren()",
+          "$i": {
+            ".validate": "newData.hasChildren(['name', 'bot'])",
+            "name": {
+              ".validate": "newData.isString() && newData.val().length <= 14"
+            },
+            "bot": {
+              ".validate": "newData.isBoolean()"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "$other": {
+          ".validate": false
         }
       }
     }

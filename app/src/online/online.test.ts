@@ -1,7 +1,9 @@
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { botMove, canAnnounce, newGame, play, playablePiles, type GameState } from '../engine';
-import { canRead, canWrite } from './rules';
+import { canRead, canWrite, validScore } from './rules';
+import { fetchScores, fromWireScores, toWireScore } from './sharedScores';
+import type { ScoreEntry } from '../scores';
 import { LocalStorageStore, MemoryStore, StoreBackend } from './localBackend';
 import { Host } from './host';
 import { OnlineSession, type Snapshot } from './session';
@@ -168,6 +170,23 @@ test('partie à 3 humains + 1 machine, jusqu\'au bout : confidentialité et coh�
   const finals = all.map((s) => s.snapshot.pub!);
   assert.ok(finals.every((f) => f.over && f.completed === finals[0].completed));
   assert.ok(finals[0].history.length > 5);
+
+  // Fin de partie : l'hôte a inscrit le résultat au tableau partagé, avec les noms de tous les participants.
+  const viewer = w.client('a'); // n'importe quel joueur connecté peut lire le tableau
+  await until(() => (w.store.read() as { scores?: Record<string, unknown> }).scores?.[code] !== undefined, 'score publié');
+  const shared = await fetchScores(viewer);
+  assert.equal(shared.length, 1);
+  assert.equal(shared[0].id, code);
+  assert.equal(shared[0].mode, 'online');
+  assert.equal(shared[0].completed, finals[0].completed);
+  assert.deepEqual(shared[0].players, [
+    { name: 'Robin', bot: false }, { name: 'Alice', bot: false }, { name: 'Bob', bot: false }, { name: 'Machine 1', bot: true },
+  ]);
+  // personne ne peut écraser ni falsifier : ni un joueur, ni même l'hôte une seconde fois, ni une valeur hors limites
+  const forged = toWireScore({ ...shared[0], completed: 50 });
+  await assert.rejects(viewer.set(`scores/${code}`, forged), /permission_denied/);
+  await assert.rejects(w.client('h').set(`scores/${code}`, forged), /permission_denied/, 'un score déjà écrit ne se remplace pas');
+  await assert.rejects(w.client('a').remove(`scores/${code}`), /permission_denied/);
   all.forEach((s) => s.leave());
 });
 
@@ -344,4 +363,40 @@ test('machines « à mon clic » : elle attend le feu vert, n\'importe quel joue
   assert.equal(played(), n + 1);
   assert.equal(host.snapshot.pub!.awaitingGo, null);
   assert.equal(host.snapshot.pub!.current, 0);
+});
+
+test('tableau partagé : règles de lecture et d\'écriture, contrôle des valeurs', () => {
+  const data: Record<string, unknown> = { 'rooms/ABCD/meta/hostUid': 'host', 'scores/DONE': { at: 1 } };
+  const peek = (p: string) => data[p];
+  const ok = { at: 1, completed: 12, plays: 40, medal: '', players: { 0: { name: 'Robin', bot: false }, 1: { name: 'Machine 1', bot: true } } };
+  assert.equal(canRead('scores', 'bob', peek), true);
+  assert.equal(canRead('scores', null, peek), false);
+  assert.equal(canWrite('scores/ABCD', 'host', ok, peek), true);
+  assert.equal(canWrite('scores/ABCD', 'bob', ok, peek), false, 'pas l\'hôte du salon');
+  assert.equal(canWrite('scores/ABCD', null, ok, peek), false);
+  assert.equal(canWrite('scores/ZZZZ', 'host', ok, peek), false, 'salon inconnu');
+  assert.equal(canWrite('scores/DONE', 'host', ok, (p) => (p === 'rooms/DONE/meta/hostUid' ? 'host' : peek(p))), false, 'déjà écrit');
+  assert.equal(canWrite('scores/ABCD', 'host', null, peek), false, 'pas de suppression');
+  assert.equal(canWrite('scores', 'host', ok, peek), false, 'pas d\'écriture en bloc');
+  for (const bad of [
+    { ...ok, completed: 51 }, { ...ok, completed: -1 }, { ...ok, plays: 5000 }, { ...ok, medal: 'médaille-trop-longue' },
+    { ...ok, extra: 1 }, { ...ok, players: {} }, { ...ok, players: { 0: { name: 'x'.repeat(15), bot: false } } },
+    { ...ok, players: { 0: { name: 'Robin', bot: 'oui' } } }, { ...ok, players: { 0: { name: 'Robin', bot: false, x: 1 } } }, { at: 1 },
+  ]) assert.equal(validScore(bad), false, JSON.stringify(bad).slice(0, 60));
+  assert.equal(validScore(ok), true);
+});
+
+test('tableau partagé : lecture tolérante (listes Firebase, entrées abîmées), classement', () => {
+  const e = (id: string, completed: number, plays: number): ScoreEntry => ({ id, at: 1, completed, plays, medal: completed >= 24 ? 'or' : null, mode: 'online', players: [{ name: 'Robin', bot: false }, { name: 'Machine 1', bot: true }] });
+  const wire = { AAAA: toWireScore(e('AAAA', 12, 30)), BBBB: toWireScore(e('BBBB', 30, 50)), CCCC: toWireScore(e('CCCC', 30, 40)) };
+  const back = fromWireScores(wire);
+  assert.deepEqual(back.map((x) => x.id), ['CCCC', 'BBBB', 'AAAA']);
+  assert.deepEqual(back[0], e('CCCC', 30, 40));
+  // Firebase renvoie une liste à clés 0, 1, 2… sous forme de tableau
+  const asArray = { ZZZZ: { ...toWireScore(e('ZZZZ', 5, 9)), players: [{ name: 'Robin', bot: false }, { name: 'Alice', bot: false }] } };
+  assert.deepEqual(fromWireScores(asArray)[0].players.map((p) => p.name), ['Robin', 'Alice']);
+  // entrées mal formées ignorées, base vide ou absente sans erreur
+  assert.deepEqual(fromWireScores({ X: { at: 'hier' }, Y: null, Z: { ...toWireScore(e('Z', 5, 9)), completed: 99 }, W: { ...toWireScore(e('W', 5, 9)), players: {} } }), []);
+  assert.deepEqual(fromWireScores(null), []);
+  assert.deepEqual(fromWireScores('n\'importe quoi'), []);
 });
