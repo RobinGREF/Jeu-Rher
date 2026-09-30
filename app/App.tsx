@@ -16,6 +16,13 @@ import { TableScene, type LastPlay, type PileView } from './src/TableScene';
 import { SYMBOLS } from './src/symbols';
 
 type Mode = 'solo' | 'together' | 'online';
+type Screen = 'home' | 'online' | 'together' | 'settings';
+
+const DEFAULTS = { bots: 2, pauseMs: 5000, helpOn: false, showTargets: true, phrasesOn: false, openHands: false };
+/** Réglages gardés d'une visite à l'autre (facultatif : sans stockage, on repart des valeurs par défaut). */
+function loadSettings(): typeof DEFAULTS {
+  try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem('50m-settings') ?? '{}') }; } catch { return DEFAULTS; }
+}
 
 const MEDAL = { bronze: '🥉 Bronze', argent: '🥈 Argent', or: '🥇 Or' } as const;
 const KIND_ICON = { help: '✋', good: '👍', stop: '⛔' } as const;
@@ -45,13 +52,16 @@ function Chips({ values, value, onChange }: { values: number[]; value: number; o
 }
 
 export default function App() {
+  const saved = useRef(loadSettings()).current;
   const [mode, setMode] = useState<Mode>('solo');
-  const [bots, setBots] = useState(2);
+  const [screen, setScreen] = useState<Screen>('home');
+  const [pendingStart, setPendingStart] = useState(false);
+  const [bots, setBots] = useState(saved.bots);
   const [players, setPlayers] = useState(2);
-  const [openHands, setOpenHands] = useState(false);
-  const [helpOn, setHelpOn] = useState(false);
-  const [showTargets, setShowTargets] = useState(true);
-  const [phrasesOn, setPhrasesOn] = useState(false);
+  const [openHands, setOpenHands] = useState(saved.openHands);
+  const [helpOn, setHelpOn] = useState(saved.helpOn);
+  const [showTargets, setShowTargets] = useState(saved.showTargets);
+  const [phrasesOn, setPhrasesOn] = useState(saved.phrasesOn);
 
   const [localGame, setGame] = useState<GameState | null>(null);
   const [myName, setMyName] = useState(() => {
@@ -70,7 +80,7 @@ export default function App() {
   const [textFor, setTextFor] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
   const [info, setInfo] = useState(false);
-  const [pauseMs, setPauseMs] = useState(5000);
+  const [pauseMs, setPauseMs] = useState(saved.pauseMs);
   const [lastPlay, setLastPlay] = useState<LastPlay | null>(null);
   const [party, setParty] = useState<Celebrate | null>(null);
   const [rowY, setRowY] = useState(46);
@@ -149,6 +159,14 @@ export default function App() {
     if (last.gained > 0) setParty({ key: Date.now(), done: last.done.map((d) => ({ def: missionById(d.id), idx: d.idx })), gained: last.gained, medal: last.medal });
   }, [pub?.v]);
 
+  useEffect(() => {
+    try { localStorage.setItem('50m-settings', JSON.stringify({ bots, pauseMs, helpOn, showTargets, phrasesOn, openHands })); } catch { /* sans stockage */ }
+  }, [bots, pauseMs, helpOn, showTargets, phrasesOn, openHands]);
+
+  useEffect(() => {
+    if (pendingStart) { setPendingStart(false); start(); }
+  }, [pendingStart]);
+
   const start = () => {
     const n = solo ? bots + 1 : players;
     const g = newGame(n);
@@ -157,7 +175,7 @@ export default function App() {
     setSigMode('play'); setSpeaker(null); setMenu(false); setInfo(false); setTextFor(null); setLastPlay(null); setParty(null);
   };
 
-  const quit = () => { if (online) onl.leave(); setGame(null); setMenu(false); };
+  const quit = () => { if (online) onl.leave(); setGame(null); setMenu(false); setScreen('home'); };
 
   if (online && osnap && osnap.phase !== 'playing' && osnap.phase !== 'over') {
     return <Lobby snap={osnap} session={onl.session.current} onLeave={quit} local={onl.kind === 'local'} />;
@@ -173,88 +191,110 @@ export default function App() {
   }
 
   if (!game) {
+    const back = <Pressable onPress={() => setScreen('home')} style={s.link}><Text style={s.linkTxt}>← Retour</Text></Pressable>;
+
+    if (screen === 'online') {
+      return (
+        <SafeAreaView style={s.root}>
+          <StatusBar style="light" />
+          <ScrollView contentContainerStyle={s.home}>
+            <Text style={s.title}>En ligne</Text>
+            <Text style={s.label}>Ton prénom</Text>
+            <TextInput value={myName} onChangeText={(v) => { setMyName(v); try { localStorage.setItem('50m-name', v); } catch { /* sans stockage */ } }}
+              placeholder="Robin" placeholderTextColor="#64748b" maxLength={14} style={s.input} accessibilityLabel="Ton prénom" />
+            {!onl.kind ? (
+              <Text style={s.err}>Le mode en ligne n'est pas configuré sur cette version. Voir docs/en-ligne.md.</Text>
+            ) : (
+              <>
+                <Pressable style={s.btn} disabled={onl.busy} onPress={() => onl.create(myName)}>
+                  <Text style={s.btnTxt}>Créer une partie</Text>
+                </Pressable>
+                <Text style={s.hint}>ou rejoindre avec un code</Text>
+                <View style={s.row}>
+                  <TextInput value={codeInput} onChangeText={(v) => setCodeInput(v.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4))}
+                    placeholder="ABCD" placeholderTextColor="#64748b" autoCapitalize="characters" maxLength={4}
+                    style={[s.input, s.codeInput]} accessibilityLabel="Code du salon" />
+                  <Pressable style={[s.mode, codeInput.length === 4 && s.modeOn]} disabled={onl.busy || codeInput.length !== 4} onPress={() => onl.join(codeInput, myName)}>
+                    <Text style={[s.modeTxt, codeInput.length === 4 && s.modeTxtOn]}>Rejoindre</Text>
+                  </Pressable>
+                </View>
+                {!!onl.error && <Text style={s.err}>{onl.error}</Text>}
+                {onl.kind === 'local' && <Text style={s.hint}>Test local : les autres joueurs sont les autres onglets de ce navigateur.</Text>}
+              </>
+            )}
+            {back}
+          </ScrollView>
+        </SafeAreaView>
+      );
+    }
+
+    if (screen === 'together') {
+      return (
+        <SafeAreaView style={s.root}>
+          <StatusBar style="light" />
+          <ScrollView contentContainerStyle={s.home}>
+            <Text style={s.title}>À plusieurs</Text>
+            <Text style={s.sub}>Un seul téléphone, on se le passe.{'\n'}Combien de joueurs ?</Text>
+            <View style={s.row}>
+              {[2, 3, 4].map((n) => (
+                <Pressable key={n} onPress={() => { setMode('together'); setPlayers(n); setPendingStart(true); }} style={s.chip}>
+                  <Text style={s.chipTxt}>{n}</Text>
+                </Pressable>
+              ))}
+            </View>
+            {back}
+          </ScrollView>
+        </SafeAreaView>
+      );
+    }
+
+    if (screen === 'settings') {
+      return (
+        <SafeAreaView style={s.root}>
+          <StatusBar style="light" />
+          <ScrollView contentContainerStyle={s.home}>
+            <Text style={s.title}>Réglages</Text>
+            <Text style={s.label}>Joueurs machine (contre les machines)</Text>
+            <Chips values={[1, 2, 3]} value={bots} onChange={setBots} />
+            <Text style={s.label}>Pause entre les coups</Text>
+            <View style={s.row}>
+              {([5000, 2000, 1000] as const).map((ms) => (
+                <Pressable key={ms} onPress={() => setPauseMs(ms)} style={[s.mode, pauseMs === ms && s.modeOn]}>
+                  <Text style={[s.modeTxt, pauseMs === ms && s.modeTxtOn]}>{ms / 1000} s</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={s.hint}>Temps pendant lequel on voit la carte se poser sur celle qu'elle recouvre.</Text>
+            <Text style={s.label}>Options</Text>
+            <Toggle on={helpOn} onPress={() => setHelpOn(!helpOn)} title="💡 Coup de pouce" sub="Le jeu montre les cartes qui réussissent une ou plusieurs missions." />
+            <Toggle on={showTargets} onPress={() => setShowTargets(!showTargets)} title="🎯 Voir les missions visées" sub="Contre les machines : des pastilles montrent les missions qu'elles peuvent réussir." />
+            <Toggle on={phrasesOn} onPress={() => setPhrasesOn(!phrasesOn)} title="💬 Phrases du livret" sub="En plus de « je peux » : « je peux aider », « bonne carte ici », « ne jouez pas ici »." />
+            <Toggle on={openHands} onPress={() => setOpenHands(!openHands)} title="👀 Mains visibles (test)" sub="À plusieurs sur un téléphone : toutes les mains sont affichées." />
+            <Pressable style={s.btn} onPress={() => setScreen('home')}><Text style={s.btnTxt}>Terminé</Text></Pressable>
+          </ScrollView>
+        </SafeAreaView>
+      );
+    }
+
     return (
       <SafeAreaView style={s.root}>
         <StatusBar style="light" />
-        <ScrollView contentContainerStyle={s.setup}>
+        <ScrollView contentContainerStyle={s.home}>
           <Text style={s.title}>50 Missions</Text>
-          <Text style={s.sub}>Jeu coopératif</Text>
-          <View style={s.row}>
-            {([
-              ['solo', 'Seul avec des machines', 'Tu joues, les autres joueurs sont simulés.'],
-              ['together', 'À plusieurs, un téléphone', 'On se passe le téléphone.'],
-              ['online', 'En ligne', 'Chacun son téléphone, avec un code de salon.'],
-            ] as const).map(([key, title, sub]) => (
-              <Pressable key={key} onPress={() => setMode(key)} style={[s.opt, mode === key && s.optOn]}>
-                <Text style={[s.optTitle, mode === key && s.optTitleOn]}>{title}</Text>
-                <Text style={[s.optSub, mode === key && s.optTitleOn]}>{sub}</Text>
-              </Pressable>
-            ))}
-          </View>
-
-          {solo && (<><Text style={s.label}>Joueurs machine</Text><Chips values={[1, 2, 3]} value={bots} onChange={setBots} /></>)}
-          {mode === 'together' && (
-            <>
-              <Text style={s.label}>Nombre de joueurs</Text>
-              <Chips values={[1, 2, 3, 4]} value={players} onChange={setPlayers} />
-              <Toggle on={openHands} onPress={() => setOpenHands(!openHands)} title="Mains visibles (mode test)" sub="Toutes les mains sont affichées, sans passer le téléphone." />
-            </>
-          )}
-
-          {online && (
-            <>
-              <Text style={s.label}>Ton prénom</Text>
-              <TextInput value={myName} onChangeText={(v) => { setMyName(v); try { localStorage.setItem('50m-name', v); } catch { /* sans stockage */ } }}
-                placeholder="Robin" placeholderTextColor="#64748b" maxLength={14} style={s.input} accessibilityLabel="Ton prénom" />
-              {!onl.kind ? (
-                <Text style={s.err}>Le mode en ligne n'est pas configuré sur cette version. Voir docs/en-ligne.md.</Text>
-              ) : (
-                <>
-                  <Pressable style={s.btn} disabled={onl.busy} onPress={() => onl.create(myName)}>
-                    <Text style={s.btnTxt}>Créer une partie</Text>
-                  </Pressable>
-                  <Text style={s.hint}>ou rejoindre avec un code</Text>
-                  <View style={s.row}>
-                    <TextInput value={codeInput} onChangeText={(v) => setCodeInput(v.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4))}
-                      placeholder="ABCD" placeholderTextColor="#64748b" autoCapitalize="characters" maxLength={4}
-                      style={[s.input, s.codeInput]} accessibilityLabel="Code du salon" />
-                    <Pressable style={[s.mode, codeInput.length === 4 && s.modeOn]} disabled={onl.busy || codeInput.length !== 4} onPress={() => onl.join(codeInput, myName)}>
-                      <Text style={[s.modeTxt, codeInput.length === 4 && s.modeTxtOn]}>Rejoindre</Text>
-                    </Pressable>
-                  </View>
-                  {!!onl.error && <Text style={s.err}>{onl.error}</Text>}
-                  {onl.kind === 'local' && <Text style={s.hint}>Test local : les autres joueurs sont les autres onglets de ce navigateur.</Text>}
-                </>
-              )}
-            </>
-          )}
-
-          {!online && (<>
-          <Text style={s.label}>Pause entre les coups</Text>
-          <View style={s.row}>
-            {([5000, 2000, 1000] as const).map((ms) => (
-              <Pressable key={ms} onPress={() => setPauseMs(ms)} style={[s.mode, pauseMs === ms && s.modeOn]}>
-                <Text style={[s.modeTxt, pauseMs === ms && s.modeTxtOn]}>{ms / 1000} s</Text>
-              </Pressable>
-            ))}
-          </View>
-          <Text style={s.hint}>Temps pendant lequel on voit la carte se poser sur celle qu'elle recouvre. Touche l'annonce pour passer plus vite.</Text>
-
-          </>)}
-
-          <Text style={s.label}>Options</Text>
-          <Toggle on={helpOn} onPress={() => setHelpOn(!helpOn)} title="💡 Coup de pouce" sub="Le jeu montre les cartes qui réussissent une ou plusieurs missions." />
-          {solo && (
-            <Toggle on={showTargets} onPress={() => setShowTargets(!showTargets)} title="🎯 Voir les missions visées" sub="Des pastilles montrent quelles missions chaque machine peut réussir." />
-          )}
-          {!online && (
-            <>
-              <Toggle on={phrasesOn} onPress={() => setPhrasesOn(!phrasesOn)} title="💬 Phrases du livret" sub="En plus de « je peux » : « je peux aider » (mission), « bonne carte ici » et « ne jouez pas ici » (tas)." />
-              <Pressable style={s.btn} onPress={start}>
-                <Text style={s.btnTxt}>Commencer</Text>
-              </Pressable>
-            </>
-          )}
+          <Text style={s.sub}>Jeu de cartes coopératif</Text>
+          <Pressable style={s.bigBtn} onPress={() => { setMode('solo'); setPendingStart(true); }}>
+            <Text style={s.bigTitle}>🤖 Jouer contre des machines</Text>
+            <Text style={s.bigSub}>Tout de suite, seul, avec {bots} joueur{bots > 1 ? 's' : ''} machine</Text>
+          </Pressable>
+          <Pressable style={s.bigBtn} onPress={() => { setMode('online'); setScreen('online'); }}>
+            <Text style={s.bigTitle}>🌐 Jouer en ligne</Text>
+            <Text style={s.bigSub}>Avec des amis, chacun sur son téléphone</Text>
+          </Pressable>
+          <Pressable style={s.bigBtn} onPress={() => setScreen('together')}>
+            <Text style={s.bigTitle}>📱 À plusieurs, un téléphone</Text>
+            <Text style={s.bigSub}>On se passe le téléphone</Text>
+          </Pressable>
+          <Pressable onPress={() => setScreen('settings')} style={s.link}><Text style={s.linkTxt}>⚙️ Réglages</Text></Pressable>
         </ScrollView>
       </SafeAreaView>
     );
@@ -468,7 +508,13 @@ const s = StyleSheet.create({
   grow: { flex: 1, alignItems: 'center' },
   menu: { position: 'absolute', top: 40, left: 16, right: 16, backgroundColor: '#111c33', borderRadius: 12, padding: 12, gap: 4, borderWidth: 1, borderColor: '#334155' },
   root: { flex: 1, backgroundColor: '#0f172a', padding: 16, justifyContent: 'center', gap: 14 },
-  setup: { gap: 14, paddingVertical: 8 },
+  home: { gap: 14, paddingVertical: 8, paddingLeft: 16, paddingRight: 16, flexGrow: 1, justifyContent: 'center' },
+  bigBtn: { backgroundColor: '#1e293b', borderRadius: 16, padding: 18, gap: 4, borderWidth: 2, borderColor: '#334155' },
+  bigTitle: { color: '#f8fafc', fontSize: 19, fontWeight: '800' },
+  bigSub: { color: '#94a3b8', fontSize: 14 },
+  link: { alignSelf: 'center', padding: 12 },
+  linkTxt: { color: '#cbd5e1', fontSize: 16, fontWeight: '700' },
+  setup: { gap: 14, paddingVertical: 8, paddingLeft: 16, paddingRight: 16, flexGrow: 1, justifyContent: 'center' },
   title: { color: '#fff', fontSize: 30, fontWeight: '800', textAlign: 'center' },
   sub: { color: '#cbd5e1', fontSize: 15, textAlign: 'center' },
   label: { color: '#94a3b8', fontSize: 13, textTransform: 'uppercase', letterSpacing: 1 },
