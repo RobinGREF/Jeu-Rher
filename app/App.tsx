@@ -227,7 +227,7 @@ export default function App() {
           <StatusBar style="light" />
           <ScrollView contentContainerStyle={s.home}>
             <Text style={s.title}>Réglages</Text>
-            <Text style={s.label}>Joueurs machine (contre les machines)</Text>
+            <Text style={s.label}>Nombre de machines</Text>
             <Chips values={[1, 2, 3]} value={bots} onChange={setBots} />
             <Toggle on={manual} onPress={() => setManual(!manual)} title="👆 Machines : attendre mon clic" sub="Avant chaque machine, un message te prévient et elle ne joue que quand tu touches « Laisser jouer »." />
             <Text style={s.label}>Pause entre les coups</Text>
