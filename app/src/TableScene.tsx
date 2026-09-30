@@ -30,7 +30,8 @@ function Countdown({ ms }: { ms: number }) {
   );
 }
 
-export type PileView = { card: Card; dim: boolean; tags: { text: string; stop?: boolean }[] };
+/** `glowColor` : couleur de la famille de la carte choisie, quand on peut la jouer sur ce tas. */
+export type PileView = { card: Card; dim: boolean; glowColor?: string; tags: { text: string; stop?: boolean }[] };
 
 function Back({ w }: { w: number }) {
   return (
@@ -136,7 +137,7 @@ export function TableScene(p: Props) {
                   </Flying>
                 </View>
               ) : (
-                <CardView card={pv.card} w={pileW} dim={pv.dim} onPress={() => p.onPile(i)} />
+                <CardView card={pv.card} w={pileW} dim={pv.dim} glow={pv.glowColor} onPress={() => p.onPile(i)} />
               )}
               <Text style={s.pileNo}>{i + 1}</Text>
               <View style={s.tags}>

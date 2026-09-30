@@ -8,6 +8,8 @@ import {
 } from './src/engine';
 import { Celebration, CELEBRATION_MS, type Celebrate } from './src/Celebration';
 import { InfoPanel } from './src/InfoPanel';
+import { ScoreBoard } from './src/ScoreBoard';
+import { addScore, cleanName, clearScores, loadScores, saveScores, type ScoreEntry } from './src/scores';
 import { Lobby } from './src/Lobby';
 import { useOnline } from './src/online/useOnline';
 import { missionById } from './src/online/wire';
@@ -87,6 +89,13 @@ export default function App() {
   const [sigMode, setSigMode] = useState<'play' | SignalKind>('play');
   const [speaker, setSpeaker] = useState<number | null>(null);
   // Annonce « je peux » en cours de saisie : le joueur qui choisit, et les missions déjà touchées.
+  // Meilleurs scores de cet appareil : enregistrés à la fin de chaque partie, avec les noms des participants.
+  const [scores, setScores] = useState<ScoreEntry[]>(loadScores);
+  const [scoresOpen, setScoresOpen] = useState(false);
+  const [lastRank, setLastRank] = useState<number | null>(null);
+  const [lastScoreId, setLastScoreId] = useState<string | null>(null);
+  const startedAt = useRef(Date.now());
+  const savedKey = useRef<string | null>(null);
   const [picking, setPicking] = useState<number | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
 
@@ -143,6 +152,26 @@ export default function App() {
   const boardKey = game ? game.piles.map((p) => p[p.length - 1].id).join('-') + game.missions.map((m) => m.id).join('') : '';
   useEffect(() => { setPicking(null); setPicked([]); }, [boardKey]);
 
+  // Fin de partie : on garde le score et les noms de tous les participants (une seule fois par partie).
+  useEffect(() => {
+    if (!game?.over) return;
+    const key = online ? `o-${osnap?.code}` : `l-${startedAt.current}`;
+    if (savedKey.current === key) return;
+    savedKey.current = key;
+    const players = online
+      ? (pub?.seats ?? []).map((s) => ({ name: s.name, bot: s.bot }))
+      : solo
+        ? [{ name: cleanName(myName, 'Moi'), bot: false }, ...Array.from({ length: game.players - 1 }, (_, i) => ({ name: `Machine ${i + 1}`, bot: true }))]
+        : Array.from({ length: game.players }, (_, i) => ({ name: `Joueur ${i + 1}`, bot: false }));
+    const entry: ScoreEntry = {
+      id: `${key}-${game.completed}`, at: Date.now(), completed: game.completed, medal: game.medal,
+      plays: online ? pub?.last?.n ?? 0 : history.length, mode, players,
+    };
+    const { list, rank } = addScore(loadScores(), entry);
+    saveScores(list);
+    setScores(list); setLastRank(rank); setLastScoreId(entry.id);
+  }, [game?.over]);
+
   useEffect(() => {
     if (!party) return;
     const id = setTimeout(() => setParty((cur) => (cur && cur.key === party.key ? null : cur)), CELEBRATION_MS);
@@ -181,7 +210,12 @@ export default function App() {
     setGame(sync(g));
     setRevealed(false); setSelected(null); setHistory([]); setError('');
     setSigMode('play'); setSpeaker(null); setMenu(false); setInfo(false); setTextFor(null); setLastPlay(null); setParty(null); setPicking(null); setPicked([]);
+    startedAt.current = Date.now(); savedKey.current = null; setLastRank(null); setLastScoreId(null);
   };
+
+  if (scoresOpen) {
+    return <ScoreBoard list={scores} highlightId={lastScoreId} onBack={() => setScoresOpen(false)} onClear={() => { clearScores(); setScores([]); setLastRank(null); setLastScoreId(null); }} />;
+  }
 
   const quit = () => { if (online) onl.leave(); setGame(null); setMenu(false); setScreen('home'); };
 
@@ -290,7 +324,10 @@ export default function App() {
             <Text style={s.bigTitle}>📱 À plusieurs, un téléphone</Text>
             <Text style={s.bigSub}>On se passe le téléphone</Text>
           </Pressable>
-          <Pressable onPress={() => setScreen('settings')} style={s.link}><Text style={s.linkTxt}>⚙️ Réglages</Text></Pressable>
+          <View style={s.row}>
+            <Pressable onPress={() => setScoresOpen(true)} style={s.link}><Text style={s.linkTxt}>🏆 Meilleurs scores</Text></Pressable>
+            <Pressable onPress={() => setScreen('settings')} style={s.link}><Text style={s.linkTxt}>⚙️ Réglages</Text></Pressable>
+          </View>
         </ScrollView>
       </SafeAreaView>
     );
@@ -310,7 +347,10 @@ export default function App() {
           <Text style={s.title}>{game.completed >= 50 ? '🎉 50 missions !' : 'Fin de partie'}</Text>
           {status}
           {game.completed < 50 && game.goldReached && <Text style={s.sub}>Il manquait {missionsLeft(game)} missions.</Text>}
-          <Text style={s.sub}>{online ? pub?.history.length ?? 0 : history.length} coups joués</Text>
+          {lastRank !== null && <Text style={s.record}>{lastRank === 1 ? '🏆 Nouveau record !' : `🏅 ${lastRank}ᵉ au classement des meilleurs scores`}</Text>}
+          <Text style={s.sub}>{(online ? (pub?.seats ?? []).map((x) => x.name) : solo ? [cleanName(myName, 'Moi'), ...Array.from({ length: game.players - 1 }, (_, i) => `Machine ${i + 1}`)] : Array.from({ length: game.players }, (_, i) => `Joueur ${i + 1}`)).join(' · ')}</Text>
+          <Text style={s.sub}>{online ? pub?.last?.n ?? 0 : history.length} coups joués</Text>
+          <Pressable style={s.bigBtn} onPress={() => setScoresOpen(true)}><Text style={s.bigTitle}>🏆 Meilleurs scores</Text></Pressable>
           <Pressable style={s.btn} onPress={quit}><Text style={s.btnTxt}>{online ? 'Quitter' : 'Rejouer'}</Text></Pressable>
         </ScrollView>
       </SafeAreaView>
@@ -398,6 +438,7 @@ export default function App() {
   const pileViews: PileView[] = t.map((card, i) => ({
     card,
     dim: !!sel && !ok.includes(i),
+    glowColor: sel && ok.includes(i) ? SYMBOLS[sel.symbol].color : undefined,
     tags: [...signalTags('good', { pile: i }), ...signalTags('stop', { pile: i })].map((text) => ({ text, stop: text.startsWith(KIND_ICON.stop) })),
   }));
 
@@ -540,6 +581,7 @@ const s = StyleSheet.create({
   menu: { position: 'absolute', top: 40, left: 16, right: 16, backgroundColor: '#111c33', borderRadius: 12, padding: 12, gap: 4, borderWidth: 1, borderColor: '#334155' },
   root: { flex: 1, backgroundColor: '#0f172a', padding: 16, justifyContent: 'center', gap: 14 },
   home: { gap: 14, paddingVertical: 8, paddingLeft: 16, paddingRight: 16, flexGrow: 1, justifyContent: 'center' },
+  record: { color: '#fbbf24', fontSize: 20, fontWeight: '900', textAlign: 'center' },
   bigBtn: { backgroundColor: '#1e293b', borderRadius: 16, padding: 18, gap: 4, borderWidth: 2, borderColor: '#334155' },
   bigTitle: { color: '#f8fafc', fontSize: 19, fontWeight: '800' },
   bigSub: { color: '#94a3b8', fontSize: 14 },
