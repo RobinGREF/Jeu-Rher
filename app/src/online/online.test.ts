@@ -93,7 +93,7 @@ test('partie à 3 humains + 1 machine, jusqu\'au bout : confidentialité et coh�
   const w = world();
   const rng = seeded(42);
   const host = await create(w.client('h'), 'Robin');
-  await host.configure({ pauseMs: 2, phrases: false });
+  await host.configure({ pauseMs: 2, phrases: false, manual: false });
   const code = host.snapshot.code;
   const a = await join(w.client('a'), code, 'Alice');
   const b = await join(w.client('b'), code, 'Bob');
@@ -143,7 +143,7 @@ test('partie à 3 humains + 1 machine, jusqu\'au bout : confidentialité et coh�
 test('un coup hors de son tour ou d\'une carte qu\'on n\'a pas est ignoré ; annonces « je peux »', async () => {
   const w = world();
   const host = await create(w.client('h'), 'Robin');
-  await host.configure({ pauseMs: 60000, phrases: true });
+  await host.configure({ pauseMs: 60000, phrases: true, manual: false });
   const a = await join(w.client('a'), host.snapshot.code, 'Alice');
   await until(() => host.snapshot.players.length === 2, 'salon');
   // Une donne où Alice (siège 1) peut réussir une mission et pas l'hôte (siège 0) : le test ne dépend pas du hasard.
@@ -181,7 +181,7 @@ test('l\'hôte recharge la page : la partie reprend là où elle en était', asy
   const w = world();
   const rng = seeded(7);
   let host = await create(w.client('h'), 'Robin');
-  await host.configure({ pauseMs: 60000, phrases: false });
+  await host.configure({ pauseMs: 60000, phrases: false, manual: false });
   const code = host.snapshot.code;
   const a = await join(w.client('a'), code, 'Alice');
   await until(() => host.snapshot.players.length === 2, 'salon');
@@ -214,7 +214,7 @@ test('l\'hôte recharge la page : la partie reprend là où elle en était', asy
 test('un joueur absent est remplacé par une machine et la partie continue', async () => {
   const w = world();
   const host = await create(w.client('h'), 'Robin');
-  await host.configure({ pauseMs: 3, phrases: false });
+  await host.configure({ pauseMs: 3, phrases: false, manual: false });
   const a = await join(w.client('a'), host.snapshot.code, 'Alice');
   await until(() => host.snapshot.players.length === 2, 'salon');
   await host.startGame(2);
@@ -238,8 +238,8 @@ test('un joueur absent est remplacé par une machine et la partie continue', asy
 test('Host.launch direct : refuse un coup illégal', async () => {
   const w = world();
   const be = w.client('h');
-  await be.set('rooms/WXYZ/meta', { hostUid: 'h', createdAt: 0, phase: 'lobby', options: { pauseMs: 60000, phrases: false } });
-  const host = await Host.launch(be, 'WXYZ', [{ name: 'A', bot: false, uid: 'h' }, { name: 'B', bot: true }], { pauseMs: 60000, phrases: false });
+  await be.set('rooms/WXYZ/meta', { hostUid: 'h', createdAt: 0, phase: 'lobby', options: { pauseMs: 60000, phrases: false, manual: false } });
+  const host = await Host.launch(be, 'WXYZ', [{ name: 'A', bot: false, uid: 'h' }, { name: 'B', bot: true }], { pauseMs: 60000, phrases: false, manual: false });
   const snap = (await be.get('rooms/WXYZ/public')) as { json: string };
   const before = JSON.parse(snap.json).v;
   host.submit({ uid: 'h', type: 'play', cardId: 99999, pile: 0 });
@@ -283,4 +283,36 @@ test('stockage entre onglets : mêmes résultats que la mémoire, écritures ato
   // une écriture = une seule clé : jamais d'état à moitié écrit
   ls.write('rooms/C/intents/k9', { uid: 'a', type: 'play', cardId: 7, pile: 2 });
   assert.equal([...data.keys()].filter((k) => k.startsWith('t:rooms/C/intents/k9')).length, 1);
+});
+
+test('machines « à mon clic » : elle attend le feu vert, n\'importe quel joueur peut le donner, sinon rien ne bouge', async () => {
+  const w = world();
+  const host = await create(w.client('h'), 'Robin');
+  await host.configure({ pauseMs: 2, phrases: false, manual: true });
+  const a = await join(w.client('a'), host.snapshot.code, 'Alice');
+  await until(() => host.snapshot.players.length === 2, 'salon');
+  await host.startGame(3); // Robin, Alice, Machine 1
+  await until(() => host.snapshot.view !== null && a.snapshot.view !== null, 'vues');
+  const rng = seeded(9);
+  const played = () => host.snapshot.pub!.history.length;
+  // Robin puis Alice jouent ; ensuite c'est à la machine (siège 2)
+  for (const who of [host, a]) {
+    const before = who.snapshot.pub!.v;
+    await until(() => who.snapshot.pub!.current === who.snapshot.mySeat, 'son tour');
+    assert.ok(act(who, rng));
+    await until(() => host.snapshot.pub!.v > before && a.snapshot.pub!.v === host.snapshot.pub!.v, 'coup publié');
+  }
+  await until(() => host.snapshot.pub!.awaitingGo === 2 && a.snapshot.pub!.awaitingGo === 2, 'la machine attend, chez tous les joueurs');
+  const n = played();
+  await sleep(120); // largement plus que la pause de 2 ms : sans clic, la machine ne joue pas
+  assert.equal(played(), n, 'la machine a joué sans feu vert');
+  assert.equal(host.snapshot.pub!.awaitingGo, 2);
+  // un joueur donne le feu vert (ici Alice, pas l'hôte) : la machine joue, une seule fois
+  a.go();
+  await until(() => played() === n + 1, 'la machine joue après le feu vert');
+  a.go(); // feu vert de trop : c'est maintenant à Robin, rien ne doit se passer
+  await sleep(40);
+  assert.equal(played(), n + 1);
+  assert.equal(host.snapshot.pub!.awaitingGo, null);
+  assert.equal(host.snapshot.pub!.current, 0);
 });

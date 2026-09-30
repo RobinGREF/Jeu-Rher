@@ -65,6 +65,13 @@ export function Lobby({ snap, session, onLeave, local }: { snap: Snapshot; sessi
                 </Pressable>
               ))}
             </View>
+            <Pressable onPress={() => session?.configure({ ...snap.options, manual: !snap.options.manual })} style={s.toggle}>
+              <View style={[s.box, snap.options.manual && s.boxOn]}>{snap.options.manual && <Text style={s.tick}>✓</Text>}</View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.toggleTitle}>🤖 Machines : attendre un clic</Text>
+                <Text style={s.toggleSub}>Avant chaque machine, un joueur touche « Laisser jouer ».</Text>
+              </View>
+            </Pressable>
             <Pressable onPress={() => session?.configure({ ...snap.options, phrases: !snap.options.phrases })} style={s.toggle}>
               <View style={[s.box, snap.options.phrases && s.boxOn]}>{snap.options.phrases && <Text style={s.tick}>✓</Text>}</View>
               <View style={{ flex: 1 }}>

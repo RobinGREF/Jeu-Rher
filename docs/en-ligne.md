@@ -10,7 +10,7 @@ Il faut une base en temps réel : on utilise **Firebase Realtime Database** (off
 - L'hôte publie l'état de la table dans `rooms/CODE/public` (visible par tous : tas, missions, nombre de cartes de chacun, jamais les mains).
 - La main de chaque joueur est publiée dans `rooms/CODE/hands/SON_ID`, lisible **uniquement par lui** (règles d'accès de Firebase).
 - Si l'hôte recharge la page, la partie reprend : l'hôte garde une copie complète dans `rooms/CODE/hostState`, que lui seul peut lire.
-- Une place peut être tenue par une **machine** (jouée par l'hôte). Si un joueur disparaît, l'hôte peut le remplacer par une machine (menu ☰).
+- Une place peut être tenue par une **machine** (jouée par l'hôte). Par défaut, chaque machine **attend qu'un joueur touche « Laisser jouer »** (réglage « Machines : attendre un clic » du salon) ; sans ce réglage, elle joue seule après la pause. Si un joueur disparaît, l'hôte peut le remplacer par une machine (menu ☰).
 
 ## Mise en place (5 à 10 minutes)
 

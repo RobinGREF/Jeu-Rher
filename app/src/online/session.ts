@@ -5,7 +5,7 @@ import { Host, type Intent } from './host';
 import { buildView, type Options, type PublicState, type SeatInfo } from './wire';
 
 export const MAX_PLAYERS = 4;
-export const DEFAULT_OPTIONS: Options = { pauseMs: 5000, phrases: false };
+export const DEFAULT_OPTIONS: Options = { pauseMs: 5000, phrases: false, manual: true };
 
 type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never;
 type Meta = { hostUid: string; createdAt: number; phase: 'lobby' | 'playing'; options: Options };
@@ -177,6 +177,8 @@ export class OnlineSession {
     else this.be.push(this.path('intents'), intent).catch((e) => this.fail(e));
   }
   play(cardId: number, pile: number) { this.send({ type: 'play', cardId, pile }); }
+  /** Feu vert : la machine dont c'est le tour peut jouer. */
+  go() { this.send({ type: 'go' }); }
   /** « Je peux réussir » ces missions (liste vide : retire l'annonce). */
   announce(missions: string[]) { this.send({ type: 'canDo', missions }); }
   toggleSignal(kind: SignalKind, target: { mission?: string; pile?: number }) {

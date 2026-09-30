@@ -34,7 +34,8 @@ export function fromWire(json: string): GameState {
 }
 
 export type SeatInfo = { name: string; bot: boolean; uid?: string };
-export type Options = { pauseMs: number; phrases: boolean };
+/** `manual` : chaque machine attend qu'un joueur touche « Laisser jouer » (sinon, elle joue toute seule après la pause). */
+export type Options = { pauseMs: number; phrases: boolean; manual: boolean };
 
 /** Dernier coup joué, pour l'animation de la carte et la fête. */
 export type LastWire = {
@@ -53,6 +54,8 @@ export type PublicState = {
   handCounts: number[];
   canDo: Announce[]; signals: Signal[];
   nextMedal: { medal: Medal; needed: number } | null;
+  /** Siège de la machine qui attend le feu vert d'un joueur, sinon null. */
+  awaitingGo: number | null;
   last: LastWire | null;
   history: string[];
   options: Options;

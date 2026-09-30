@@ -10,6 +10,7 @@ import { fromWire, toWire, type LastWire, type Options, type PublicState, type S
 export type Intent =
   | { uid: string; type: 'play'; cardId: number; pile: number }
   | { uid: string; type: 'canDo'; missions: string[] }
+  | { uid: string; type: 'go' }
   | { uid: string; type: 'signal'; kind: SignalKind; mission?: string; pile?: number };
 
 const MEDAL_TXT = { bronze: 'de bronze', argent: "d'argent", or: "d'or" } as const;
@@ -98,6 +99,12 @@ export class Host {
     if (seat < 0 || this.stopped) return;
     if (it.type === 'play') {
       if (!this.apply(seat, it.cardId, it.pile)) return;
+    } else if (it.type === 'go') {
+      // Feu vert d'un joueur : la machine dont c'est le tour joue maintenant.
+      if (!this.waiting()) return;
+      const s = this.g.current;
+      const mv = botMove(this.g, s);
+      if (!mv || !this.apply(s, mv.cardId, mv.pile)) return;
     } else if (it.type === 'canDo') {
       this.g = setCanDo(this.g, seat, Array.isArray(it.missions) ? it.missions : []); // refusée si le joueur ne peut rien réussir
     } else if (it.type === 'signal') {
@@ -123,10 +130,14 @@ export class Host {
     this.scheduleBots();
   }
 
+  /** Siège de la machine qui attend le feu vert d'un joueur (mode « à mon clic »), sinon null. */
+  private waiting = (): number | null =>
+    this.options.manual && !this.stopped && !this.g.over && this.seats[this.g.current]?.bot ? this.g.current : null;
+
   private scheduleBots() {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
-    if (this.stopped || this.g.over || !this.seats[this.g.current]?.bot) return;
+    if (this.stopped || this.g.over || !this.seats[this.g.current]?.bot || this.options.manual) return;
     this.timer = setTimeout(() => {
       const seat = this.g.current;
       const mv = botMove(this.g, seat);
@@ -155,6 +166,7 @@ export class Host {
       deckCount: g.symbolDeck.length, handCounts: g.hands.map((h) => h.length),
       canDo: g.canDo, signals: g.signals,
       nextMedal: nm ? { medal: nm.medal, needed: nm.missionsNeeded } : null,
+      awaitingGo: this.waiting(),
       last: this.last, history: this.history.slice(0, 30), options: this.options,
     };
     await this.be.set(this.path('public'), { json: JSON.stringify(pub) });

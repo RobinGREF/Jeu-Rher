@@ -18,7 +18,7 @@ import { SYMBOLS } from './src/symbols';
 type Mode = 'solo' | 'together' | 'online';
 type Screen = 'home' | 'together' | 'settings';
 
-const DEFAULTS = { bots: 2, pauseMs: 5000, phrasesOn: false, openHands: false };
+const DEFAULTS = { bots: 2, pauseMs: 5000, manual: true, phrasesOn: false, openHands: false };
 /** Réglages gardés d'une visite à l'autre (facultatif : sans stockage, on repart des valeurs par défaut). */
 function loadSettings(): typeof DEFAULTS {
   try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem('50m-settings') ?? '{}') }; } catch { return DEFAULTS; }
@@ -60,6 +60,7 @@ export default function App() {
   const [players, setPlayers] = useState(2);
   const [openHands, setOpenHands] = useState(saved.openHands);
   const [phrasesOn, setPhrasesOn] = useState(saved.phrasesOn);
+  const [manual, setManual] = useState(saved.manual); // les machines attendent mon clic
 
   const [localGame, setGame] = useState<GameState | null>(null);
   const [myName, setMyName] = useState(() => {
@@ -131,12 +132,12 @@ export default function App() {
   // Tour d'une machine : une courte pause pour qu'on voie ce qui se passe, puis elle joue.
   useEffect(() => {
     if (!game || game.over) return;
-    if (!solo || game.current === 0) return;
+    if (!solo || game.current === 0 || manual) return; // « à mon clic » : la machine attend le bouton
     // Si une machine vient d'annoncer « je peux », on laisse plus de temps pour repérer sur quelles missions.
     const announced = game.canDo.some((a) => botSeats(game.players).includes(a.player));
     const id = setTimeout(() => doBotMove(game), botDelayMs(pauseMs, announced));
     return () => clearTimeout(id);
-  }, [game, mode, pauseMs]);
+  }, [game, mode, pauseMs, manual]);
 
   // La saisie d'une annonce s'arrête dès que le tapis change (carte posée, mission remplacée).
   const boardKey = game ? game.piles.map((p) => p[p.length - 1].id).join('-') + game.missions.map((m) => m.id).join('') : '';
@@ -167,8 +168,8 @@ export default function App() {
   }, [pub?.v]);
 
   useEffect(() => {
-    try { localStorage.setItem('50m-settings', JSON.stringify({ bots, pauseMs, phrasesOn, openHands })); } catch { /* sans stockage */ }
-  }, [bots, pauseMs, phrasesOn, openHands]);
+    try { localStorage.setItem('50m-settings', JSON.stringify({ bots, pauseMs, manual, phrasesOn, openHands })); } catch { /* sans stockage */ }
+  }, [bots, pauseMs, manual, phrasesOn, openHands]);
 
   useEffect(() => {
     if (pendingStart) { setPendingStart(false); start(); }
@@ -228,6 +229,7 @@ export default function App() {
             <Text style={s.title}>Réglages</Text>
             <Text style={s.label}>Joueurs machine (contre les machines)</Text>
             <Chips values={[1, 2, 3]} value={bots} onChange={setBots} />
+            <Toggle on={manual} onPress={() => setManual(!manual)} title="👆 Machines : attendre mon clic" sub="Avant chaque machine, un message te prévient et elle ne joue que quand tu touches « Laisser jouer »." />
             <Text style={s.label}>Pause entre les coups</Text>
             <View style={s.row}>
               {([5000, 2000, 1000] as const).map((ms) => (
@@ -236,7 +238,7 @@ export default function App() {
                 </Pressable>
               ))}
             </View>
-            <Text style={s.hint}>Temps pendant lequel on voit la carte se poser sur celle qu'elle recouvre.</Text>
+            <Text style={s.hint}>Temps pendant lequel on voit la carte se poser sur celle qu'elle recouvre. Sans « attendre mon clic », c'est aussi le délai avant que la machine suivante joue.</Text>
             <Text style={s.label}>Options</Text>
             <Toggle on={phrasesOn} onPress={() => setPhrasesOn(!phrasesOn)} title="💬 Phrases du livret" sub="En plus de l'annonce « je peux » : « je peux aider », « bonne carte ici », « ne jouez pas ici »." />
             <Toggle on={openHands} onPress={() => setOpenHands(!openHands)} title="👀 Mains visibles (test)" sub="À plusieurs sur un téléphone : toutes les mains sont affichées." />
@@ -337,6 +339,11 @@ export default function App() {
     ...game.canDo.filter((a) => a.missions.includes(id)).map((a) => `🙋 ${who2(a.player)}`),
     ...signalTags('help', { mission: id }),
   ];
+  // Une machine attend le feu vert (à mon clic) : message et bouton « Laisser jouer ».
+  const waitingBot = !game.over && (online ? pub?.awaitingGo != null && pub.awaitingGo === game.current : solo && manual && game.current !== 0);
+  const goBot = () => { if (online) session()?.go(); else doBotMove(game); setError(''); };
+  const botName = seat(game.current).replace(' (machine)', '');
+  const botShort = online ? botName : `J${game.current + 1}`;
   const announced = (p: number) => game.canDo.some((a) => a.player === p);
   // Le bouton d'annonce n'apparaît que si le joueur peut vraiment réussir une mission : c'est l'indice, sans dire laquelle ni avec quelle carte.
   const announcers: number[] = online || solo
@@ -397,7 +404,7 @@ export default function App() {
   const missionText = game.missions.find((m) => m.id === textFor)?.label;
   const sigHint = { play: '', help: 'Touche la mission pour laquelle tu peux aider', good: 'Touche le tas où tu as une bonne carte', stop: 'Touche le tas où il ne faut pas jouer' }[sigMode];
   const toggleSig = (k: SignalKind) => setSigMode(sigMode === k ? 'play' : k);
-  const turnTitle = solo || online ? (game.current === me ? 'À toi de jouer' : `${seat(game.current)} joue…`) : `Joueur ${game.current + 1} joue`;
+  const turnTitle = solo || online ? (game.current === me ? 'À toi de jouer' : waitingBot ? `${botName} va jouer` : `${seat(game.current)} joue…`) : `Joueur ${game.current + 1} joue`;
   const labels = online ? game.hands.map((_, i) => ({ name: i === me ? 'Toi' : seat(i).replace(' (machine)', ''), avatar: pub?.seats[i]?.bot ? '🤖' : i === me ? '🙂' : '👤' })) : undefined;
 
   return (
@@ -426,7 +433,7 @@ export default function App() {
           onReveal={() => { setRevealed(true); setSigMode('play'); }} revealAll={openHands} scale={scale}
           lastPlay={lastPlay} pauseMs={effPause}
           who={(i) => (online ? (i === me ? 'Toi' : seat(i)) : solo && i === 0 ? 'Toi' : `J${i + 1}${solo ? ' (machine)' : ''}`)}
-          onSkip={() => { if (solo && game.current !== 0) doBotMove(game); else setLastPlay(null); }} />
+          onSkip={() => { if (solo && game.current !== 0 && !manual) doBotMove(game); else setLastPlay(null); }} />
         {!!missionText && (
           <Pressable onPress={() => setTextFor(null)} style={s.tip}><Text style={s.tipTxt}>{missionText}</Text></Pressable>
         )}
@@ -436,6 +443,7 @@ export default function App() {
         {!!error ? <Text style={s.barErr} numberOfLines={1}>{error}</Text>
           : picking !== null ? <Text style={s.barTxt} numberOfLines={1}>Touche la ou les missions que tu peux réussir, puis valide</Text>
           : sigMode !== 'play' ? <Text style={s.barTxt} numberOfLines={1}>{sigHint}</Text>
+          : waitingBot ? <Text style={s.barWait} numberOfLines={1}>🤖 {botName} va jouer{announcers.length ? ' · tu peux annoncer avant' : ''}</Text>
           : <Text style={s.barTxt} numberOfLines={1}>{hist[0] ?? (game.current === me ? 'À toi de commencer' : `${seat(game.current)} commence`)}</Text>}
         <View style={s.barRow}>
           {picking !== null ? (
@@ -452,11 +460,16 @@ export default function App() {
             return (
               <Pressable key={i} onPress={() => onAnnounceButton(i)} style={[s.mode, s.grow, on && s.modeOn]}>
                 <Text style={[s.modeTxt, on && s.modeTxtOn]} numberOfLines={1}>
-                  {solo || online ? (on ? '🙋 Retirer mon annonce' : '🙋 Je peux réussir une mission') : on ? `🙋 J${i + 1} : retirer` : `🙋 J${i + 1} peut réussir`}
+                  {solo || online ? (waitingBot ? (on ? '🙋 Retirer' : '🙋 Je peux') : on ? '🙋 Retirer mon annonce' : '🙋 Je peux réussir une mission') : on ? `🙋 J${i + 1} : retirer` : `🙋 J${i + 1} peut réussir`}
                 </Text>
               </Pressable>
             );
-          }) : !canSignal && <View style={s.barSpacer} />}
+          }) : !canSignal && !waitingBot && <View style={s.barSpacer} />}
+          {waitingBot && picking === null && (
+            <Pressable onPress={goBot} style={[s.goBtn, s.grow]} accessibilityLabel={`Laisser ${botName} jouer`}>
+              <Text style={s.goTxt} numberOfLines={1}>▶ Laisser {botShort} jouer</Text>
+            </Pressable>
+          )}
           {canSignal && picking === null && (['help', 'good', 'stop'] as const).map((k) => (
             <Pressable key={k} onPress={() => toggleSig(k)} style={[s.mode, sigMode === k && s.modeOn]}>
               <Text style={[s.modeTxt, sigMode === k && s.modeTxtOn]}>{KIND_ICON[k]}</Text>
@@ -519,6 +532,9 @@ const s = StyleSheet.create({
   barTxt: { color: '#94a3b8', fontSize: 12, textAlign: 'center' },
   barErr: { color: '#fca5a5', fontSize: 12, textAlign: 'center', fontWeight: '700' },
   barRow: { flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' },
+  barWait: { color: '#fde68a', fontSize: 13, textAlign: 'center', fontWeight: '800' },
+  goBtn: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, backgroundColor: '#22c55e' },
+  goTxt: { color: '#052e16', fontWeight: '900', fontSize: 15 },
   barSpacer: { height: 39 },
   grow: { flex: 1, alignItems: 'center' },
   menu: { position: 'absolute', top: 40, left: 16, right: 16, backgroundColor: '#111c33', borderRadius: 12, padding: 12, gap: 4, borderWidth: 1, borderColor: '#334155' },
