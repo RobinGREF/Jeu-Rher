@@ -1,0 +1,62 @@
+name: Publier sur GitHub Pages
+
+on:
+  push:
+    branches: [ccr-6c52d89d-ni35lw, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Une seule publication à la fois ; une plus récente remplace une plus ancienne.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - name: Vérifications (types et tests)
+        run: |
+          npm run typecheck
+          npm test
+      - name: Construire le site
+        run: npx expo export --platform web
+        env:
+          CI: '1'
+          EXPO_NO_TELEMETRY: '1'
+          # Le site est servi sous https://<compte>.github.io/<dépôt>/
+          EXPO_BASE_URL: /${{ github.event.repository.name }}
+          # Configuration Firebase (publique, pas secrète) : Réglages → Secrets and variables → Actions → Variables.
+          EXPO_PUBLIC_FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
+          EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.FIREBASE_AUTH_DOMAIN }}
+          EXPO_PUBLIC_FIREBASE_DATABASE_URL: ${{ vars.FIREBASE_DATABASE_URL }}
+          EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+          EXPO_PUBLIC_FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: app/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
