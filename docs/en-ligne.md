@@ -20,7 +20,7 @@ Il faut une base en temps réel : on utilise **Firebase Realtime Database** (off
    Vérifie à ce moment qu'elle est proposée dans l'offre gratuite.
 4. Onglet **Règles** de la base : remplace tout par le contenu de [`app/firebase.rules.json`](../app/firebase.rules.json), puis **Publier**.
 5. **Paramètres du projet → Vos applications → `</>` (Web)** : enregistre une application web et note la configuration affichée.
-6. Copie `app/.env.example` en `app/.env.local` et remplis les 5 valeurs :
+6. Mets les 5 valeurs dans **`app/.env`** (fichier versionné, voir `app/.env.example` pour le modèle) :
 
    ```
    EXPO_PUBLIC_FIREBASE_API_KEY=...

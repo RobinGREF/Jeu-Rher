@@ -13,21 +13,11 @@ Adresse du site : `https://<compte>.github.io/<dépôt>/`, soit ici <https://rob
 2. Dans le dépôt : **Settings → Pages → Build and deployment → Source : GitHub Actions.**
 3. Lancer une première fois : **Actions → « Publier sur GitHub Pages » → Run workflow** (ensuite, chaque mise à jour de la branche principale publie automatiquement).
 
-## Activer le mode en ligne sur le site publié
+## Le mode en ligne sur le site publié
 
-Une fois le projet Firebase créé (voir [en-ligne.md](en-ligne.md)), ajouter ses 5 valeurs comme **variables** du dépôt
-(**Settings → Secrets and variables → Actions → onglet Variables → New repository variable**) :
-
-| Variable | Valeur Firebase |
-|---|---|
-| `FIREBASE_API_KEY` | `apiKey` |
-| `FIREBASE_AUTH_DOMAIN` | `authDomain` |
-| `FIREBASE_DATABASE_URL` | `databaseURL` |
-| `FIREBASE_PROJECT_ID` | `projectId` |
-| `FIREBASE_APP_ID` | `appId` |
-
-Puis relancer la publication. Ce ne sont pas des secrets (elles finissent dans le site) : ce sont les règles d'accès de la base qui protègent les données.
-Sans ces variables, le site marche, l'option « En ligne » indique seulement « non configuré ».
+La configuration Firebase (5 valeurs publiques) est dans [`app/.env`](../app/.env) : elle est lue à la construction, sur GitHub comme en local.
+Rien à régler dans GitHub. Pour changer de projet Firebase, modifier ce fichier et pousser : le site se republie tout seul.
+Voir [en-ligne.md](en-ligne.md) pour créer le projet Firebase.
 
 ## En local
 
@@ -37,5 +27,4 @@ Sans ces variables, le site marche, l'option « En ligne » indique seulement «
 ## Et si GitHub Pages n'est pas possible (dépôt privé, offre gratuite)
 
 Le dossier `app/dist` est un site statique : Netlify, Cloudflare Pages ou Vercel le publient gratuitement, même depuis un dépôt privé.
-Réglages : dossier de départ `app`, commande `npm ci && npx expo export --platform web`, dossier publié `dist`, et les 5 variables `EXPO_PUBLIC_FIREBASE_*`
-(sans `EXPO_BASE_URL`, l'adresse de base est la racine).
+Réglages : dossier de départ `app`, commande `npm ci && npx expo export --platform web`, dossier publié `dist`, (sans `EXPO_BASE_URL`, l'adresse de base est la racine ; la configuration Firebase vient de `app/.env`).
