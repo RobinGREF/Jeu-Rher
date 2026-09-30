@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
-  botMove, completedBetween, findMissionMoves, missionsLeft, newGame, play, playablePiles, reachableMissions,
-  syncBotAnnouncements, syncBotSignals, toggleCanDo, toggleSignal, tops,
+  botDelayMs, botMove, canAnnounce, completedBetween, missionsLeft, newGame, play, playablePiles, setCanDo,
+  syncBotAnnouncements, syncBotSignals, toggleSignal, tops,
   type GameState, type SignalKind,
 } from './src/engine';
 import { Celebration, CELEBRATION_MS, type Celebrate } from './src/Celebration';
@@ -18,7 +18,7 @@ import { SYMBOLS } from './src/symbols';
 type Mode = 'solo' | 'together' | 'online';
 type Screen = 'home' | 'together' | 'settings';
 
-const DEFAULTS = { bots: 2, pauseMs: 5000, helpOn: false, showTargets: true, phrasesOn: false, openHands: false };
+const DEFAULTS = { bots: 2, pauseMs: 5000, phrasesOn: false, openHands: false };
 /** Réglages gardés d'une visite à l'autre (facultatif : sans stockage, on repart des valeurs par défaut). */
 function loadSettings(): typeof DEFAULTS {
   try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem('50m-settings') ?? '{}') }; } catch { return DEFAULTS; }
@@ -59,8 +59,6 @@ export default function App() {
   const [bots, setBots] = useState(saved.bots);
   const [players, setPlayers] = useState(2);
   const [openHands, setOpenHands] = useState(saved.openHands);
-  const [helpOn, setHelpOn] = useState(saved.helpOn);
-  const [showTargets, setShowTargets] = useState(saved.showTargets);
   const [phrasesOn, setPhrasesOn] = useState(saved.phrasesOn);
 
   const [localGame, setGame] = useState<GameState | null>(null);
@@ -87,6 +85,9 @@ export default function App() {
   const [history, setHistory] = useState<string[]>([]);
   const [sigMode, setSigMode] = useState<'play' | SignalKind>('play');
   const [speaker, setSpeaker] = useState<number | null>(null);
+  // Annonce « je peux » en cours de saisie : le joueur qui choisit, et les missions déjà touchées.
+  const [picking, setPicking] = useState<number | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
 
   const { width, height } = useWindowDimensions();
   const tokenSize = Math.min(96, (width - 32 - 3 * 6) / 4);
@@ -131,9 +132,15 @@ export default function App() {
   useEffect(() => {
     if (!game || game.over) return;
     if (!solo || game.current === 0) return;
-    const id = setTimeout(() => doBotMove(game), pauseMs);
+    // Si une machine vient d'annoncer « je peux », on laisse plus de temps pour repérer sur quelles missions.
+    const announced = game.canDo.some((a) => botSeats(game.players).includes(a.player));
+    const id = setTimeout(() => doBotMove(game), botDelayMs(pauseMs, announced));
     return () => clearTimeout(id);
   }, [game, mode, pauseMs]);
+
+  // La saisie d'une annonce s'arrête dès que le tapis change (carte posée, mission remplacée).
+  const boardKey = game ? game.piles.map((p) => p[p.length - 1].id).join('-') + game.missions.map((m) => m.id).join('') : '';
+  useEffect(() => { setPicking(null); setPicked([]); }, [boardKey]);
 
   useEffect(() => {
     if (!party) return;
@@ -160,8 +167,8 @@ export default function App() {
   }, [pub?.v]);
 
   useEffect(() => {
-    try { localStorage.setItem('50m-settings', JSON.stringify({ bots, pauseMs, helpOn, showTargets, phrasesOn, openHands })); } catch { /* sans stockage */ }
-  }, [bots, pauseMs, helpOn, showTargets, phrasesOn, openHands]);
+    try { localStorage.setItem('50m-settings', JSON.stringify({ bots, pauseMs, phrasesOn, openHands })); } catch { /* sans stockage */ }
+  }, [bots, pauseMs, phrasesOn, openHands]);
 
   useEffect(() => {
     if (pendingStart) { setPendingStart(false); start(); }
@@ -172,7 +179,7 @@ export default function App() {
     const g = newGame(n);
     setGame(sync(g));
     setRevealed(false); setSelected(null); setHistory([]); setError('');
-    setSigMode('play'); setSpeaker(null); setMenu(false); setInfo(false); setTextFor(null); setLastPlay(null); setParty(null);
+    setSigMode('play'); setSpeaker(null); setMenu(false); setInfo(false); setTextFor(null); setLastPlay(null); setParty(null); setPicking(null); setPicked([]);
   };
 
   const quit = () => { if (online) onl.leave(); setGame(null); setMenu(false); setScreen('home'); };
@@ -231,9 +238,7 @@ export default function App() {
             </View>
             <Text style={s.hint}>Temps pendant lequel on voit la carte se poser sur celle qu'elle recouvre.</Text>
             <Text style={s.label}>Options</Text>
-            <Toggle on={helpOn} onPress={() => setHelpOn(!helpOn)} title="💡 Coup de pouce" sub="Le jeu montre les cartes qui réussissent une ou plusieurs missions." />
-            <Toggle on={showTargets} onPress={() => setShowTargets(!showTargets)} title="🎯 Voir les missions visées" sub="Contre les machines : des pastilles montrent les missions qu'elles peuvent réussir." />
-            <Toggle on={phrasesOn} onPress={() => setPhrasesOn(!phrasesOn)} title="💬 Phrases du livret" sub="En plus de « je peux » : « je peux aider », « bonne carte ici », « ne jouez pas ici »." />
+            <Toggle on={phrasesOn} onPress={() => setPhrasesOn(!phrasesOn)} title="💬 Phrases du livret" sub="En plus de l'annonce « je peux » : « je peux aider », « bonne carte ici », « ne jouez pas ici »." />
             <Toggle on={openHands} onPress={() => setOpenHands(!openHands)} title="👀 Mains visibles (test)" sub="À plusieurs sur un téléphone : toutes les mains sont affichées." />
             <Pressable style={s.btn} onPress={() => setScreen('home')}><Text style={s.btnTxt}>Terminé</Text></Pressable>
           </ScrollView>
@@ -322,29 +327,39 @@ export default function App() {
   // Celui qui parle : toi en solo ; sinon, par défaut, le joueur suivant.
   const who = online || solo ? me : speaker ?? (game.current + 1) % game.players;
 
-  const hintsOf = (p: number) => (helpOn ? findMissionMoves(game, p) : []);
-  const hintCards = new Set(hintsOf(me).map((m) => m.cardId));
-  const hintPiles = new Set(hintsOf(me).filter((m) => m.cardId === selected).map((m) => m.pile));
-  const hintLine = (() => {
-    const h = hintsOf(me);
-    if (!h.length) return null;
-    const best = Math.max(...h.map((m) => m.missions.length));
-    const cards = new Set(h.map((m) => m.cardId)).size;
-    return `💡 ${cards} carte${cards > 1 ? 's' : ''} réussi${cards > 1 ? 'ssent' : 't'} une mission${best > 1 ? ` (jusqu'à ${best})` : ''}`;
-  })();
-
   const signalTags = (kind: SignalKind, target: { mission?: string; pile?: number }) =>
     game.signals.filter((g) => g.kind === kind && g.mission === target.mission && g.pile === target.pile).map((g) => `${KIND_ICON[kind]} J${g.player + 1}`);
 
-  const missionBadges = (id: string) => {
-    const help = signalTags('help', { mission: id });
-    const helpers = new Set(game.signals.filter((g) => g.kind === 'help' && g.mission === id).map((g) => g.player));
-    const targets =
-      showTargets && solo
-        ? botSeats(game.players).filter((b) => !helpers.has(b) && reachableMissions(game, b).includes(id)).map((b) => `🙋J${b + 1}`)
-        : [];
-    const mine = helpOn && reachableMissions(game, me).includes(id) ? [solo || online ? '💡Toi' : `💡J${me + 1}`] : [];
-    return [...mine, ...help, ...targets];
+  const who2 = (p: number) => (online || solo ? (p === me ? 'Toi' : `J${p + 1}`) : `J${p + 1}`);
+  /** Qui se positionne sur quelle mission (annonces « je peux »), et ce que tu es en train de choisir. */
+  const missionBadges = (id: string) => [
+    ...(picking !== null && picked.includes(id) ? ['✅'] : []),
+    ...game.canDo.filter((a) => a.missions.includes(id)).map((a) => `🙋 ${who2(a.player)}`),
+    ...signalTags('help', { mission: id }),
+  ];
+  const announced = (p: number) => game.canDo.some((a) => a.player === p);
+  // Le bouton d'annonce n'apparaît que si le joueur peut vraiment réussir une mission : c'est l'indice, sans dire laquelle ni avec quelle carte.
+  const announcers: number[] = online || solo
+    ? (canAnnounce(game, me) ? [me] : [])
+    : openHands ? game.hands.map((_, i) => i).filter((i) => canAnnounce(game, i)) : handShown && canAnnounce(game, me) ? [me] : [];
+  const sendAnnounce = (p: number, ids: string[]) => {
+    if (online) session()?.announce(ids);
+    else setGame(setCanDo(game, p, ids));
+  };
+  const onAnnounceButton = (p: number) => {
+    if (announced(p)) return sendAnnounce(p, []); // retirer son annonce
+    setPicking(p); setPicked([]); setTextFor(null); setSigMode('play'); setError('');
+  };
+  const confirmPick = () => {
+    if (picking === null) return;
+    if (!picked.length) return setError('Touche au moins une mission');
+    sendAnnounce(picking, picked);
+    setPicking(null); setPicked([]); setError('');
+  };
+  const onMissionPress = (id: string) => {
+    if (picking !== null) return setPicked(picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]);
+    if (canSignal && sigMode === 'help') return online ? session()?.toggleSignal('help', { mission: id }) : setGame(toggleSignal(game, { player: who, kind: 'help', mission: id }));
+    setTextFor(textFor === id ? null : id);
   };
 
   const drop = (pile: number) => {
@@ -376,7 +391,6 @@ export default function App() {
   const pileViews: PileView[] = t.map((card, i) => ({
     card,
     dim: !!sel && !ok.includes(i),
-    glow: hintPiles.has(i),
     tags: [...signalTags('good', { pile: i }), ...signalTags('stop', { pile: i })].map((text) => ({ text, stop: text.startsWith(KIND_ICON.stop) })),
   }));
 
@@ -400,15 +414,14 @@ export default function App() {
       <View style={s.missRow} onLayout={(e) => setRowY(e.nativeEvent.layout.y)}>
         {game.missions.map((m) => (
           <MissionToken key={m.id} def={m} size={tokenSize} showText={false} badges={missionBadges(m.id)}
-            onPress={() => (canSignal && sigMode === 'help'
-              ? (online ? session()?.toggleSignal('help', { mission: m.id }) : setGame(toggleSignal(game, { player: who, kind: 'help', mission: m.id })))
-              : setTextFor(textFor === m.id ? null : m.id))} />
+            mark={picking !== null && picked.includes(m.id) ? 'picked' : game.canDo.some((a) => a.missions.includes(m.id)) ? 'announced' : undefined}
+            onPress={() => onMissionPress(m.id)} />
         ))}
       </View>
 
       <View style={s.tableWrap}>
         <TableScene game={game} solo={solo} labels={labels} piles={pileViews} onPile={drop}
-          meIndex={me} hand={hand} handShown={handShown} selectedId={selected} hintCards={hintCards} hintLine={hintLine}
+          meIndex={me} hand={hand} handShown={handShown} selectedId={selected}
           onSelect={(id) => { setSelected(id); setError(''); setSigMode('play'); }}
           onReveal={() => { setRevealed(true); setSigMode('play'); }} revealAll={openHands} scale={scale}
           lastPlay={lastPlay} pauseMs={effPause}
@@ -421,18 +434,30 @@ export default function App() {
 
       <View style={s.bar}>
         {!!error ? <Text style={s.barErr} numberOfLines={1}>{error}</Text>
+          : picking !== null ? <Text style={s.barTxt} numberOfLines={1}>Touche la ou les missions que tu peux réussir, puis valide</Text>
           : sigMode !== 'play' ? <Text style={s.barTxt} numberOfLines={1}>{sigHint}</Text>
           : <Text style={s.barTxt} numberOfLines={1}>{hist[0] ?? (game.current === me ? 'À toi de commencer' : `${seat(game.current)} commence`)}</Text>}
         <View style={s.barRow}>
-          {(solo || online ? [me] : game.hands.map((_, i) => i)).map((i) => {
-            const on = game.canDo.includes(i);
+          {picking !== null ? (
+            <>
+              <Pressable onPress={confirmPick} style={[s.mode, s.grow, picked.length > 0 && s.modeOn]}>
+                <Text style={[s.modeTxt, picked.length > 0 && s.modeTxtOn]}>✔ Valider{picked.length ? ` (${picked.length})` : ''}</Text>
+              </Pressable>
+              <Pressable onPress={() => { setPicking(null); setPicked([]); setError(''); }} style={s.mode}>
+                <Text style={s.modeTxt}>Annuler</Text>
+              </Pressable>
+            </>
+          ) : announcers.length > 0 ? announcers.map((i) => {
+            const on = announced(i);
             return (
-              <Pressable key={i} onPress={() => (online ? session()?.toggleCanDo() : setGame(toggleCanDo(game, i)))} style={[s.mode, s.grow, on && s.modeOn]}>
-                <Text style={[s.modeTxt, on && s.modeTxtOn]} numberOfLines={1}>{solo || online ? '🙋 Je peux réussir une mission' : `🙋 J${i + 1}`}</Text>
+              <Pressable key={i} onPress={() => onAnnounceButton(i)} style={[s.mode, s.grow, on && s.modeOn]}>
+                <Text style={[s.modeTxt, on && s.modeTxtOn]} numberOfLines={1}>
+                  {solo || online ? (on ? '🙋 Retirer mon annonce' : '🙋 Je peux réussir une mission') : on ? `🙋 J${i + 1} : retirer` : `🙋 J${i + 1} peut réussir`}
+                </Text>
               </Pressable>
             );
-          })}
-          {canSignal && (['help', 'good', 'stop'] as const).map((k) => (
+          }) : !canSignal && <View style={s.barSpacer} />}
+          {canSignal && picking === null && (['help', 'good', 'stop'] as const).map((k) => (
             <Pressable key={k} onPress={() => toggleSig(k)} style={[s.mode, sigMode === k && s.modeOn]}>
               <Text style={[s.modeTxt, sigMode === k && s.modeTxtOn]}>{KIND_ICON[k]}</Text>
             </Pressable>
@@ -455,7 +480,7 @@ export default function App() {
       )}
 
       {info && (
-        <InfoPanel game={game} solo={solo} onClose={() => setInfo(false)} options={{ help: helpOn, targets: showTargets, phrases: online ? !!pub?.options.phrases : phrasesOn }}
+        <InfoPanel game={game} solo={solo} onClose={() => setInfo(false)} options={{ phrases: online ? !!pub?.options.phrases : phrasesOn }}
           nameOf={online ? (i) => (i === me ? 'Toi' : seat(i)) : undefined} />
       )}
 
@@ -494,6 +519,7 @@ const s = StyleSheet.create({
   barTxt: { color: '#94a3b8', fontSize: 12, textAlign: 'center' },
   barErr: { color: '#fca5a5', fontSize: 12, textAlign: 'center', fontWeight: '700' },
   barRow: { flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' },
+  barSpacer: { height: 39 },
   grow: { flex: 1, alignItems: 'center' },
   menu: { position: 'absolute', top: 40, left: 16, right: 16, backgroundColor: '#111c33', borderRadius: 12, padding: 12, gap: 4, borderWidth: 1, borderColor: '#334155' },
   root: { flex: 1, backgroundColor: '#0f172a', padding: 16, justifyContent: 'center', gap: 14 },

@@ -1,6 +1,6 @@
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { playablePiles } from '../engine';
+import { canAnnounce, newGame, playablePiles } from '../engine';
 import { canRead, canWrite } from './rules';
 import { LocalStorageStore, MemoryStore, StoreBackend } from './localBackend';
 import { Host } from './host';
@@ -146,14 +146,24 @@ test('un coup hors de son tour ou d\'une carte qu\'on n\'a pas est ignoré ; ann
   await host.configure({ pauseMs: 60000, phrases: true });
   const a = await join(w.client('a'), host.snapshot.code, 'Alice');
   await until(() => host.snapshot.players.length === 2, 'salon');
-  await host.startGame(2);
+  // Une donne où Alice (siège 1) peut réussir une mission et pas l'hôte (siège 0) : le test ne dépend pas du hasard.
+  let seed = 1;
+  while (seed < 2000 && !(canAnnounce(newGame(2, seeded(seed)), 1) && !canAnnounce(newGame(2, seeded(seed)), 0))) seed++;
+  assert.ok(seed < 2000, 'aucune donne adaptée');
+  await host.startGame(2, seeded(seed));
   await until(() => a.snapshot.view !== null && host.snapshot.view !== null, 'vues');
   // c'est à l'hôte de jouer : Alice tente un coup (refusé) et une annonce (acceptée, elle n'a pas besoin de son tour)
   const v0 = a.snapshot.pub!.v;
   const mine = a.snapshot.view!.hands[1][0];
   a.play(mine.id, 0);
-  a.toggleCanDo();
-  await until(() => a.snapshot.pub!.canDo.includes(1), 'annonce d\'Alice visible');
+  const target = a.snapshot.view!.missions[0].id;
+  a.announce([target]);
+  await until(() => a.snapshot.pub!.canDo.some((x) => x.player === 1), 'annonce d\'Alice visible');
+  assert.deepEqual(a.snapshot.pub!.canDo, [{ player: 1, missions: [target] }], 'l\'annonce dit sur quelle mission');
+  // l'hôte, qui ne peut rien réussir, n'est pas autorisé à annoncer
+  host.announce([target]);
+  await sleep(30);
+  assert.ok(!host.snapshot.pub!.canDo.some((x) => x.player === 0), 'annonce refusée à qui ne peut rien réussir');
   assert.equal(a.snapshot.pub!.current, 0, 'le tour n\'a pas bougé');
   assert.ok(a.snapshot.pub!.v > v0);
   // l'hôte, lui, ne peut pas jouer une carte qui n'est pas dans sa main
@@ -233,7 +243,7 @@ test('Host.launch direct : refuse un coup illégal', async () => {
   const snap = (await be.get('rooms/WXYZ/public')) as { json: string };
   const before = JSON.parse(snap.json).v;
   host.submit({ uid: 'h', type: 'play', cardId: 99999, pile: 0 });
-  host.submit({ uid: 'intrus', type: 'canDo' });
+  host.submit({ uid: 'intrus', type: 'canDo', missions: [] });
   await sleep(20);
   assert.equal(JSON.parse(((await be.get('rooms/WXYZ/public')) as { json: string }).json).v, before);
   host.stop();

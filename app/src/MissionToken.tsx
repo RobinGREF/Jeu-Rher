@@ -50,12 +50,12 @@ function TermView({ t, size }: { t: Term; size: number }) {
 }
 
 /** Jeton rond de mission, dessiné comme sur la carte du jeu. Touche pour lire le texte. */
-export function MissionToken({ def, size, showText, badges = [], onPress }: { def: MissionDef; size: number; showText: boolean; badges?: string[]; onPress: () => void }) {
+export function MissionToken({ def, size, showText, badges = [], mark, onPress }: { def: MissionDef; size: number; showText: boolean; badges?: string[]; mark?: 'announced' | 'picked'; onPress: () => void }) {
   const v = def.visual;
   return (
     <Pressable onPress={onPress} accessibilityLabel={def.label} style={{ width: size, alignItems: 'center', gap: 3 }}>
-      <View style={[s.token, { width: size, height: size, borderRadius: size / 2 }]}>
-        <View style={[s.ring, { borderRadius: size / 2 }]} />
+      <View style={[s.token, { width: size, height: size, borderRadius: size / 2 }, mark === 'announced' && s.announced]}>
+        <View style={[s.ring, { borderRadius: size / 2 }, mark === 'picked' && s.ringPicked]} />
         {v.kind === 'row' ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
             {v.items.map((it, i) => <Item key={i} it={it} w={size * (v.items.length > 4 ? 0.14 : 0.185)} />)}
@@ -79,6 +79,8 @@ export function MissionToken({ def, size, showText, badges = [], onPress }: { de
 
 const s = StyleSheet.create({
   token: { backgroundColor: '#9a3412', alignItems: 'center', justifyContent: 'center' },
+  announced: { shadowColor: '#fde047', shadowOpacity: 1, shadowRadius: 14, shadowOffset: { width: 0, height: 0 }, elevation: 10 },
+  ringPicked: { borderColor: '#22c55e', borderWidth: 5 },
   ring: { position: 'absolute', top: 5, left: 5, right: 5, bottom: 5, borderWidth: 3, borderColor: '#fbbf24' },
   mini: { backgroundColor: CREAM, borderWidth: 2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   vals: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },

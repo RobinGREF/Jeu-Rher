@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSymbolDeck, canPlayOn, newGame, play, playablePiles, toggleCanDo, tops, findMissionMoves, botMove, syncBotAnnouncements, reachableMissions, nextMedal, completedBetween, toggleSignal, syncBotSignals } from './engine';
+import { buildSymbolDeck, canPlayOn, newGame, play, playablePiles, setCanDo, canAnnounce, announcedBy, botDelayMs, tops, findMissionMoves, botMove, syncBotAnnouncements, reachableMissions, nextMedal, completedBetween, toggleSignal, syncBotSignals } from './engine';
 
 const seeded = (seed: number) => () => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296);
 
@@ -126,22 +126,37 @@ test('missions : chaque mission a un dessin', () => {
   }
 });
 
-test('annonce « je peux » : poser, retirer, refuser un joueur inconnu', () => {
-  let s = newGame(3, seeded(3));
-  s = toggleCanDo(s, 2);
-  s = toggleCanDo(s, 0);
-  assert.deepEqual(s.canDo, [0, 2]);
-  s = toggleCanDo(s, 2);
-  assert.deepEqual(s.canDo, [0]);
-  assert.equal(toggleCanDo(s, 3), s);
-  assert.equal(toggleCanDo(s, -1), s);
+/** Une partie où ce joueur peut réussir au moins une mission tout de suite (et un autre qui ne le peut pas, si possible). */
+function findState(pred: (s: ReturnType<typeof newGame>) => boolean) {
+  for (let seed = 1; seed < 400; seed++) { const s = newGame(3, seeded(seed)); if (pred(s)) return s; }
+  throw new Error('aucune partie adaptée trouvée');
+}
+
+test('annonce « je peux » : seulement si on peut, avec les missions choisies', () => {
+  const s0 = findState((s) => [0, 1, 2].some((p) => canAnnounce(s, p)) && [0, 1, 2].some((p) => !canAnnounce(s, p)));
+  const can = [0, 1, 2].find((p) => canAnnounce(s0, p))!;
+  const cannot = [0, 1, 2].find((p) => !canAnnounce(s0, p))!;
+  const ids = s0.missions.map((m) => m.id);
+  // impossible d'annoncer quand on ne peut rien réussir
+  assert.equal(setCanDo(s0, cannot, [ids[0]]), s0);
+  // on annonce une ou plusieurs missions ; les inconnues sont ignorées, les doublons aussi
+  let s = setCanDo(s0, can, [ids[1], ids[0], ids[0], 'inconnue']);
+  assert.deepEqual(announcedBy(s, can)?.missions.sort(), [ids[0], ids[1]].sort());
+  // une nouvelle annonce remplace la précédente ; une liste vide la retire
+  s = setCanDo(s, can, [ids[2]]);
+  assert.deepEqual(announcedBy(s, can)?.missions, [ids[2]]);
+  s = setCanDo(s, can, []);
+  assert.equal(announcedBy(s, can), null);
+  // joueurs hors table refusés
+  assert.equal(setCanDo(s0, 3, [ids[0]]), s0);
+  assert.equal(setCanDo(s0, -1, [ids[0]]), s0);
 });
 
 test('annonce « je peux » : possible hors tour, effacée dès qu\'une carte est posée', () => {
-  let s = newGame(3, seeded(5));
-  const notMe = (s.current + 1) % 3;
-  s = toggleCanDo(s, notMe);
-  assert.deepEqual(s.canDo, [notMe]);
+  const s0 = findState((s) => canAnnounce(s, (s.current + 1) % 3));
+  const notMe = (s0.current + 1) % 3;
+  const s = setCanDo(s0, notMe, [s0.missions[0].id]);
+  assert.equal(announcedBy(s, notMe)?.player, notMe);
   const c = s.hands[s.current].find((x) => playablePiles(s, x).length)!;
   const r = play(s, c.id, playablePiles(s, c)[0]);
   assert.ok(r.ok);
@@ -238,14 +253,22 @@ test('machines : prennent une mission quand elles le peuvent, et refusent de jou
   void rng;
 });
 
-test('machines : annoncent « je peux » seulement si elles le peuvent, sans toucher aux annonces humaines', () => {
-  for (let seed = 1; seed <= 60; seed++) {
+test('machines : annoncent toutes les missions à leur portée, sans toucher aux annonces humaines', () => {
+  let seen = 0;
+  for (let seed = 1; seed <= 80; seed++) {
     let s = newGame(3, seeded(seed));
-    s = toggleCanDo(s, 0);
+    if (canAnnounce(s, 0)) s = setCanDo(s, 0, [reachableMissions(s, 0)[0]]);
+    const human = announcedBy(s, 0);
     s = syncBotAnnouncements(s, [1, 2]);
-    assert.ok(s.canDo.includes(0));
-    for (const b of [1, 2]) assert.equal(s.canDo.includes(b), findMissionMoves(s, b).length > 0);
+    assert.deepEqual(announcedBy(s, 0), human);
+    for (const b of [1, 2]) {
+      const a = announcedBy(s, b);
+      const r = reachableMissions(s, b);
+      assert.deepEqual(a ? [...a.missions].sort() : [], [...r].sort());
+      if (a) seen++;
+    }
   }
+  assert.ok(seen > 0, 'aucune annonce de machine rencontrée : test sans valeur');
 });
 
 test('missions visées : celles du coup de pouce, sans doublon, toutes présentes sur le tapis', () => {
@@ -352,4 +375,11 @@ test('missions réussies entre deux états : cohérent avec le compteur, présen
   }
   assert.ok(avecMission > 0, 'aucune mission réussie rencontrée : test sans valeur');
   void coups; void chaines;
+});
+
+test('délai des machines : plus long quand une machine vient d\'annoncer, pour laisser le temps de l\'identifier', () => {
+  assert.equal(botDelayMs(5000, false), 5000);
+  assert.equal(botDelayMs(5000, true), 8000);
+  assert.equal(botDelayMs(1000, true), 1600);
+  assert.ok(botDelayMs(2, true) >= 2);
 });

@@ -24,7 +24,10 @@
 
 ## Communication
 - On peut parler, mais jamais des valeurs ni des symboles/couleurs de sa propre main.
-- **Règle retenue pour l'appli (exemplaire du joueur)** : la seule chose qu'on peut dire, c'est qu'on peut réussir une mission, sans dire laquelle ni avec quelle carte. Ni « bonne carte ici », ni « je peux aider ».
+- **Règle retenue pour l'appli (exemplaire du joueur)** : on peut annoncer « je peux réussir » sur une ou plusieurs missions, à tout moment, hors de son tour compris. Ni « bonne carte ici », ni « je peux aider » (sauf option).
+  - Le bouton d'annonce **n'apparaît que si le joueur peut réellement réussir au moins une mission** d'un seul coup : c'est le seul indice, il ne dit ni quelle carte ni sur quel tas jouer.
+  - Le joueur touche ensuite la ou les missions concernées, puis valide. Les autres voient sur quelles missions il se positionne.
+  - L'annonce disparaît dès qu'une carte est posée. Les machines annoncent toutes les missions à leur portée et, pour laisser le temps de le repérer, jouent un peu plus tard après une annonce.
 - (Le PDF en ligne cite ces phrases en exemples : « Ne jouez pas sur cette carte ! », « J'ai une bonne carte à jouer ici. », « Je peux aider pour cette Mission. » L'appli suit la règle de l'exemplaire, plus stricte.)
 - **Option « Phrases du livret »** : ajoute « Je peux aider pour cette mission » (sur une mission), « J'ai une bonne carte ici » et « Ne jouez pas ici » (sur un tas), en plus de « je peux réussir une mission ».
 - Débutants : permis de regarder sous les 4 cartes exposées (cartes déjà jouées).

@@ -1,6 +1,6 @@
 import {
-  botMove, completedBetween, newGame, nextMedal, play, syncBotAnnouncements, syncBotSignals,
-  toggleCanDo, toggleSignal, type GameState, type SignalKind,
+  botDelayMs, botMove, completedBetween, newGame, nextMedal, play, syncBotAnnouncements, syncBotSignals,
+  setCanDo, toggleSignal, type GameState, type SignalKind,
 } from '../engine';
 import { SYMBOLS } from '../symbols';
 import type { Backend } from './backend';
@@ -9,7 +9,7 @@ import { fromWire, toWire, type LastWire, type Options, type PublicState, type S
 /** Demande d'un joueur à l'hôte. */
 export type Intent =
   | { uid: string; type: 'play'; cardId: number; pile: number }
-  | { uid: string; type: 'canDo' }
+  | { uid: string; type: 'canDo'; missions: string[] }
   | { uid: string; type: 'signal'; kind: SignalKind; mission?: string; pile?: number };
 
 const MEDAL_TXT = { bronze: 'de bronze', argent: "d'argent", or: "d'or" } as const;
@@ -99,7 +99,7 @@ export class Host {
     if (it.type === 'play') {
       if (!this.apply(seat, it.cardId, it.pile)) return;
     } else if (it.type === 'canDo') {
-      this.g = toggleCanDo(this.g, seat);
+      this.g = setCanDo(this.g, seat, Array.isArray(it.missions) ? it.missions : []); // refusée si le joueur ne peut rien réussir
     } else if (it.type === 'signal') {
       if (!this.options.phrases) return;
       this.g = toggleSignal(this.g, { player: seat, kind: it.kind, mission: it.mission, pile: it.pile });
@@ -132,7 +132,7 @@ export class Host {
       const mv = botMove(this.g, seat);
       if (mv && this.apply(seat, mv.cardId, mv.pile)) this.enqueuePublish();
       this.scheduleBots();
-    }, this.options.pauseMs);
+    }, botDelayMs(this.options.pauseMs, this.g.canDo.some((a) => this.seats[a.player]?.bot)));
   }
 
   private enqueuePublish() {

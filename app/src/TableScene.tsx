@@ -30,7 +30,7 @@ function Countdown({ ms }: { ms: number }) {
   );
 }
 
-export type PileView = { card: Card; dim: boolean; glow: boolean; tags: { text: string; stop?: boolean }[] };
+export type PileView = { card: Card; dim: boolean; tags: { text: string; stop?: boolean }[] };
 
 function Back({ w }: { w: number }) {
   return (
@@ -67,7 +67,7 @@ function Seat({ game, i, name, avatar, vertical, reveal }: { game: GameState; i:
     <View style={[s.seat, vertical ? { flexDirection: 'column', width: 58 } : { flexDirection: 'row' }]}>
       <View style={[s.avatar, current && s.avatarOn]}>
         <Text style={{ fontSize: 18 }}>{avatar}</Text>
-        {game.canDo.includes(i) && <Text style={s.can}>🙋</Text>}
+        {game.canDo.some((a) => a.player === i) && <Text style={s.can}>🙋</Text>}
       </View>
       {info}
     </View>
@@ -77,7 +77,7 @@ function Seat({ game, i, name, avatar, vertical, reveal }: { game: GameState; i:
 type Props = {
   game: GameState; solo: boolean; piles: PileView[]; onPile: (i: number) => void;
   /** Joueur dont la main est affichée en bas (toi en solo, le joueur courant sinon). */
-  meIndex: number; hand: Card[]; handShown: boolean; selectedId: number | null; hintCards: Set<number>; hintLine: string | null;
+  meIndex: number; hand: Card[]; handShown: boolean; selectedId: number | null;
   onSelect: (id: number) => void; onReveal: () => void; revealAll: boolean; scale: number;
   lastPlay: LastPlay | null; pauseMs: number; onSkip: () => void; who: (i: number) => string;
   /** Nom et avatar de chaque siège (sinon : Toi / J2… selon `solo`). */
@@ -136,7 +136,7 @@ export function TableScene(p: Props) {
                   </Flying>
                 </View>
               ) : (
-                <CardView card={pv.card} w={pileW} dim={pv.dim} glow={pv.glow} onPress={() => p.onPile(i)} />
+                <CardView card={pv.card} w={pileW} dim={pv.dim} onPress={() => p.onPile(i)} />
               )}
               <Text style={s.pileNo}>{i + 1}</Text>
               <View style={s.tags}>
@@ -161,17 +161,16 @@ export function TableScene(p: Props) {
         <View style={s.meSeat}>
           <View style={[s.avatar, meCurrent && s.avatarOn]}>
             <Text style={{ fontSize: 18 }}>{avatar(me)}</Text>
-            {game.canDo.includes(me) && <Text style={s.can}>🙋</Text>}
+            {game.canDo.some((a) => a.player === me) && <Text style={s.can}>🙋</Text>}
           </View>
           <Text style={[s.name, meCurrent && s.nameOn]}>{label(me)}</Text>
           <Text style={s.sub}>{meCurrent ? '▶ joue' : ' '}</Text>
         </View>
         <View style={s.meHand}>
-          {p.hintLine && <Text style={s.hint}>{p.hintLine}</Text>}
           {p.handShown ? (
             <View style={s.handRow}>
               {p.hand.map((c) => (
-                <CardView key={c.id} card={c} w={handW} glow={p.hintCards.has(c.id)} selected={c.id === p.selectedId} onPress={() => p.onSelect(c.id)} />
+                <CardView key={c.id} card={c} w={handW} selected={c.id === p.selectedId} onPress={() => p.onSelect(c.id)} />
               ))}
             </View>
           ) : (

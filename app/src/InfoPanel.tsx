@@ -13,6 +13,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+const announceTxt = (game: GameState, i: number) => {
+  const a = game.canDo.find((x) => x.player === i);
+  return a ? ` · 🙋 vise ${a.missions.length} mission${a.missions.length > 1 ? 's' : ''}` : '';
+};
+
 const Line = ({ k, v }: { k: string; v: string }) => (
   <View style={s.line}>
     <Text style={s.k}>{k}</Text>
@@ -23,7 +28,7 @@ const Line = ({ k, v }: { k: string; v: string }) => (
 /** Infos sur la partie : avancement, joueurs, missions en cours, symboles, rappel des règles. */
 export function InfoPanel({ game, solo, options, onClose, nameOf }: {
   game: GameState; solo: boolean; onClose: () => void; nameOf?: (i: number) => string;
-  options: { help: boolean; targets: boolean; phrases: boolean };
+  options: { phrases: boolean };
 }) {
   const nm = nextMedal(game);
   const name = (i: number) => nameOf?.(i) ?? (solo ? (i === 0 ? 'Toi' : `Joueur ${i + 1} (machine)`) : `Joueur ${i + 1}`);
@@ -48,7 +53,7 @@ export function InfoPanel({ game, solo, options, onClose, nameOf }: {
         <Section title={`Table à ${game.players} joueur${game.players > 1 ? 's' : ''}`}>
           {game.hands.map((h, i) => (
             <Line key={i} k={`${name(i)}${i === game.current ? ' ▶ joue' : i === next ? ' · suivant' : ''}`}
-              v={`${h.length} carte${h.length > 1 ? 's' : ''}${game.canDo.includes(i) ? ' · 🙋 peut réussir une mission' : ''}`} />
+              v={`${h.length} carte${h.length > 1 ? 's' : ''}${announceTxt(game, i)}`} />
           ))}
           <Text style={s.note}>On joue dans le sens des aiguilles d'une montre.</Text>
         </Section>
@@ -68,13 +73,11 @@ export function InfoPanel({ game, solo, options, onClose, nameOf }: {
           <Text style={s.rule}>• Après chaque coup, on repioche pour revenir à 4 cartes.</Text>
           <Text style={s.rule}>• Une mission réussie est remplacée tout de suite.</Text>
           <Text style={s.rule}>• La partie s'arrête dès qu'un joueur ne peut plus jouer.</Text>
-          <Text style={s.rule}>• On ne dit jamais les valeurs ni les symboles de sa main : on peut seulement dire « je peux réussir une mission ».</Text>
+          <Text style={s.rule}>• On ne dit jamais les valeurs ni les symboles de sa main : on peut seulement annoncer « je peux réussir » sur une ou plusieurs missions (le bouton n'apparaît que si c'est vrai).</Text>
           {options.phrases && <Text style={s.rule}>• Phrases du livret actives : « je peux aider » (mission), « bonne carte ici » et « ne jouez pas ici » (tas).</Text>}
         </Section>
 
         <Section title="Options">
-          <Line k="💡 Coup de pouce" v={options.help ? 'oui' : 'non'} />
-          {solo && <Line k="🎯 Missions visées" v={options.targets ? 'oui' : 'non'} />}
           <Line k="💬 Phrases du livret" v={options.phrases ? 'oui' : 'non'} />
         </Section>
       </ScrollView>

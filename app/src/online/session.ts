@@ -155,7 +155,7 @@ export class OnlineSession {
   }
 
   /** Lance la partie avec `total` sièges : les joueurs présents, complétés par des machines. */
-  async startGame(total: number) {
+  async startGame(total: number, rng?: () => number) {
     if (!this.snap.isHost || !this.meta || this.host) return;
     const humans = this.snap.players;
     const n = Math.max(2, Math.min(MAX_PLAYERS, Math.max(total, humans.length)));
@@ -163,7 +163,7 @@ export class OnlineSession {
       ...humans.map((p) => ({ name: p.name, bot: false, uid: p.uid })),
       ...Array.from({ length: n - humans.length }, (_, i) => ({ name: `Machine ${i + 1}`, bot: true })),
     ];
-    this.host = await Host.launch(this.be, this.snap.code, seats, this.meta.options);
+    this.host = await Host.launch(this.be, this.snap.code, seats, this.meta.options, rng);
     await this.be.set(this.path('meta'), { ...this.meta, phase: 'playing' });
   }
 
@@ -177,7 +177,8 @@ export class OnlineSession {
     else this.be.push(this.path('intents'), intent).catch((e) => this.fail(e));
   }
   play(cardId: number, pile: number) { this.send({ type: 'play', cardId, pile }); }
-  toggleCanDo() { this.send({ type: 'canDo' }); }
+  /** « Je peux réussir » ces missions (liste vide : retire l'annonce). */
+  announce(missions: string[]) { this.send({ type: 'canDo', missions }); }
   toggleSignal(kind: SignalKind, target: { mission?: string; pile?: number }) {
     const t: { mission?: string; pile?: number } = {};
     if (target.mission !== undefined) t.mission = target.mission;

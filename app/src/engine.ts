@@ -7,6 +7,9 @@ export type MissionDeckItem = { kind: 'mission'; def: MissionDef } | { kind: 'me
 export type SignalKind = 'help' | 'good' | 'stop';
 export type Signal = { player: number; kind: SignalKind; mission?: string; pile?: number };
 
+/** Annonce « je peux réussir… » : qui, et sur quelles missions il se positionne. */
+export type Announce = { player: number; missions: string[] };
+
 export type GameState = {
   players: number;
   current: number;
@@ -17,7 +20,7 @@ export type GameState = {
   missions: MissionDef[];
   missionDeck: MissionDeckItem[];
   /** Joueurs ayant annoncé « je peux réussir une mission » (sans dire laquelle). */
-  canDo: number[];
+  canDo: Announce[];
   signals: Signal[];
   completed: number;
   medal: Medal | null;
@@ -154,14 +157,22 @@ export function play(prev: GameState, cardId: number, pile: number, rng: Rng = M
 export const missionsLeft = (s: GameState) =>
   Math.max(0, 50 - s.completed);
 
+export const announcedBy = (s: GameState, player: number): Announce | null => s.canDo.find((a) => a.player === player) ?? null;
+
+/** Le joueur peut-il réussir au moins une mission d'un seul coup ? (Le bouton d'annonce n'apparaît que dans ce cas.) */
+export const canAnnounce = (s: GameState, player: number) => !s.over && reachableMissions(s, player).length > 0;
+
 /**
- * Annonce (ou retire l'annonce) « je peux réussir une mission », à tout moment, y compris hors de son tour.
- * C'est la seule communication autorisée sur le jeu : on ne dit ni laquelle, ni avec quelle carte.
+ * Annonce « je peux réussir » ces missions (à tout moment, hors tour compris), ou retire l'annonce si la liste est vide.
+ * Refusée si le joueur ne peut en réussir aucune. Les missions inconnues sont ignorées.
  */
-export function toggleCanDo(prev: GameState, player: number): GameState {
+export function setCanDo(prev: GameState, player: number, missions: string[]): GameState {
   if (prev.over || player < 0 || player >= prev.players) return prev;
-  const canDo = prev.canDo.includes(player) ? prev.canDo.filter((p) => p !== player) : [...prev.canDo, player].sort();
-  return { ...prev, canDo };
+  const ids = [...new Set(missions)].filter((id) => prev.missions.some((m) => m.id === id));
+  const rest = prev.canDo.filter((a) => a.player !== player);
+  if (!ids.length) return { ...prev, canDo: rest };
+  if (!canAnnounce(prev, player)) return prev;
+  return { ...prev, canDo: [...rest, { player, missions: ids }].sort((x, y) => x.player - y.player) };
 }
 
 export type MissionMove = { cardId: number; pile: number; missions: string[] };
@@ -204,10 +215,11 @@ export function botMove(s: GameState, player: number, rng: Rng = Math.random): M
   return best;
 }
 
-/** Les machines annoncent « je peux réussir une mission » quand elles le peuvent (les autres annonces sont conservées). */
+/** Les machines annoncent « je peux » sur toutes les missions à leur portée (les annonces des autres sont conservées). */
 export function syncBotAnnouncements(s: GameState, bots: number[]): GameState {
-  const canDo = [...s.canDo.filter((p) => !bots.includes(p)), ...bots.filter((p) => findMissionMoves(s, p).length > 0)].sort();
-  return { ...s, canDo };
+  const others = s.canDo.filter((a) => !bots.includes(a.player));
+  const mine = bots.flatMap((b) => { const missions = reachableMissions(s, b); return missions.length ? [{ player: b, missions }] : []; });
+  return { ...s, canDo: [...others, ...mine].sort((x, y) => x.player - y.player) };
 }
 
 /** Missions qu'un joueur pourrait réussir d'un seul coup avec sa main actuelle. */
@@ -255,3 +267,9 @@ export function completedBetween(before: GameState, after: GameState): { done: {
     done: before.missions.flatMap((def, idx) => (after.missions.some((m) => m.id === def.id) ? [] : [{ def, idx }])),
   };
 }
+
+/**
+ * Délai avant qu'une machine joue : la pause choisie, plus un supplément quand une machine vient
+ * d'annoncer « je peux », pour laisser le temps de repérer sur quelles missions elle se positionne.
+ */
+export const botDelayMs = (pauseMs: number, botAnnounced: boolean) => pauseMs + (botAnnounced ? Math.round(pauseMs * 0.6) : 0);

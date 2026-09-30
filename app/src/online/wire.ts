@@ -1,5 +1,5 @@
 import { buildMissionDefs, type MissionDef } from '../missions';
-import type { GameState, Signal, MissionDeckItem } from '../engine';
+import type { Announce, GameState, Signal, MissionDeckItem } from '../engine';
 import type { Card, Medal } from '../types';
 
 let defsById: Map<string, MissionDef> | null = null;
@@ -51,7 +51,7 @@ export type PublicState = {
   piles: { top: Card; depth: number }[];
   deckCount: number;
   handCounts: number[];
-  canDo: number[]; signals: Signal[];
+  canDo: Announce[]; signals: Signal[];
   nextMedal: { medal: Medal; needed: number } | null;
   last: LastWire | null;
   history: string[];
