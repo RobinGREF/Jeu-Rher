@@ -19,12 +19,13 @@ import { MissionToken } from './src/MissionToken';
 import { TableScene, type LastPlay, type PileView } from './src/TableScene';
 import { SYMBOLS } from './src/symbols';
 import { alertPlayer, joinedNames } from './src/alerts';
+import { setMusic } from './src/music';
 import { clearLocal, clearRoom, loadLocal, loadRoom, saveLocal, saveRoom } from './src/resume';
 
 type Mode = 'solo' | 'together' | 'online';
 type Screen = 'home' | 'together' | 'settings';
 
-const DEFAULTS = { bots: 2, pauseMs: 5000, manual: true, phrasesOn: false, openHands: false, alertsOn: true, ask: true };
+const DEFAULTS = { bots: 2, pauseMs: 5000, manual: true, phrasesOn: false, openHands: false, alertsOn: true, ask: true, musicOn: true };
 /** Réglages gardés d'une visite à l'autre (facultatif : sans stockage, on repart des valeurs par défaut). */
 function loadSettings(): typeof DEFAULTS {
   try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem('50m-settings') ?? '{}') }; } catch { return DEFAULTS; }
@@ -67,6 +68,7 @@ export default function App() {
   const [openHands, setOpenHands] = useState(saved.openHands);
   const [phrasesOn, setPhrasesOn] = useState(saved.phrasesOn);
   const [manual, setManual] = useState(saved.manual); // les machines attendent mon clic
+  const [musicOn, setMusicOn] = useState(saved.musicOn); // musique de fond
   const [ask, setAsk] = useState(saved.ask); // tour de table : chacun dit s'il peut ou non avant que le joueur ne joue
   const [alertsOn, setAlertsOn] = useState(saved.alertsOn); // son, vibration et titre : un joueur arrive, c'est ton tour
 
@@ -214,8 +216,9 @@ export default function App() {
   }, [pub?.v]);
 
   useEffect(() => {
-    try { localStorage.setItem('50m-settings', JSON.stringify({ bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask })); } catch { /* sans stockage */ }
-  }, [bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask]);
+    try { localStorage.setItem('50m-settings', JSON.stringify({ bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask, musicOn })); } catch { /* sans stockage */ }
+  }, [bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask, musicOn]);
+  useEffect(() => { setMusic(musicOn); }, [musicOn]);
 
   // Alertes en ligne : un joueur rejoint le salon, la partie démarre, c'est ton tour.
   const seenPlayers = useRef<string[] | null>(null);
@@ -347,6 +350,7 @@ export default function App() {
             {!ask && (
               <Toggle on={manual} onPress={() => setManual(!manual)} title="👆 Machines : attendre mon clic" sub="Avant chaque machine, un message te prévient et elle ne joue que quand tu touches « Laisser jouer »." />
             )}
+            <Toggle on={musicOn} onPress={() => setMusicOn(!musicOn)} title="🎵 Musique de fond" sub="Une mélodie de marin, composée pour le jeu. Se coupe aussi avec le bouton 🎵 en haut de la table." />
             <Toggle on={alertsOn} onPress={() => setAlertsOn(!alertsOn)} title="🔔 Alertes (son, vibration, titre)" sub="En ligne : un bip et une vibration quand un joueur rejoint le salon ou quand c'est ton tour ; le titre de l'onglet clignote si la page est cachée." />
             <Text style={s.label}>Pause entre les coups</Text>
             <View style={s.row}>
@@ -572,6 +576,7 @@ export default function App() {
       <View style={s.head}>
         <Text style={s.headTitle} numberOfLines={1}>{turnTitle}</Text>
         <Text style={[s.headStat, !!party && s.headStatOn]} numberOfLines={1}>🎯 {game.completed}/50{game.medal ? ` ${MEDAL[game.medal].split(' ')[0]}` : ''} · 📚 {game.symbolDeck.length}</Text>
+        <Pressable onPress={() => setMusicOn(!musicOn)} style={s.menuBtn} accessibilityLabel={musicOn ? 'Couper la musique' : 'Mettre la musique'}><Text style={s.menuTxt}>{musicOn ? '🎵' : '🔇'}</Text></Pressable>
         <Pressable onPress={() => { setInfo(true); setMenu(false); }} style={s.menuBtn} accessibilityLabel="Infos sur la partie"><Text style={s.menuTxt}>ℹ️</Text></Pressable>
         <Pressable onPress={() => setMenu(!menu)} style={s.menuBtn} accessibilityLabel="Menu"><Text style={s.menuTxt}>☰</Text></Pressable>
       </View>

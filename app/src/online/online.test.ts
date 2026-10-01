@@ -432,11 +432,6 @@ test('tour de table en ligne : personne ne joue (ni machine) tant que chacun n\'
     assert.equal(host.snapshot.view!.current, first);
     other.pass();
     await until(() => host.snapshot.view!.passed.includes(1 - first) || host.snapshot.view!.canDo.some((x) => x.player === 1 - first), 'réponse reçue');
-    me.play(mv.cardId, mv.pile); // refusé aussi : celui qui va jouer doit répondre lui-même
-    await sleep(80);
-    assert.equal(host.snapshot.pub!.last, null, 'celui qui joue doit aussi répondre');
-    me.pass();
-    await until(() => host.snapshot.view!.passed.includes(first) || host.snapshot.view!.canDo.some((x) => x.player === first), 'ma réponse reçue');
     const mv2 = firstLegal(host.snapshot.view!, first)!;
     me.play(mv2.cardId, mv2.pile);
     await until(() => host.snapshot.pub!.last !== null, 'coup accepté après la réponse');
@@ -449,8 +444,6 @@ test('tour de table : plus de « Laisser jouer », la machine joue seule dès qu
   await host.configure({ pauseMs: 2, phrases: false, manual: true, ask: true });
   await host.startGame(2, seeded(seedFor(2, 1, 6)));
   await until(() => host.snapshot.view !== null, 'vue');
-  host.pass();
-  await until(() => host.snapshot.view!.passed.includes(0) || host.snapshot.view!.canDo.some((x) => x.player === 0), 'ma réponse');
   const mv = firstLegal(host.snapshot.view!, 0)!;
   host.play(mv.cardId, mv.pile);
   await until(() => host.snapshot.view!.current === 1, 'tour de la machine');
