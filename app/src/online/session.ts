@@ -5,7 +5,7 @@ import { Host, type Intent } from './host';
 import { buildView, type Options, type PublicState, type SeatInfo } from './wire';
 
 export const MAX_PLAYERS = 4;
-export const DEFAULT_OPTIONS: Options = { pauseMs: 5000, phrases: false, manual: true };
+export const DEFAULT_OPTIONS: Options = { pauseMs: 5000, phrases: false, manual: true, ask: true };
 
 type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never;
 type Meta = { hostUid: string; createdAt: number; phase: 'lobby' | 'playing'; options: Options };
@@ -181,6 +181,8 @@ export class OnlineSession {
   go() { this.send({ type: 'go' }); }
   /** « Je peux réussir » ces missions (liste vide : retire l'annonce). */
   announce(missions: string[]) { this.send({ type: 'canDo', missions }); }
+  /** « Je ne peux pas réussir de mission » pour ce tour. */
+  pass() { this.send({ type: 'pass' }); }
   toggleSignal(kind: SignalKind, target: { mission?: string; pile?: number }) {
     const t: { mission?: string; pile?: number } = {};
     if (target.mission !== undefined) t.mission = target.mission;

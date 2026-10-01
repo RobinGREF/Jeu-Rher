@@ -3,7 +3,7 @@ import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, useWi
 import { StatusBar } from 'expo-status-bar';
 import {
   botDelayMs, botMove, canAnnounce, completedBetween, missionsLeft, newGame, play, playablePiles, setCanDo,
-  syncBotAnnouncements, syncBotSignals, toggleSignal, tops,
+  syncBotAnnouncements, setPass, unanswered, syncBotSignals, toggleSignal, tops,
   type GameState, type SignalKind,
 } from './src/engine';
 import { Celebration, CELEBRATION_MS, type Celebrate } from './src/Celebration';
@@ -24,7 +24,7 @@ import { clearLocal, clearRoom, loadLocal, loadRoom, saveLocal, saveRoom } from 
 type Mode = 'solo' | 'together' | 'online';
 type Screen = 'home' | 'together' | 'settings';
 
-const DEFAULTS = { bots: 2, pauseMs: 5000, manual: true, phrasesOn: false, openHands: false, alertsOn: true };
+const DEFAULTS = { bots: 2, pauseMs: 5000, manual: true, phrasesOn: false, openHands: false, alertsOn: true, ask: true };
 /** Réglages gardés d'une visite à l'autre (facultatif : sans stockage, on repart des valeurs par défaut). */
 function loadSettings(): typeof DEFAULTS {
   try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem('50m-settings') ?? '{}') }; } catch { return DEFAULTS; }
@@ -67,6 +67,7 @@ export default function App() {
   const [openHands, setOpenHands] = useState(saved.openHands);
   const [phrasesOn, setPhrasesOn] = useState(saved.phrasesOn);
   const [manual, setManual] = useState(saved.manual); // les machines attendent mon clic
+  const [ask, setAsk] = useState(saved.ask); // tour de table : chacun dit s'il peut ou non avant que le joueur ne joue
   const [alertsOn, setAlertsOn] = useState(saved.alertsOn); // son, vibration et titre : un joueur arrive, c'est ton tour
 
   const [localGame, setGame] = useState<GameState | null>(null);
@@ -79,6 +80,8 @@ export default function App() {
   const osnap = online ? onl.snap : null;
   const pub = osnap?.pub ?? null;
   const game = online ? osnap?.view ?? null : localGame;
+  // Tour de table : qui n'a pas encore dit s'il peut ou non réussir une mission (personne ne joue avant).
+  const pendingAns = game && (online ? !!pub?.options.ask : ask) ? unanswered(game) : [];
   const seenPlay = useRef<number | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [, bump] = useState(0); // relit les parties à reprendre sur l'accueil
@@ -152,12 +155,12 @@ export default function App() {
   // Tour d'une machine : une courte pause pour qu'on voie ce qui se passe, puis elle joue.
   useEffect(() => {
     if (!game || game.over) return;
-    if (!solo || game.current === 0 || manual) return; // « à mon clic » : la machine attend le bouton
+    if (!solo || game.current === 0 || manual || pendingAns.length) return; // « à mon clic » : la machine attend le bouton ; ou une réponse
     // Si une machine vient d'annoncer « je peux », on laisse plus de temps pour repérer sur quelles missions.
     const announced = game.canDo.some((a) => botSeats(game.players).includes(a.player));
     const id = setTimeout(() => doBotMove(game), botDelayMs(pauseMs, announced));
     return () => clearTimeout(id);
-  }, [game, mode, pauseMs, manual]);
+  }, [game, mode, pauseMs, manual, pendingAns.length]);
 
   // La saisie d'une annonce s'arrête dès que le tapis change (carte posée, mission remplacée).
   const boardKey = game ? game.piles.map((p) => p[p.length - 1].id).join('-') + game.missions.map((m) => m.id).join('') : '';
@@ -208,8 +211,8 @@ export default function App() {
   }, [pub?.v]);
 
   useEffect(() => {
-    try { localStorage.setItem('50m-settings', JSON.stringify({ bots, pauseMs, manual, phrasesOn, openHands, alertsOn })); } catch { /* sans stockage */ }
-  }, [bots, pauseMs, manual, phrasesOn, openHands, alertsOn]);
+    try { localStorage.setItem('50m-settings', JSON.stringify({ bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask })); } catch { /* sans stockage */ }
+  }, [bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask]);
 
   // Alertes en ligne : un joueur rejoint le salon, la partie démarre, c'est ton tour.
   const seenPlayers = useRef<string[] | null>(null);
@@ -286,7 +289,7 @@ export default function App() {
   const resumeLocal = () => {
     const sv = loadLocal();
     if (!sv) return;
-    setMode(sv.mode); setGame(sv.game); setHistory(sv.history);
+    setMode(sv.mode); setGame(sv.mode === 'solo' ? syncBotAnnouncements(sv.game, Array.from({ length: sv.game.players - 1 }, (_, i) => i + 1)) : sv.game); setHistory(sv.history);
     setRevealed(false); setSelected(null); setError(''); setSigMode('play'); setSpeaker(null); setMenu(false); setInfo(false);
     setTextFor(null); setLastPlay(null); setParty(null); setPicking(null); setPicked([]); setResultSeen(false);
     startedAt.current = sv.startedAt; savedKey.current = null; setLastRank(null); setLastScoreId(null);
@@ -337,6 +340,7 @@ export default function App() {
             <Text style={s.title}>Réglages</Text>
             <Text style={s.label}>Nombre de machines</Text>
             <Chips values={[1, 2, 3]} value={bots} onChange={setBots} />
+            <Toggle on={ask} onPress={() => setAsk(!ask)} title="🗣️ Tour de table" sub="Avant chaque coup, chaque joueur dit s'il peut réussir une mission ou non. Personne ne joue avant." />
             <Toggle on={manual} onPress={() => setManual(!manual)} title="👆 Machines : attendre mon clic" sub="Avant chaque machine, un message te prévient et elle ne joue que quand tu touches « Laisser jouer »." />
             <Toggle on={alertsOn} onPress={() => setAlertsOn(!alertsOn)} title="🔔 Alertes (son, vibration, titre)" sub="En ligne : un bip et une vibration quand un joueur rejoint le salon ou quand c'est ton tour ; le titre de l'onglet clignote si la page est cachée." />
             <Text style={s.label}>Pause entre les coups</Text>
@@ -479,7 +483,7 @@ export default function App() {
   ];
   // Une machine attend le feu vert (à mon clic) : message et bouton « Laisser jouer ».
   const waitingBot = !game.over && (online ? pub?.awaitingGo != null && pub.awaitingGo === game.current : solo && manual && game.current !== 0);
-  const goBot = () => { if (online) session()?.go(); else doBotMove(game); setError(''); };
+  const goBot = () => { if (pendingAns.length) return setError('Chacun doit d\'abord dire s\'il peut réussir une mission'); if (online) session()?.go(); else doBotMove(game); setError(''); };
   const botName = seat(game.current).replace(' (machine)', '');
   const botShort = online ? botName : `J${game.current + 1}`;
   const announced = (p: number) => game.canDo.some((a) => a.player === p);
@@ -491,6 +495,8 @@ export default function App() {
     if (online) session()?.announce(ids);
     else setGame(setCanDo(game, p, ids));
   };
+  const answerNo = (p: number) => { if (online) session()?.pass(); else setGame(setPass(game, p)); setError(''); };
+  const askTogether = (p: number) => { if (!canAnnounce(game, p)) return setError(`J${p + 1} ne peut réussir aucune mission d'un seul coup`); onAnnounceButton(p); };
   const onAnnounceButton = (p: number) => {
     if (announced(p)) return sendAnnounce(p, []); // retirer son annonce
     setPicking(p); setPicked([]); setTextFor(null); setSigMode('play'); setError('');
@@ -508,6 +514,7 @@ export default function App() {
   };
 
   const drop = (pile: number) => {
+    if (pendingAns.length && !(canSignal && sigMode !== 'play')) return setError(`On attend la réponse de ${pendingAns.map((i) => (online ? seat(i) : `J${i + 1}`)).join(', ')}`);
     if (canSignal && (sigMode === 'good' || sigMode === 'stop')) {
       return online ? session()?.toggleSignal(sigMode, { pile }) : setGame(toggleSignal(game, { player: who, kind: sigMode, pile }));
     }
@@ -597,6 +604,7 @@ export default function App() {
         {!!error ? <Text style={s.barErr} numberOfLines={1}>{error}</Text>
           : picking !== null ? <Text style={s.barTxt} numberOfLines={1}>Touche la ou les missions que tu peux réussir, puis valide</Text>
           : sigMode !== 'play' ? <Text style={s.barTxt} numberOfLines={1}>{sigHint}</Text>
+          : pendingAns.length > 0 && picking === null ? <Text style={s.barWait} numberOfLines={1}>{(solo || online) ? (pendingAns.includes(me) ? '🗣️ Peux-tu réussir une mission ?' : `⏳ On attend : ${pendingAns.map(seat).join(', ')}`) : `🗣️ J${pendingAns[0] + 1}, peux-tu réussir une mission ?`}</Text>
           : waitingBot ? <Text style={s.barWait} numberOfLines={1}>🤖 {botName} va jouer{announcers.length ? ' · tu peux annoncer avant' : ''}</Text>
           : <Text style={s.barTxt} numberOfLines={1}>{hist[0] ?? (game.current === me ? 'À toi de commencer' : `${seat(game.current)} commence`)}</Text>}
         <View style={s.barRow}>
@@ -609,7 +617,19 @@ export default function App() {
                 <Text style={s.modeTxt}>Annuler</Text>
               </Pressable>
             </>
-          ) : announcers.length > 0 ? announcers.map((i) => {
+          ) : pendingAns.length > 0 ? ((solo || online) ? (pendingAns.includes(me) ? (
+            <>
+              {canAnnounce(game, me) && (
+                <Pressable onPress={() => onAnnounceButton(me)} style={[s.mode, s.grow, s.modeOn]} accessibilityLabel="Oui, je peux réussir une mission"><Text style={[s.modeTxt, s.modeTxtOn]} numberOfLines={1}>🙋 Oui, je peux</Text></Pressable>
+              )}
+              <Pressable onPress={() => answerNo(me)} style={[s.mode, s.grow]} accessibilityLabel="Non, je ne peux pas"><Text style={s.modeTxt} numberOfLines={1}>🚫 Non, je ne peux pas</Text></Pressable>
+            </>
+          ) : <View style={s.barSpacer} />) : (
+            <>
+              <Pressable onPress={() => askTogether(pendingAns[0])} style={[s.mode, s.grow, s.modeOn]} accessibilityLabel={`J${pendingAns[0] + 1} peut`}><Text style={[s.modeTxt, s.modeTxtOn]} numberOfLines={1}>🙋 J{pendingAns[0] + 1} peut</Text></Pressable>
+              <Pressable onPress={() => answerNo(pendingAns[0])} style={[s.mode, s.grow]} accessibilityLabel={`J${pendingAns[0] + 1} ne peut pas`}><Text style={s.modeTxt} numberOfLines={1}>🚫 J{pendingAns[0] + 1} ne peut pas</Text></Pressable>
+            </>
+          )) : announcers.length > 0 ? announcers.map((i) => {
             const on = announced(i);
             return (
               <Pressable key={i} onPress={() => onAnnounceButton(i)} style={[s.mode, s.grow, on && s.modeOn]}>
@@ -619,7 +639,7 @@ export default function App() {
               </Pressable>
             );
           }) : !canSignal && !waitingBot && <View style={s.barSpacer} />}
-          {waitingBot && picking === null && (
+          {waitingBot && picking === null && pendingAns.length === 0 && (
             <Pressable onPress={goBot} style={[s.goBtn, s.grow]} accessibilityLabel={`Laisser ${botName} jouer`}>
               <Text style={s.goTxt} numberOfLines={1}>▶ Laisser {botShort} jouer</Text>
             </Pressable>

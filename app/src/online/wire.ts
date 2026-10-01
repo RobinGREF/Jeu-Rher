@@ -19,7 +19,7 @@ export function toWire(g: GameState): string {
     players: g.players, current: g.current, hands: g.hands, piles: g.piles, symbolDeck: g.symbolDeck,
     missions: g.missions.map((m) => m.id),
     missionDeck: g.missionDeck.map((it): DeckWire => (it.kind === 'mission' ? { m: it.def.id } : { medal: it.medal })),
-    canDo: g.canDo, signals: g.signals, completed: g.completed, medal: g.medal, goldReached: g.goldReached, over: g.over,
+    canDo: g.canDo, passed: g.passed, signals: g.signals, completed: g.completed, medal: g.medal, goldReached: g.goldReached, over: g.over,
   });
 }
 
@@ -29,13 +29,13 @@ export function fromWire(json: string): GameState {
     players: w.players, current: w.current, hands: w.hands, piles: w.piles, symbolDeck: w.symbolDeck,
     missions: (w.missions as string[]).map(missionById),
     missionDeck: (w.missionDeck as DeckWire[]).map((it): MissionDeckItem => ('m' in it ? { kind: 'mission', def: missionById(it.m) } : { kind: 'medal', medal: it.medal })),
-    canDo: w.canDo, signals: w.signals as Signal[], completed: w.completed, medal: w.medal, goldReached: w.goldReached, over: w.over,
+    canDo: w.canDo, passed: w.passed ?? [], signals: w.signals as Signal[], completed: w.completed, medal: w.medal, goldReached: w.goldReached, over: w.over,
   };
 }
 
 export type SeatInfo = { name: string; bot: boolean; uid?: string };
 /** `manual` : chaque machine attend qu'un joueur touche « Laisser jouer » (sinon, elle joue toute seule après la pause). */
-export type Options = { pauseMs: number; phrases: boolean; manual: boolean };
+export type Options = { pauseMs: number; phrases: boolean; manual: boolean; /** Tour de table : chacun dit s'il peut ou non avant que le joueur ne joue. */ ask?: boolean };
 
 /** Dernier coup joué, pour l'animation de la carte et la fête. */
 export type LastWire = {
@@ -54,7 +54,7 @@ export type PublicState = {
   handCounts: number[];
   /** Fin de partie seulement : les mains de tous, pour voir pourquoi on a perdu. */
   finalHands?: Card[][];
-  canDo: Announce[]; signals: Signal[];
+  canDo: Announce[]; signals: Signal[]; passed?: number[];
   nextMedal: { medal: Medal; needed: number } | null;
   /** Siège de la machine qui attend le feu vert d'un joueur, sinon null. */
   awaitingGo: number | null;
@@ -81,7 +81,7 @@ export function buildView(pub: PublicState, hand: Card[], mySeat: number): GameS
     hands: pub.handCounts.map((n, i) => (i === mySeat ? hand : pub.over && pub.finalHands?.[i] ? pub.finalHands[i] : filler(n))),
     piles: pub.piles.map((p) => [...filler(p.depth), p.top]),
     symbolDeck: filler(pub.deckCount),
-    missions, missionDeck, canDo: pub.canDo, signals: pub.signals,
+    missions, missionDeck, canDo: pub.canDo, passed: pub.passed ?? [], signals: pub.signals,
     completed: pub.completed, medal: pub.medal, goldReached: pub.goldReached, over: pub.over,
   };
 }

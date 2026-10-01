@@ -1,6 +1,6 @@
 import {
   botDelayMs, botMove, completedBetween, newGame, nextMedal, play, syncBotAnnouncements, syncBotSignals,
-  setCanDo, toggleSignal, type GameState, type SignalKind,
+  setCanDo, setPass, toggleSignal, unanswered, type GameState, type SignalKind,
 } from '../engine';
 import { SYMBOLS } from '../symbols';
 import type { Backend } from './backend';
@@ -11,6 +11,7 @@ import { fromWire, toWire, type LastWire, type Options, type PublicState, type S
 export type Intent =
   | { uid: string; type: 'play'; cardId: number; pile: number }
   | { uid: string; type: 'canDo'; missions: string[] }
+  | { uid: string; type: 'pass' }
   | { uid: string; type: 'go' }
   | { uid: string; type: 'signal'; kind: SignalKind; mission?: string; pile?: number };
 
@@ -72,6 +73,9 @@ export class Host {
     this.off?.();
   }
 
+  /** Tour de table obligatoire et quelqu'un n'a pas encore répondu : personne ne peut jouer. */
+  private gated = () => this.options.ask === true && unanswered(this.g).length > 0;
+
   private botSeats = () => this.seats.flatMap((s, i) => (s.bot ? [i] : []));
   private sync(g: GameState): GameState {
     const bots = this.botSeats();
@@ -101,6 +105,7 @@ export class Host {
   submit(it: Intent) {
     const seat = this.seats.findIndex((s) => s.uid === it.uid);
     if (seat < 0 || this.stopped) return;
+    if ((it.type === 'play' || it.type === 'go') && this.gated()) return; // chacun doit d'abord répondre
     if (it.type === 'play') {
       if (!this.apply(seat, it.cardId, it.pile)) return;
     } else if (it.type === 'go') {
@@ -111,6 +116,8 @@ export class Host {
       if (!mv || !this.apply(s, mv.cardId, mv.pile)) return;
     } else if (it.type === 'canDo') {
       this.g = setCanDo(this.g, seat, Array.isArray(it.missions) ? it.missions : []); // refusée si le joueur ne peut rien réussir
+    } else if (it.type === 'pass') {
+      this.g = setPass(this.g, seat);
     } else if (it.type === 'signal') {
       if (!this.options.phrases) return;
       this.g = toggleSignal(this.g, { player: seat, kind: it.kind, mission: it.mission, pile: it.pile });
@@ -141,10 +148,10 @@ export class Host {
   private scheduleBots() {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
-    if (this.stopped || this.g.over || !this.seats[this.g.current]?.bot || this.options.manual) return;
+    if (this.stopped || this.g.over || !this.seats[this.g.current]?.bot || this.options.manual || this.gated()) return;
     this.timer = setTimeout(() => {
       const seat = this.g.current;
-      const mv = botMove(this.g, seat, this.rng);
+      const mv = this.gated() ? null : botMove(this.g, seat, this.rng);
       if (mv && this.apply(seat, mv.cardId, mv.pile)) this.enqueuePublish();
       this.scheduleBots();
     }, botDelayMs(this.options.pauseMs, this.g.canDo.some((a) => this.seats[a.player]?.bot)));
@@ -168,7 +175,7 @@ export class Host {
       missions: g.missions.map((m) => m.id),
       piles: g.piles.map((p) => ({ top: p[p.length - 1], depth: p.length - 1 })),
       deckCount: g.symbolDeck.length, handCounts: g.hands.map((h) => h.length), ...(g.over ? { finalHands: g.hands } : {}),
-      canDo: g.canDo, signals: g.signals,
+      canDo: g.canDo, passed: g.passed, signals: g.signals,
       nextMedal: nm ? { medal: nm.medal, needed: nm.missionsNeeded } : null,
       awaitingGo: this.waiting(),
       last: this.last, history: this.history.slice(0, 30), options: this.options,

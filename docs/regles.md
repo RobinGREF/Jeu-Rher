@@ -34,6 +34,9 @@
 - Débutants : permis de regarder sous les 4 cartes exposées (cartes déjà jouées).
 - Super-pros : aucune communication.
 
+## Tour de table (réglable, activé par défaut)
+- Avant chaque coup, chaque joueur autre que celui qui va jouer dit « oui, je peux réussir une mission » (en choisissant lesquelles) ou « non, je ne peux pas ». Personne, machine comprise, ne joue tant que tout le monde n’a pas répondu. Les machines répondent toutes seules. Les réponses sont effacées à chaque carte posée.
+
 ## Quitter et reprendre
 - Contre des machines ou à plusieurs sur un téléphone : la partie est sauvegardée sur l’appareil à chaque coup ; l’accueil propose « Reprendre la partie en cours » (ou « Abandonner »). Oubliée après 3 jours ou à la fin de la partie.
 - En ligne : l’accueil propose « Reprendre la partie en ligne » (code du salon). Si l’hôte quitte, la partie est reprise à son retour ; les autres peuvent le remplacer par une machine.

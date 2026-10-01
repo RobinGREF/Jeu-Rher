@@ -410,3 +410,30 @@ test('fin de partie : les mains de tous sont visibles, avant elles restent des d
   assert.equal(buildView(pub, [card(10)], 0).hands[1][0].id < 0, true);
   assert.equal(buildView({ ...pub, over: true }, [card(10)], 0).hands[1][0].id, 11);
 });
+
+test('tour de table en ligne : personne ne joue (ni machine) tant que chacun n\'a pas répondu', async () => {
+  const w = world();
+  const host = await create(w.client('h'), 'Robin');
+  await host.configure({ pauseMs: 2, phrases: false, manual: false, ask: true });
+  const a = await join(w.client('a'), host.snapshot.code, 'Alice');
+  await until(() => host.snapshot.players.length === 2, 'salon');
+  await host.startGame(3, seeded(seedFor(3, 2, 8)));
+  await until(() => [host, a].every((s) => s.snapshot.view !== null), 'vues');
+  const cur = () => host.snapshot.view!.current;
+  // le siège 0 (hôte) ou 1 (Alice) joue en premier ; l'autre humain doit répondre d'abord
+  const first = cur();
+  const players = [host, a];
+  const me = players[first]; const other = players[1 - first];
+  if (first <= 1) {
+    const mv = firstLegal(host.snapshot.view!, first)!;
+    me.play(mv.cardId, mv.pile); // refusé : l'autre n'a pas répondu
+    await sleep(80);
+    assert.equal(host.snapshot.pub!.last, null, 'coup refusé tant qu\'un joueur n\'a pas répondu');
+    assert.equal(host.snapshot.view!.current, first);
+    other.pass();
+    await until(() => host.snapshot.view!.passed.includes(1 - first) || host.snapshot.view!.canDo.some((x) => x.player === 1 - first), 'réponse reçue');
+    const mv2 = firstLegal(host.snapshot.view!, first)!;
+    me.play(mv2.cardId, mv2.pile);
+    await until(() => host.snapshot.pub!.last !== null, 'coup accepté après la réponse');
+  }
+});

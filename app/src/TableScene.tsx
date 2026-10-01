@@ -68,7 +68,7 @@ function Seat({ game, i, name, avatar, vertical, reveal }: { game: GameState; i:
     <View style={[s.seat, vertical ? { flexDirection: 'column', width: 58 } : { flexDirection: 'row' }]}>
       <View style={[s.avatar, current && s.avatarOn]}>
         <Text style={{ fontSize: 18 }}>{avatar}</Text>
-        {game.canDo.some((a) => a.player === i) && <Text style={s.can}>🙋</Text>}
+        {game.canDo.some((a) => a.player === i) ? <Text style={s.can}>🙋</Text> : game.passed.includes(i) ? <Text style={s.can}>🚫</Text> : null}
       </View>
       {info}
     </View>

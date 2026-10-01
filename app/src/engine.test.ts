@@ -410,3 +410,34 @@ test('une machine ne défait pas la mission annoncée par un autre joueur', () =
   }
   assert.ok(checked > 0, 'aucune situation de test trouvée');
 });
+
+test('tour de table : chacun répond (je peux / je ne peux pas) avant le coup, effacé à chaque carte posée', async () => {
+  const { setPass, unanswered } = await import('./engine');
+  let s = newGame(3, seeded(11));
+  assert.deepEqual(unanswered(s), [(s.current + 1) % 3, (s.current + 2) % 3].sort());
+  const other = unanswered(s)[0];
+  s = setPass(s, other);
+  assert.deepEqual(s.passed, [other]);
+  assert.equal(unanswered(s).includes(other), false);
+  // une annonce vaut réponse et retire le « non »
+  const can = [0, 1, 2].find((p) => p !== s.current && canAnnounce(s, p));
+  if (can !== undefined) {
+    const s2 = setCanDo(s, can, reachableMissions(s, can));
+    assert.equal(s2.passed.includes(can), false);
+    assert.equal(unanswered(s2).includes(can), false);
+    // et un « non » retire l'annonce
+    assert.equal(setPass(s2, can).canDo.some((a) => a.player === can), false);
+  }
+  // les machines répondent toutes seules : « je ne peux pas » quand elles n'ont rien
+  const bots = [1, 2];
+  const synced = syncBotAnnouncements(newGame(3, seeded(11)), bots);
+  for (const b of bots) {
+    if (b === synced.current) continue;
+    assert.ok(synced.passed.includes(b) !== synced.canDo.some((a) => a.player === b), `machine ${b} : oui ou non, pas les deux ni aucun`);
+  }
+  // poser une carte efface les réponses
+  const c = s.hands[s.current].find((x) => playablePiles(s, x).length)!;
+  const r = play(s, c.id, playablePiles(s, c)[0]);
+  assert.ok(r.ok);
+  assert.deepEqual(r.state.passed, []);
+});
