@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSymbolDeck, canPlayOn, newGame, play, playablePiles, setCanDo, canAnnounce, announcedBy, botDelayMs, tops, findMissionMoves, botMove, syncBotAnnouncements, reachableMissions, nextMedal, completedBetween, toggleSignal, syncBotSignals } from './engine';
+import { buildSymbolDeck, canPlayOn, newGame, play, playablePiles, setCanDo, canAnnounce, announcedBy, botDelayMs, tops, findMissionMoves, botMove, syncBotAnnouncements, reachableMissions, nextMedal, completedBetween, toggleSignal, syncBotSignals, botMoveGreedy, missionDifficulty, unseenCards } from './engine';
 
 const seeded = (seed: number) => () => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296);
 
@@ -469,4 +469,33 @@ test('missions « exactement 2 cartes d\'un symbole » : 3 cartes du symbole ne 
       assert.equal(defs.find((d) => d.label === `Exactement 3 des 4 cartes sont des ${names[s]}`)!.check(t), pos.length === 3);
     }
   }
+});
+
+test('machines : la difficulté d\'une mission dépend du contexte de la partie', () => {
+  const s = newGame(3, seeded(5));
+  const pool = unseenCards(s, 0);
+  assert.equal(pool.length, 56 - 4 - 4);
+  const easy = missionDifficulty(mission('Exactement 2 cartes sont des Boussoles et elles ne se touchent pas'), pool, seeded(1), 600);
+  const hardM = missionDifficulty(mission('Chaque carte a une valeur inférieure à 4'), pool, seeded(1), 600);
+  assert.ok(hardM > easy, `toutes < 4 (${hardM.toFixed(2)}) plus dure que 2 boussoles qui ne se touchent pas (${easy.toFixed(2)})`);
+  // plus aucune Boussole en jeu : « exactement 2 boussoles » devient impossible
+  const noBou = pool.filter((c) => c.symbol !== 1);
+  assert.equal(missionDifficulty(mission('Exactement 2 cartes sont des Boussoles et elles ne se touchent pas'), noBou, seeded(1), 600), 1);
+  // plus aucune carte de valeur ≥ 4 : « toutes < 4 » devient facile
+  const low = pool.filter((c) => c.value < 4);
+  assert.ok(missionDifficulty(mission('Chaque carte a une valeur inférieure à 4'), low, seeded(1), 600) < 0.05);
+});
+
+test('machines : la nouvelle machine réussit nettement plus de missions que l\'ancienne, parties de 3 machines', () => {
+  const run = (choose: typeof botMove) => {
+    let total = 0;
+    for (let g = 1; g <= 40; g++) {
+      const rng = seeded(g * 7919); let s = newGame(3, seeded(g)); let guard = 0;
+      while (!s.over && guard++ < 4000) { const mv = choose(s, s.current, rng); if (!mv) break; const r = play(s, mv.cardId, mv.pile, rng); if (!r.ok) break; s = r.state; }
+      total += s.completed;
+    }
+    return total / 40;
+  };
+  const greedy = run(botMoveGreedy), smart = run(botMove);
+  assert.ok(smart > greedy * 1.3, `nouvelle ${smart.toFixed(1)} contre ancienne ${greedy.toFixed(1)}`);
 });

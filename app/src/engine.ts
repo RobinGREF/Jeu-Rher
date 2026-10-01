@@ -217,16 +217,75 @@ export function findMissionMoves(s: GameState, player: number): MissionMove[] {
 
 export type Move = { cardId: number; pile: number };
 
-/**
- * Coup d'un joueur machine : celui qui réussit le plus de missions, en évitant de bloquer
- * le joueur suivant (ce qui terminerait la partie). Simule chaque coup avec `play`.
- * On joue ensemble : une machine ne défait pas la mission qu'un autre joueur (humain ou machine) a
- * annoncée pouvoir réussir, tant qu'un autre coup lui permet de l'éviter.
- */
 export const KEEP_ANNOUNCED_PENALTY = 150;
+/** Réglages internes de la machine (servent aux comparaisons de force). */
+export const botTuning = { slope: 1.2 };
+
+/** Ancienne machine, gourmande : réussit le plus de missions tout de suite (gardée pour comparer). */
+export function botMoveGreedy(s: GameState, player: number, rng: Rng = Math.random): Move | null {
+  if (s.over || s.current !== player) return null;
+  let best: Move | null = null;
+  let bestScore = -Infinity;
+  for (const card of s.hands[player]) {
+    for (const pile of playablePiles(s, card)) {
+      const r = play(s, card.id, pile, rng);
+      if (!r.ok) continue;
+      const score = (r.state.completed - s.completed) * 100 - (r.state.over && r.state.completed < 50 ? 1000 : 0) + rng();
+      if (score > bestScore) { bestScore = score; best = { cardId: card.id, pile }; }
+    }
+  }
+  return best;
+}
+
+/** Cartes que la machine ne voit pas : ni sur les tas (jouées), ni dans sa main. Pioche et mains des autres, sans l'ordre. */
+export function unseenCards(s: GameState, player: number): Card[] {
+  const seen = new Set<number>([...s.piles.flat(), ...(s.hands[player] ?? [])].map((c) => c.id));
+  return buildSymbolDeck().filter((c) => !seen.has(c.id));
+}
+
+/**
+ * Difficulté d'une mission dans le contexte de la partie, de 0 (facile) à 1 (très rare) : chance qu'une combinaison
+ * de 4 cartes tirées parmi les cartes encore inconnues la réussisse. Elle bouge au fil de la partie : une famille
+ * presque épuisée rend difficiles les missions qui en demandent.
+ */
+export function missionDifficulty(def: MissionDef, pool: Card[], rng: Rng = Math.random, samples = 300): number {
+  if (pool.length < 4) return 1;
+  let hits = 0;
+  for (let i = 0; i < samples; i++) {
+    const pick = new Set<number>();
+    while (pick.size < 4) pick.add(Math.floor(rng() * pool.length));
+    if (def.check([...pick].map((k) => pool[k]))) hits++;
+  }
+  return Math.min(1, Math.log((hits + 0.5) / (samples + 0.5)) / Math.log(0.5 / (samples + 0.5)));
+}
+
+/**
+ * Coup d'un joueur machine, pour réussir ensemble :
+ *  - il réussit tout de suite le plus de missions possible ;
+ *  - il évite de bloquer le joueur suivant (ce qui terminerait la partie) ;
+ *  - il ne défait pas une mission qu'un autre joueur a annoncée pouvoir réussir ;
+ *  - il préfère laisser un tapis où les prochains joueurs ont une bonne chance de réussir une mission, en comptant
+ *    davantage les missions difficiles (rares dans le contexte de la partie) que les faciles.
+ */
 export function botMove(s: GameState, player: number, rng: Rng = Math.random): Move | null {
   if (s.over || s.current !== player) return null;
   const promised = s.canDo.filter((a) => a.player !== player);
+  const pool = unseenCards(s, player);
+  const diff = new Map<string, number>();
+  const hard = (m: MissionDef) => { let d = diff.get(m.id); if (d === undefined) { d = missionDifficulty(m, pool, rng); diff.set(m.id, d); } return d; };
+  const weight = (m: MissionDef) => Math.max(0.1, 1 + botTuning.slope * (hard(m) - 0.5));
+  const others = Math.max(1, s.players - 1);
+
+  /** Chance que ce tapis offre une mission : à la machine (sa main, exacte) et aux autres (cartes inconnues, probabilité). */
+  const chance = (after: GameState, m: MissionDef) => {
+    const t = tops(after);
+    const reach = (card: Card) => playablePiles(after, card).some((i) => { const u = [...t]; u[i] = card; return m.check(u); });
+    const own = after.hands[player].some(reach) ? 1 : 0;
+    const frac = pool.length ? pool.filter(reach).length / pool.length : 0;
+    const theirs = 1 - Math.pow(1 - frac, Math.min(12, 4 * others));
+    return 0.6 * theirs + 0.4 * own;
+  };
+
   let best: Move | null = null;
   let bestScore = -Infinity;
   for (const card of s.hands[player]) {
@@ -234,10 +293,13 @@ export function botMove(s: GameState, player: number, rng: Rng = Math.random): M
       const r = play(s, card.id, pile, rng);
       if (!r.ok) continue;
       let score = (r.state.completed - s.completed) * 100 - (r.state.over && r.state.completed < 50 ? 1000 : 0) + rng();
+      score += 4 * r.state.missions.reduce((acc, m) => acc + weight(m) * chance(r.state, m), 0);
       for (const a of promised) {
         const still = reachableMissions(r.state, a.player);
-        const lost = a.missions.filter((id) => r.state.missions.some((m) => m.id === id) && !still.includes(id));
-        score -= lost.length * KEEP_ANNOUNCED_PENALTY;
+        for (const id of a.missions) {
+          const m = s.missions.find((x) => x.id === id);
+          if (m && r.state.missions.some((x) => x.id === id) && !still.includes(id)) score -= KEEP_ANNOUNCED_PENALTY * (0.7 + 0.6 * hard(m));
+        }
       }
       if (score > bestScore) { bestScore = score; best = { cardId: card.id, pile }; }
     }

@@ -29,6 +29,7 @@
   - Le joueur touche ensuite la ou les missions concernées, puis valide. Les autres voient sur quelles missions il se positionne.
   - L'annonce disparaît dès qu'une carte est posée. Les machines annoncent toutes les missions à leur portée et, pour laisser le temps de le repérer, jouent un peu plus tard après une annonce.
 - (Le PDF en ligne cite ces phrases en exemples : « Ne jouez pas sur cette carte ! », « J'ai une bonne carte à jouer ici. », « Je peux aider pour cette Mission. » L'appli suit la règle de l'exemplaire, plus stricte.)
+- **Machines stratèges** : elles réussissent ce qu’elles peuvent, évitent de bloquer le joueur suivant, laissent un tapis où les autres ont une chance de réussir (en comptant davantage les missions rares dans le contexte de la partie, d’après les cartes encore inconnues) et ne défont pas une mission annoncée.
 - **Esprit coopératif** : une machine ne joue pas un coup qui défait une mission annoncée par un autre joueur (humain ou machine), tant qu’un autre coup l’évite.
 - **Option « Phrases du livret »** : ajoute « Je peux aider pour cette mission » (sur une mission), « J'ai une bonne carte ici » et « Ne jouez pas ici » (sur un tas), en plus de « je peux réussir une mission ».
 - Débutants : permis de regarder sous les 4 cartes exposées (cartes déjà jouées).
