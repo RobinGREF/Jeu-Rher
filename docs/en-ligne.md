@@ -58,3 +58,6 @@ Ces conditions sont celles de Google et peuvent changer : vérifie-les à la cr�
 À la fin de chaque partie en ligne, l'hôte inscrit le résultat (missions, médaille, coups, noms des participants) dans le nœud `scores/<code du salon>` de la base. Une entrée ne s'écrit qu'une fois (pas de modification ni de suppression) et seul l'hôte du salon peut l'écrire. Tous les joueurs voient ce tableau dans **🏆 Meilleurs scores → 🌐 Tous les joueurs**.
 
 ⚠️ Après cette mise à jour, il faut **republier les règles** : Firebase → Realtime Database → Règles → coller le contenu de `app/firebase.rules.json` → Publier. Sans cela, le tableau partagé reste vide (l'écran l'indique).
+
+## Arriver après le début de la partie
+Quelqu'un qui tape le code d'une partie déjà lancée rejoint **en spectateur** : il voit la table (jamais les mains) et ne peut pas jouer. S'il reste une machine à la table, il peut toucher « 🙋 Demander une place ». L'hôte voit alors « 👋 Léo veut jouer à la place d'une machine » avec **Accepter** / **Refuser**. Accepté, le spectateur prend la place d'une machine, reçoit une vraie main et joue ; refusé, il continue à regarder. Sans machine à remplacer, l'hôte peut d'abord remplacer un joueur absent par une machine (menu ☰). Aucune règle Firebase à changer.

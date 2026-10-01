@@ -58,6 +58,8 @@ export type PublicState = {
   nextMedal: { medal: Medal; needed: number } | null;
   /** Siège de la machine qui attend le feu vert d'un joueur, sinon null. */
   awaitingGo: number | null;
+  /** Demandes de place refusées par l'hôte (identifiants des spectateurs). */
+  refused?: string[];
   last: LastWire | null;
   history: string[];
   options: Options;

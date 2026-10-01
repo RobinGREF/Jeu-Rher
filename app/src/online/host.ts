@@ -33,6 +33,7 @@ export class Host {
   private queue: Promise<void> = Promise.resolve();
   private stopped = false;
   private scoreSaved = false;
+  private refused = new Set<string>();
   private rng: () => number = Math.random;
 
   private constructor(private be: Backend, private code: string, private options: Options) {}
@@ -134,6 +135,31 @@ export class Host {
     this.submit(it);
   }
 
+  /** Un spectateur prend la place d'une machine (accepté par l'hôte). Renvoie false s'il n'y a plus de machine à remplacer. */
+  takeSeat(uid: string, name: string): boolean {
+    if (this.stopped || this.g.over) return false;
+    if (this.seats.some((s) => s.uid === uid)) return true;
+    // On remplace de préférence une machine dont ce n'est pas le tour.
+    const bots = this.botSeats();
+    const i = bots.find((b) => b !== this.g.current) ?? bots[0];
+    if (i === undefined) return false;
+    const old = this.seats[i].name;
+    this.seats[i] = { name, bot: false, uid };
+    this.refused.delete(uid);
+    // La nouvelle personne répond elle-même : on retire les réponses de la machine qu'elle remplace.
+    this.g = this.sync({ ...this.g, canDo: this.g.canDo.filter((a) => a.player !== i), passed: this.g.passed.filter((p) => p !== i) });
+    this.history.unshift(`${name} rejoint la table à la place de ${old}`);
+    this.enqueuePublish();
+    this.scheduleBots();
+    return true;
+  }
+
+  /** L'hôte refuse la demande d'un spectateur. */
+  refuse(uid: string) {
+    this.refused.add(uid);
+    this.enqueuePublish();
+  }
+
   /** Un joueur absent est remplacé par une machine pour que la partie continue. */
   botify(seat: number) {
     const s = this.seats[seat];
@@ -180,7 +206,7 @@ export class Host {
       deckCount: g.symbolDeck.length, handCounts: g.hands.map((h) => h.length), ...(g.over ? { finalHands: g.hands } : {}),
       canDo: g.canDo, passed: g.passed, signals: g.signals,
       nextMedal: nm ? { medal: nm.medal, needed: nm.missionsNeeded } : null,
-      awaitingGo: this.waiting(),
+      awaitingGo: this.waiting(), refused: [...this.refused],
       last: this.last, history: this.history.slice(0, 30), options: this.options,
     };
     await this.be.set(this.path('public'), { json: JSON.stringify(pub) });

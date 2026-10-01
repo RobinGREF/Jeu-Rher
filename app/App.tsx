@@ -230,6 +230,12 @@ export default function App() {
     }
     seenPlayers.current = osnap.players.map((p) => p.uid);
   }, [online, osnap?.players, osnap?.phase]);
+  const seenReq = useRef(0);
+  useEffect(() => {
+    const n = online && osnap?.isHost ? osnap.requests.length : 0;
+    if (n > seenReq.current) alertPlayer(`${osnap!.requests[n - 1].name} demande une place`, 'join', alertsOn);
+    seenReq.current = n;
+  }, [online, osnap?.requests.length]);
   const wasPlaying = useRef(false);
   const wasMyTurn = useRef(false);
   useEffect(() => {
@@ -468,6 +474,7 @@ export default function App() {
     );
   }
 
+  const spectator = online && !!osnap?.spectator; // arrivé après le début : il regarde, et peut demander la place d'une machine
   const me = online ? Math.max(0, osnap?.mySeat ?? 0) : solo ? 0 : game.current;
   const hand = game.hands[me];
   const sel = hand.find((c) => c.id === selected) ?? null;
@@ -497,7 +504,7 @@ export default function App() {
   const botShort = online ? botName : `J${game.current + 1}`;
   const announced = (p: number) => game.canDo.some((a) => a.player === p);
   // Le bouton d'annonce n'apparaît que si le joueur peut vraiment réussir une mission : c'est l'indice, sans dire laquelle ni avec quelle carte.
-  const announcers: number[] = online || solo
+  const announcers: number[] = spectator ? [] : online || solo
     ? (canAnnounce(game, me) ? [me] : [])
     : openHands ? game.hands.map((_, i) => i).filter((i) => canAnnounce(game, i)) : handShown && canAnnounce(game, me) ? [me] : [];
   const sendAnnounce = (p: number, ids: string[]) => {
@@ -523,6 +530,7 @@ export default function App() {
   };
 
   const drop = (pile: number) => {
+    if (spectator) return setError('Tu regardes la partie : demande une place pour jouer');
     if (pendingAns.length && !(canSignal && sigMode !== 'play')) return setError(`On attend la réponse de ${pendingAns.map((i) => (online ? seat(i) : `J${i + 1}`)).join(', ')}`);
     if (canSignal && (sigMode === 'good' || sigMode === 'stop')) {
       return online ? session()?.toggleSignal(sigMode, { pile }) : setGame(toggleSignal(game, { player: who, kind: sigMode, pile }));
@@ -559,7 +567,7 @@ export default function App() {
   const missionText = game.missions.find((m) => m.id === textFor)?.label;
   const sigHint = { play: '', help: 'Touche la mission pour laquelle tu peux aider', good: 'Touche le tas où tu as une bonne carte', stop: 'Touche le tas où il ne faut pas jouer' }[sigMode];
   const toggleSig = (k: SignalKind) => setSigMode(sigMode === k ? 'play' : k);
-  const turnTitle = review ? '🛑 Fin de partie' : solo || online ? (game.current === me ? 'À toi de jouer' : waitingBot ? `${botName} va jouer` : `${seat(game.current)} joue…`) : `Joueur ${game.current + 1} joue`;
+  const turnTitle = review ? '🛑 Fin de partie' : spectator ? `👀 ${seat(game.current)} joue…` : solo || online ? (game.current === me ? 'À toi de jouer' : waitingBot ? `${botName} va jouer` : `${seat(game.current)} joue…`) : `Joueur ${game.current + 1} joue`;
   const stuck = game.current;
   const stuckYou = (online || solo) && stuck === me;
   const stuckName = seat(stuck).replace(' (machine)', '');
@@ -567,7 +575,7 @@ export default function App() {
   const why = review
     ? `${stuckYou ? "Tu n'as" : `${stuckName} n'a`} ${game.hands[stuck].length ? `aucune carte jouable : ${game.hands[stuck].map(show).join(' ')} ne vont sur aucun des tas (${t.map(show).join(' ')}).` : 'plus aucune carte en main.'}`
     : '';
-  const labels = online ? game.hands.map((_, i) => ({ name: i === me ? 'Toi' : seat(i).replace(' (machine)', ''), avatar: pub?.seats[i]?.bot ? '🤖' : i === me ? '🙂' : '👤' })) : undefined;
+  const labels = online ? game.hands.map((_, i) => ({ name: !spectator && i === me ? 'Toi' : seat(i).replace(' (machine)', ''), avatar: pub?.seats[i]?.bot ? '🤖' : !spectator && i === me ? '🙂' : '👤' })) : undefined;
 
   return (
     <SafeAreaView style={s.game}>
@@ -591,7 +599,7 @@ export default function App() {
 
       <View style={s.tableWrap}>
         <TableScene game={game} solo={solo} labels={labels} piles={pileViews} onPile={drop}
-          meIndex={me} hand={hand} handShown={handShown} selectedId={selected}
+          meIndex={me} hand={spectator ? [] : hand} handShown={handShown} selectedId={selected}
           onSelect={(id) => { setSelected(id); setError(''); setSigMode('play'); }}
           onReveal={() => { setRevealed(true); setSigMode('play'); }} revealAll={openHands || review} scale={scale}
           lastPlay={lastPlay} pauseMs={effPause}
@@ -602,7 +610,29 @@ export default function App() {
         )}
       </View>
 
-      {review ? (
+      {online && osnap?.isHost && osnap.requests.map((r) => (
+        <View key={r.uid} style={s.askRow}>
+          <Text style={s.askTxt} numberOfLines={2}>👋 {r.name} veut jouer à la place d'une machine</Text>
+          <Pressable onPress={() => session()?.acceptSeat(r.uid)} style={s.askYes} accessibilityLabel={`Accepter ${r.name}`}><Text style={s.askBtn}>Accepter</Text></Pressable>
+          <Pressable onPress={() => session()?.refuseSeat(r.uid)} style={s.askNo} accessibilityLabel={`Refuser ${r.name}`}><Text style={s.askBtn}>Refuser</Text></Pressable>
+        </View>
+      ))}
+      {spectator && !review ? (
+        <View style={s.bar}>
+          <Text style={s.whyTitle}>👀 Tu regardes la partie</Text>
+          {osnap?.refused ? <Text style={s.barTxt}>L'hôte a refusé ta demande. Tu continues à regarder.</Text>
+            : osnap?.asked ? <Text style={s.barWait}>⏳ Demande envoyée à l'hôte…</Text>
+            : pub?.seats.some((x) => x.bot) ? <Text style={s.barTxt}>Tu peux demander la place d'une machine.</Text>
+            : <Text style={s.barTxt}>Aucune place libre pour l'instant.</Text>}
+          <View style={s.barRow}>
+            {osnap?.asked ? (
+              <Pressable onPress={() => session()?.requestSeat(false)} style={[s.mode, s.grow]}><Text style={s.modeTxt}>Annuler ma demande</Text></Pressable>
+            ) : !osnap?.refused && pub?.seats.some((x) => x.bot) ? (
+              <Pressable onPress={() => session()?.requestSeat(true)} style={[s.goBtn, s.grow]} accessibilityLabel="Demander une place"><Text style={s.goTxt}>🙋 Demander une place</Text></Pressable>
+            ) : <View style={s.barSpacer} />}
+          </View>
+        </View>
+      ) : review ? (
         <View style={s.bar}>
           <Text style={s.whyTitle}>La partie s'arrête : {game.completed}/50 missions</Text>
           <Text style={s.whyTxt}>{why}</Text>
@@ -716,6 +746,11 @@ const s = StyleSheet.create({
   bar: { gap: 4 },
   whyTitle: { color: '#fca5a5', fontWeight: '900', fontSize: 15, textAlign: 'center' },
   whyTxt: { color: '#f8fafc', fontWeight: '700', fontSize: 14, textAlign: 'center' },
+  askRow: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#1e3a8a', borderRadius: 12, paddingVertical: 6, paddingHorizontal: 10, marginBottom: 6 },
+  askTxt: { flex: 1, color: '#e0e7ff', fontWeight: '700', fontSize: 13 },
+  askYes: { backgroundColor: '#16a34a', borderRadius: 8, paddingVertical: 6, paddingHorizontal: 10 },
+  askNo: { backgroundColor: '#475569', borderRadius: 8, paddingVertical: 6, paddingHorizontal: 10 },
+  askBtn: { color: '#fff', fontWeight: '800', fontSize: 13 },
   barTxt: { color: '#94a3b8', fontSize: 12, textAlign: 'center' },
   barErr: { color: '#fca5a5', fontSize: 12, textAlign: 'center', fontWeight: '700' },
   barRow: { flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' },

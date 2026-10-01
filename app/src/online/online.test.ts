@@ -115,7 +115,15 @@ test('salon : créer, rejoindre, refus (code inconnu, complet, partie commencée
   await until(() => a.snapshot.players.length === 4, 'Alice voit le salon');
   await host.startGame(4);
   await until(() => a.snapshot.phase === 'playing', 'Alice voit la partie');
-  await assert.rejects(join(w.client('z'), code, 'Zoé'), /déjà commencé/);
+  // arrivée après le début : elle regarde, sans place ni main, et personne n'est dérangé
+  const z = await join(w.client('z'), code, 'Zoé');
+  await until(() => z.snapshot.spectator && z.snapshot.view !== null, 'Zoé spectatrice');
+  assert.equal(z.snapshot.mySeat, -1);
+  assert.ok(z.snapshot.view!.hands.every((h) => h.every((c) => c.id < 0)), 'aucune main visible pour un spectateur');
+  z.play(1, 0);
+  await sleep(60);
+  assert.equal(host.snapshot.pub!.last, null, 'un spectateur ne peut pas jouer');
+  z.leave();
   // reconnexion d'un joueur déjà assis : acceptée
   const a2 = await join(w.client('a'), code, 'Alice');
   await until(() => a2.snapshot.phase === 'playing' && a2.snapshot.view !== null, 'reconnexion d\'Alice');
@@ -450,4 +458,36 @@ test('tour de table : plus de « Laisser jouer », la machine joue seule dès qu
   assert.equal(host.snapshot.pub!.awaitingGo, null, 'aucun feu vert demandé');
   host.pass(); // ma réponse pour ce tour
   await until(() => host.snapshot.pub!.last!.seat === 1, 'la machine a joué toute seule');
+});
+
+
+test('retardataire : spectateur, demande la place d\'une machine, l\'hôte accepte ou refuse', async () => {
+  const w = world();
+  const host = await create(w.client('h'), 'Robin');
+  await host.configure({ pauseMs: 60000, phrases: false, manual: false, ask: false });
+  await host.startGame(3, seeded(seedFor(3, 1, 6))); // 1 humain + 2 machines
+  await until(() => host.snapshot.view !== null, 'partie lancée');
+  const code = host.snapshot.code;
+  const l1 = await join(w.client('l1'), code, 'Léo');
+  const l2 = await join(w.client('l2'), code, 'Mia');
+  await until(() => l1.snapshot.spectator && l2.snapshot.spectator, 'deux spectateurs');
+  await l1.requestSeat(true); await l2.requestSeat(true);
+  await until(() => host.snapshot.requests.length === 2, "l'hôte voit les deux demandes");
+  await until(() => l1.snapshot.asked, 'Léo voit sa demande envoyée');
+  // refus : Mia continue à regarder
+  host.refuseSeat(l2.snapshot.uid);
+  await until(() => l2.snapshot.refused, 'Mia voit le refus');
+  assert.equal(host.snapshot.requests.length, 1);
+  // accepté : Léo prend la place d'une machine et reçoit sa vraie main
+  host.acceptSeat(l1.snapshot.uid);
+  await until(() => l1.snapshot.mySeat >= 1 && !l1.snapshot.spectator && l1.snapshot.view !== null, 'Léo est assis');
+  const seat = l1.snapshot.mySeat;
+  assert.equal(host.snapshot.pub!.seats[seat].bot, false);
+  assert.equal(host.snapshot.pub!.seats[seat].name, 'Léo');
+  assert.ok(l1.snapshot.view!.hands[seat].every((c) => c.value >= 1 && c.value <= 7), 'Léo voit sa vraie main');
+  // plus qu\'une machine : on peut encore remplacer, puis plus de place
+  host.acceptSeat(l2.snapshot.uid); // déjà refusée mais l\'hôte peut changer d\'avis
+  await until(() => l2.snapshot.mySeat >= 1, 'Mia est assise');
+  assert.equal(host.snapshot.pub!.seats.filter((s) => s.bot).length, 0);
+  [host, l1, l2].forEach((s) => s.leave());
 });
