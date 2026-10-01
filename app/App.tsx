@@ -25,7 +25,7 @@ import { TvScreen } from './src/TvScreen';
 import { clearLocal, clearRoom, loadLocal, loadRoom, saveLocal, saveRoom } from './src/resume';
 
 type Mode = 'solo' | 'together' | 'online';
-type Screen = 'home' | 'together' | 'settings' | 'tv';
+type Screen = 'home' | 'together' | 'settings' | 'tv' | 'machines';
 
 const DEFAULTS = { bots: 2, pauseMs: 5000, manual: true, phrasesOn: false, openHands: false, alertsOn: true, ask: true, musicOn: true, hint: true };
 /** Réglages gardés d'une visite à l'autre (facultatif : sans stockage, on repart des valeurs par défaut). */
@@ -262,6 +262,7 @@ export default function App() {
     if (osnap.phase === 'over') clearRoom();
     else if (osnap.phase === 'lobby' || osnap.phase === 'playing') saveRoom(osnap.code);
   }, [online, osnap?.code, osnap?.phase]);
+  useEffect(() => { if (tv && !osnap && onl.error) setTv(false); }, [onl.error]);
   // Un salon qui n'existe plus ou déjà parti sans nous : on l'oublie.
   useEffect(() => {
     if (online && !osnap && onl.error && /Aucun salon|déjà commencé|complet/.test(onl.error)) clearRoom();
@@ -312,7 +313,6 @@ export default function App() {
     startedAt.current = sv.startedAt; savedKey.current = null; setLastRank(null); setLastScoreId(null);
   };
   const resumeOnline = (code: string) => { setMode('online'); setTv(false); onl.join(code, myName); };
-  useEffect(() => { if (tv && !osnap && onl.error) setTv(false); }, [onl.error]);
 
   if (online && tv && osnap) return <TvScreen snap={osnap} onQuit={quit} />;
 
@@ -331,6 +331,26 @@ export default function App() {
 
   if (!game) {
     const back = <Pressable onPress={() => setScreen('home')} style={s.link}><Text style={s.linkTxt}>← Retour</Text></Pressable>;
+
+    if (screen === 'machines') {
+      return (
+        <SafeAreaView style={s.root}>
+          <StatusBar style="light" />
+          <ScrollView contentContainerStyle={s.home}>
+            <Text style={s.title}>🤖 Contre des machines</Text>
+            <Text style={s.sub}>Combien de joueurs machine à ta table ?</Text>
+            {[1, 2, 3].map((n) => (
+              <Pressable key={n} style={s.bigBtn} accessibilityLabel={`${n} machine${n > 1 ? 's' : ''}`}
+                onPress={() => { setBots(n); setMode('solo'); setPendingStart(true); }}>
+                <Text style={s.bigTitle}>{n} machine{n > 1 ? 's' : ''}</Text>
+                <Text style={s.bigSub}>Toi + {n} · {n + 1} joueurs</Text>
+              </Pressable>
+            ))}
+            {back}
+          </ScrollView>
+        </SafeAreaView>
+      );
+    }
 
     if (screen === 'tv') {
       return (
@@ -358,8 +378,6 @@ export default function App() {
           <StatusBar style="light" />
           <ScrollView contentContainerStyle={s.home}>
             <Text style={s.title}>Réglages</Text>
-            <Text style={s.label}>Nombre de machines</Text>
-            <Chips values={[1, 2, 3]} value={bots} onChange={setBots} />
             <Toggle on={hint} onPress={() => setHint(!hint)} title="💡 Indice « je peux » (pour moi)" sub="Activé : le jeu te propose « Oui, je peux » seulement quand tu peux vraiment réussir une mission. Désactivé : le bouton est toujours là et tu peux te positionner sur une mission même si aucune n'est faisable (à toi de juger). Réglage personnel à chaque joueur." />
             <Toggle on={ask} onPress={() => setAsk(!ask)} title="🗣️ Tour de table" sub="Avant chaque coup, chaque joueur dit s'il peut réussir une mission ou non. Personne ne joue avant." />
             {!ask && (
@@ -439,10 +457,10 @@ export default function App() {
             </>
           )}
 
-          <Text style={[s.label, { marginTop: 8 }]}>Autres façons de jouer</Text>
-          <Pressable style={s.bigBtn} onPress={() => { setMode('solo'); setPendingStart(true); }}>
+          <Text style={[s.label, { marginTop: 8 }]}>Ou jouer seul</Text>
+          <Pressable style={s.bigBtn} onPress={() => setScreen('machines')}>
             <Text style={s.bigTitle}>🤖 Contre des machines</Text>
-            <Text style={s.bigSub}>Seul, avec {bots} joueur{bots > 1 ? 's' : ''} machine</Text>
+            <Text style={s.bigSub}>Seul, avec 1 à 3 joueurs machine</Text>
           </Pressable>
           <View style={s.row}>
             <Pressable onPress={openScores} style={s.link}><Text style={s.linkTxt}>🏆 Meilleurs scores</Text></Pressable>
@@ -610,7 +628,7 @@ export default function App() {
       <View style={s.tableWrap}>
         <TableScene game={game} solo={solo} labels={labels} piles={pileViews} onPile={drop}
           meIndex={me} hand={spectator ? [] : hand} handShown={handShown} selectedId={selected}
-          onSelect={(id) => { setSelected(id); setError(''); setSigMode('play'); }}
+          onSelect={(id) => { setSelected(selected === id ? null : id); setError(''); setSigMode('play'); }}
           onReveal={() => { setRevealed(true); setSigMode('play'); }} revealAll={openHands || review} scale={scale}
           lastPlay={lastPlay} pauseMs={effPause}
           who={(i) => (online ? (i === me ? 'Toi' : seat(i)) : solo ? (i === 0 ? 'Toi' : seat(i)) : `J${i + 1}`)}

@@ -23,7 +23,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "tsx --test src/engine.test.ts src/scores.test.ts src/online/online.test.ts src/resume.test.ts src/alerts.test.ts src/names.test.ts",
+    "test": "tsx --test src/engine.test.ts src/scores.test.ts src/online/online.test.ts src/resume.test.ts src/alerts.test.ts src/names.test.ts src/hooks.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "private": true
