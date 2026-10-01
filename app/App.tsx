@@ -27,7 +27,7 @@ import { clearLocal, clearRoom, loadLocal, loadRoom, saveLocal, saveRoom } from 
 type Mode = 'solo' | 'together' | 'online';
 type Screen = 'home' | 'together' | 'settings' | 'tv' | 'machines';
 
-const DEFAULTS = { bots: 2, pauseMs: 5000, manual: true, phrasesOn: false, openHands: false, alertsOn: true, ask: true, musicOn: true, hint: true };
+const DEFAULTS = { bots: 2, pauseMs: 5000, manual: true, phrasesOn: false, openHands: false, alertsOn: true, ask: true, musicOn: true, hint: true, loupe: false };
 /** Réglages gardés d'une visite à l'autre (facultatif : sans stockage, on repart des valeurs par défaut). */
 function loadSettings(): typeof DEFAULTS {
   try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem('50m-settings') ?? '{}') }; } catch { return DEFAULTS; }
@@ -72,6 +72,7 @@ export default function App() {
   const [phrasesOn, setPhrasesOn] = useState(saved.phrasesOn);
   const [manual, setManual] = useState(saved.manual); // les machines attendent mon clic
   const [musicOn, setMusicOn] = useState(saved.musicOn); // musique de fond
+  const [loupe, setLoupe] = useState(saved.loupe); // mode loupe : missions en grand (2 colonnes), le reste réduit
   const [hint, setHint] = useState(saved.hint); // le jeu m'indique si je peux réussir une mission (bouton « je peux » seulement si c'est vrai)
   const [ask, setAsk] = useState(saved.ask); // tour de table : chacun dit s'il peut ou non avant que le joueur ne joue
   const [alertsOn, setAlertsOn] = useState(saved.alertsOn); // son, vibration et titre : un joueur arrive, c'est ton tour
@@ -122,8 +123,8 @@ export default function App() {
   const [picked, setPicked] = useState<string[]>([]);
 
   const { width, height } = useWindowDimensions();
-  const tokenSize = Math.min(96, (width - 32 - 3 * 6) / 4);
-  const scale = Math.min(1, Math.max(0.72, (height - 200) / 560));
+  const tokenSize = loupe ? Math.max(70, Math.min((width - 32 - 12) / 2, (height - 380) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
+  const scale = loupe ? 0.62 : Math.min(1, Math.max(0.72, (height - 200) / 560));
 
   const solo = mode === 'solo';
   const botSeats = (n: number) => (solo ? Array.from({ length: n - 1 }, (_, i) => i + 1) : []);
@@ -221,8 +222,8 @@ export default function App() {
   }, [pub?.v]);
 
   useEffect(() => {
-    try { localStorage.setItem('50m-settings', JSON.stringify({ bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask, musicOn, hint })); } catch { /* sans stockage */ }
-  }, [bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask, musicOn, hint]);
+    try { localStorage.setItem('50m-settings', JSON.stringify({ bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask, musicOn, hint, loupe })); } catch { /* sans stockage */ }
+  }, [bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask, musicOn, hint, loupe]);
   useEffect(() => { setMusic(musicOn); }, [musicOn]);
 
   // Alertes en ligne : un joueur rejoint le salon, la partie démarre, c'est ton tour.
@@ -378,6 +379,7 @@ export default function App() {
           <StatusBar style="light" />
           <ScrollView contentContainerStyle={s.home}>
             <Text style={s.title}>Réglages</Text>
+            <Toggle on={loupe} onPress={() => setLoupe(!loupe)} title="🔍 Mode loupe (malvoyant)" sub="Les 4 missions en grand, en carré sur 2 colonnes ; la table et la main sont réduites au nécessaire." />
             <Toggle on={hint} onPress={() => setHint(!hint)} title="💡 Indice « je peux » (pour moi)" sub="Activé : le jeu te propose « Oui, je peux » seulement quand tu peux vraiment réussir une mission. Désactivé : le bouton est toujours là et tu peux te positionner sur une mission même si aucune n'est faisable (à toi de juger). Réglage personnel à chaque joueur." />
             <Toggle on={ask} onPress={() => setAsk(!ask)} title="🗣️ Tour de table" sub="Avant chaque coup, chaque joueur dit s'il peut réussir une mission ou non. Personne ne joue avant." />
             {!ask && (
@@ -617,7 +619,7 @@ export default function App() {
         <Pressable onPress={() => setMenu(!menu)} style={s.menuBtn} accessibilityLabel="Menu"><Text style={s.menuTxt}>☰</Text></Pressable>
       </View>
 
-      <View style={s.missRow} onLayout={(e) => setRowY(e.nativeEvent.layout.y)}>
+      <View style={[s.missRow, loupe && { flexWrap: 'wrap', justifyContent: 'center', gap: 6 }]} onLayout={(e) => setRowY(e.nativeEvent.layout.y)}>
         {game.missions.map((m) => (
           <MissionToken key={m.id} def={m} size={tokenSize} showText={false} badges={missionBadges(m.id)}
             mark={picking !== null && picked.includes(m.id) ? 'picked' : game.canDo.some((a) => a.missions.includes(m.id)) ? 'announced' : undefined}
@@ -752,6 +754,7 @@ export default function App() {
               <Text style={s.quitTxt}>Remplacer {sd.name} par une machine</Text>
             </Pressable>
           ) : null))}
+          <Pressable onPress={() => setLoupe(!loupe)} style={s.quit}><Text style={s.quitTxt}>{loupe ? '🔍 Mode loupe : activé' : '🔍 Mode loupe : désactivé'}</Text></Pressable>
           <Pressable onPress={() => setHint(!hint)} style={s.quit}><Text style={s.quitTxt}>{hint ? '💡 Indice « je peux » : activé' : '💡 Indice « je peux » : désactivé'}</Text></Pressable>
           <Pressable onPress={quit} style={s.quit}><Text style={s.quitTxt}>Quitter (tu pourras reprendre)</Text></Pressable>
         </View>
