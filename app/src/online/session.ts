@@ -107,6 +107,17 @@ export class OnlineSession {
     return s;
   }
 
+  /** Écran télé : suit la table sans y prendre de place (ni main, ni nom dans le salon). */
+  static async watch(be: Backend, rawCode: string): Promise<OnlineSession> {
+    const code = normalizeCode(rawCode);
+    if (code.length !== 4) throw new Error('Le code a 4 lettres.');
+    const uid = await be.uid();
+    if (!(await be.get(`rooms/${code}/meta`))) throw new Error('Aucun salon avec ce code.');
+    const s = new OnlineSession(be, code, uid, 'Télé');
+    await s.attach();
+    return s;
+  }
+
   private async attach() {
     const { code, uid } = this.snap;
     const err = (e: Error) => this.fail(e);

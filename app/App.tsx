@@ -21,10 +21,11 @@ import { SYMBOLS } from './src/symbols';
 import { alertPlayer, joinedNames } from './src/alerts';
 import { setMusic } from './src/music';
 import { BOT_NAMES, shortName } from './src/names';
+import { TvScreen } from './src/TvScreen';
 import { clearLocal, clearRoom, loadLocal, loadRoom, saveLocal, saveRoom } from './src/resume';
 
 type Mode = 'solo' | 'together' | 'online';
-type Screen = 'home' | 'together' | 'settings';
+type Screen = 'home' | 'together' | 'settings' | 'tv';
 
 const DEFAULTS = { bots: 2, pauseMs: 5000, manual: true, phrasesOn: false, openHands: false, alertsOn: true, ask: true, musicOn: true, hint: true };
 /** Réglages gardés d'une visite à l'autre (facultatif : sans stockage, on repart des valeurs par défaut). */
@@ -64,6 +65,7 @@ export default function App() {
   const [mode, setMode] = useState<Mode>('online'); // en ligne par défaut
   const [screen, setScreen] = useState<Screen>('home');
   const [pendingStart, setPendingStart] = useState(false);
+  const [tv, setTv] = useState(false); // mode télé : suivre la table sans jouer
   const [bots, setBots] = useState(saved.bots);
   const [players, setPlayers] = useState(2);
   const [openHands, setOpenHands] = useState(saved.openHands);
@@ -229,7 +231,7 @@ export default function App() {
     if (!online || !osnap) { seenPlayers.current = null; return; }
     if (osnap.phase === 'lobby') {
       const names = joinedNames(seenPlayers.current, osnap.players, osnap.uid);
-      if (names.length) alertPlayer(`${names.join(', ')} a rejoint le salon`, 'join', alertsOn);
+      if (names.length && !tv) alertPlayer(`${names.join(', ')} a rejoint le salon`, 'join', alertsOn);
     }
     seenPlayers.current = osnap.players.map((p) => p.uid);
   }, [online, osnap?.players, osnap?.phase]);
@@ -256,7 +258,7 @@ export default function App() {
     else saveLocal({ mode: mode === 'solo' ? 'solo' : 'together', game: localGame, history, startedAt: startedAt.current });
   }, [localGame, history]);
   useEffect(() => {
-    if (!online || !osnap?.code) return;
+    if (!online || tv || !osnap?.code) return; // une télé n'est pas un joueur : rien à reprendre
     if (osnap.phase === 'over') clearRoom();
     else if (osnap.phase === 'lobby' || osnap.phase === 'playing') saveRoom(osnap.code);
   }, [online, osnap?.code, osnap?.phase]);
@@ -298,7 +300,7 @@ export default function App() {
   const quit = () => {
     if (online && osnap?.phase === 'lobby') clearRoom(); // quitter le salon d'attente : rien à reprendre
     if (online) onl.leave();
-    setGame(null); setMenu(false); setScreen('home');
+    setGame(null); setMenu(false); setTv(false); setScreen('home');
   };
   /** Reprend la partie locale sauvegardée. */
   const resumeLocal = () => {
@@ -309,7 +311,10 @@ export default function App() {
     setTextFor(null); setLastPlay(null); setParty(null); setPicking(null); setPicked([]); setResultSeen(false);
     startedAt.current = sv.startedAt; savedKey.current = null; setLastRank(null); setLastScoreId(null);
   };
-  const resumeOnline = (code: string) => { setMode('online'); onl.join(code, myName); };
+  const resumeOnline = (code: string) => { setMode('online'); setTv(false); onl.join(code, myName); };
+  useEffect(() => { if (tv && !osnap && onl.error) setTv(false); }, [onl.error]);
+
+  if (online && tv && osnap) return <TvScreen snap={osnap} onQuit={quit} />;
 
   if (online && osnap && osnap.phase !== 'playing' && osnap.phase !== 'over') {
     return <Lobby snap={osnap} session={onl.session.current} onLeave={quit} local={onl.kind === 'local'} />;
@@ -326,6 +331,26 @@ export default function App() {
 
   if (!game) {
     const back = <Pressable onPress={() => setScreen('home')} style={s.link}><Text style={s.linkTxt}>← Retour</Text></Pressable>;
+
+    if (screen === 'tv') {
+      return (
+        <SafeAreaView style={s.root}>
+          <StatusBar style="light" />
+          <ScrollView contentContainerStyle={s.home}>
+            <Text style={s.title}>📺 Écran télé</Text>
+            <Text style={s.sub}>Suivre la table sur un grand écran, sans jouer.{'\n'}Ouvre le jeu sur la télé, tape le code du salon.</Text>
+            <TextInput value={codeInput} onChangeText={(v) => setCodeInput(v.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4))}
+              placeholder="CODE" placeholderTextColor="#64748b" autoCapitalize="characters" maxLength={4}
+              style={[s.input, s.codeInput, { alignSelf: 'center' }]} accessibilityLabel="Code du salon pour la télé" />
+            {!!onl.error && <Text style={s.err}>{onl.error}</Text>}
+            <Pressable style={[s.btn, codeInput.length !== 4 && { opacity: 0.4 }]} disabled={onl.busy || codeInput.length !== 4} onPress={() => { setMode('online'); setTv(true); onl.watch(codeInput); }}>
+              <Text style={s.btnTxt}>Afficher la table</Text>
+            </Pressable>
+            {back}
+          </ScrollView>
+        </SafeAreaView>
+      );
+    }
 
     if (screen === 'settings') {
       return (
@@ -361,8 +386,8 @@ export default function App() {
 
     const resLocal = loadLocal()?.mode === 'solo' ? loadLocal() : null; // l'ancien mode « un téléphone » n'existe plus
     const resRoom = onl.kind ? loadRoom() : null;
-    const createOnline = () => { setMode('online'); onl.create(myName); };
-    const joinOnline = () => { setMode('online'); onl.join(codeInput, myName); };
+    const createOnline = () => { setMode('online'); setTv(false); onl.create(myName); };
+    const joinOnline = () => { setMode('online'); setTv(false); onl.join(codeInput, myName); };
     return (
       <SafeAreaView style={s.root}>
         <StatusBar style="light" />
@@ -409,6 +434,7 @@ export default function App() {
                 </Pressable>
               </View>
               {!!onl.error && <Text style={s.err}>{onl.error}</Text>}
+              <Pressable onPress={() => setScreen('tv')} style={s.link}><Text style={s.linkTxt}>📺 Écran télé (suivre la table sans jouer)</Text></Pressable>
               {onl.kind === 'local' && <Text style={s.hint}>Test local : les autres joueurs sont les autres onglets de ce navigateur.</Text>}
             </>
           )}

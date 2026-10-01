@@ -61,3 +61,6 @@ Ces conditions sont celles de Google et peuvent changer : vérifie-les à la cr�
 
 ## Arriver après le début de la partie
 Quelqu'un qui tape le code d'une partie déjà lancée rejoint **en spectateur** : il voit la table (jamais les mains) et ne peut pas jouer. S'il reste une machine à la table, il peut toucher « 🙋 Demander une place ». L'hôte voit alors « 👋 Léo veut jouer à la place d'une machine » avec **Accepter** / **Refuser**. Accepté, le spectateur prend la place d'une machine, reçoit une vraie main et joue ; refusé, il continue à regarder. Sans machine à remplacer, l'hôte peut d'abord remplacer un joueur absent par une machine (menu ☰). Aucune règle Firebase à changer.
+
+## Mode télé
+Sur une télé (ou n'importe quel grand écran), ouvrir le jeu → **📺 Écran télé** → taper le code du salon → **Afficher la table**. La télé suit la partie sans jouer et sans prendre de place : missions en grand avec leur texte, les 4 tas, les joueurs (prénoms, qui joue, qui se positionne sur quelle mission), le dernier coup et les missions réussies. Les mains restent cachées jusqu'à la fin de la partie, où elles sont dévoilées avec la raison de l'arrêt. On peut la lancer avant le début de la partie : elle attend. Aucune règle Firebase à changer.

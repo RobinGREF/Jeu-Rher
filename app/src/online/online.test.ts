@@ -492,3 +492,24 @@ test('retardataire : spectateur, demande la place d\'une machine, l\'hôte accep
   assert.equal(host.snapshot.pub!.seats.filter((s) => s.bot).length, 0);
   [host, l1, l2].forEach((s) => s.leave());
 });
+
+test('écran télé : suit la table sans prendre de place ni voir de main, et ne peut pas jouer', async () => {
+  const w = world();
+  const host = await create(w.client('h'), 'Robin');
+  await host.configure({ pauseMs: 60000, phrases: false, manual: false, ask: false });
+  await host.startGame(3, seeded(seedFor(3, 1, 6)));
+  await until(() => host.snapshot.view !== null, 'partie');
+  const tv = track(await OnlineSession.watch(w.client('tv'), host.snapshot.code));
+  await until(() => tv.snapshot.view !== null, 'la télé voit la table');
+  assert.equal(tv.snapshot.mySeat, -1);
+  assert.ok(tv.snapshot.view!.hands.every((h) => h.every((c) => c.id < 0)), 'aucune main visible');
+  assert.equal(host.snapshot.players.length, 1, 'la télé n\'apparaît pas parmi les joueurs');
+  tv.play(1, 0);
+  await sleep(60);
+  assert.equal(host.snapshot.pub!.last, null);
+  const mv = firstLegal(host.snapshot.view!, 0)!;
+  host.play(mv.cardId, mv.pile);
+  await until(() => tv.snapshot.pub!.last !== null, 'la télé voit le coup');
+  assert.equal(tv.snapshot.pub!.last!.seat, 0);
+  await assert.rejects(OnlineSession.watch(w.client('tv2'), 'ZZZZ'), /Aucun salon/);
+});

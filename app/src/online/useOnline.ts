@@ -29,6 +29,7 @@ export function useOnline() {
     kind, snap, busy, error, session: ref,
     create: (name: string) => run((be) => OnlineSession.create(be, name)),
     join: (code: string, name: string) => run((be) => OnlineSession.join(be, code, name)),
+    watch: (code: string) => run((be) => OnlineSession.watch(be, code)),
     leave: () => { ref.current?.leave(); ref.current = null; setSnap(null); setError(null); },
   };
 }

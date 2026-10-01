@@ -33,7 +33,7 @@ function Countdown({ ms }: { ms: number }) {
 /** `glowColor` : couleur de la famille de la carte choisie, quand on peut la jouer sur ce tas. */
 export type PileView = { card: Card; dim: boolean; glowColor?: string; tags: { text: string; stop?: boolean }[] };
 
-function Back({ w }: { w: number }) {
+export function Back({ w }: { w: number }) {
   return (
     <View style={[s.back, { width: w, height: w * 1.4, borderRadius: w * 0.16 }]}>
       <View style={[s.backInner, { borderRadius: w * 0.1 }]} />

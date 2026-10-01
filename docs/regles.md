@@ -66,6 +66,6 @@ Symboles : Jumelles (vert), Boussoles (jaune), Briquets (bleu), Couteaux (rouge)
 - Or : « Reformez une pioche avec les cartes Symbole présentes sous les 4 piles et essayez de réaliser les 50 missions ».
 
 ## Modes de jeu
-- En ligne (un téléphone par joueur) et contre des machines. Le mode « on se passe un téléphone » a été retiré : trop d’échanges à prévoir. À venir (pas prioritaire) : un mode d’affichage pour suivre le tapis ensemble sur une télé.
+- En ligne (un téléphone par joueur) et contre des machines. Le mode « on se passe un téléphone » a été retiré : trop d’échanges à prévoir. Un mode télé (📺 Écran télé) permet de suivre le tapis ensemble sur un grand écran, sans jouer.
 - Les machines ont des prénoms (Jack, Anne, Morgan…) ; sur les missions, une pastille donne « Toi » ou le début du prénom.
 - L’indice « je peux » est un réglage personnel (également dans le menu ☰) : désactivé, on peut se positionner sur une mission même si aucune n’est faisable.
