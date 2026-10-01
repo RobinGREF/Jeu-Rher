@@ -83,6 +83,8 @@ type Props = {
   lastPlay: LastPlay | null; pauseMs: number; onSkip: () => void; who: (i: number) => string;
   /** Nom et avatar de chaque siège (sinon : Toi / J2… selon `solo`). */
   labels?: { name: string; avatar: string }[];
+  /** Titre du panneau de ta main (défaut : TON JEU). */
+  mineLabel?: string;
 };
 
 /**
@@ -158,14 +160,15 @@ export function TableScene(p: Props) {
         </Pressable>
       )}
 
-      <View style={s.me}>
+      <View style={[s.me, s.mine, meCurrent && s.mineOn]}>
+        <Text style={[s.mineTag, meCurrent && s.mineTagOn]}>{p.mineLabel ?? 'TON JEU'}{meCurrent ? ' · à toi' : ''}</Text>
         <View style={s.meSeat}>
           <View style={[s.avatar, meCurrent && s.avatarOn]}>
             <Text style={{ fontSize: 18 }}>{avatar(me)}</Text>
             {game.canDo.some((a) => a.player === me) && <Text style={s.can}>🙋</Text>}
           </View>
-          <Text style={[s.name, meCurrent && s.nameOn]}>{label(me)}</Text>
-          <Text style={s.sub}>{meCurrent ? '▶ joue' : ' '}</Text>
+          <Text style={[s.name, { color: '#422006' }]}>{label(me)}</Text>
+          <Text style={[s.sub, { color: '#92400e' }]}>{meCurrent ? '▶ joue' : ' '}</Text>
         </View>
         <View style={s.meHand}>
           {p.handShown ? (
@@ -207,6 +210,10 @@ const s = StyleSheet.create({
   countTrack: { height: 3, backgroundColor: '#334155', borderRadius: 2, overflow: 'hidden' },
   countBar: { height: 3, backgroundColor: '#f59e0b' },
   me: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  mine: { backgroundColor: '#fef9c3', borderRadius: 16, borderWidth: 3, borderColor: '#ca8a04', paddingHorizontal: 6, paddingTop: 16, paddingBottom: 6, marginTop: 6 },
+  mineOn: { backgroundColor: '#fde68a', borderColor: '#f59e0b' },
+  mineTag: { position: 'absolute', top: -2, left: 12, color: '#713f12', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  mineTagOn: { color: '#92400e' },
   meSeat: { width: 46, alignItems: 'center', gap: 1 },
   meHand: { flex: 1, alignItems: 'center', gap: 4 },
   handRow: { flexDirection: 'row', gap: 6, justifyContent: 'center' },
