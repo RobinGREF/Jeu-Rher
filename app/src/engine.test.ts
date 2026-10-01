@@ -152,15 +152,27 @@ test('annonce « je peux » : seulement si on peut, avec les missions choisies',
   assert.equal(setCanDo(s0, -1, [ids[0]]), s0);
 });
 
-test('annonce « je peux » : possible hors tour, effacée dès qu\'une carte est posée', () => {
-  const s0 = findState((s) => canAnnounce(s, (s.current + 1) % 3));
-  const notMe = (s0.current + 1) % 3;
-  const s = setCanDo(s0, notMe, [s0.missions[0].id]);
-  assert.equal(announcedBy(s, notMe)?.player, notMe);
-  const c = s.hands[s.current].find((x) => playablePiles(s, x).length)!;
-  const r = play(s, c.id, playablePiles(s, c)[0]);
-  assert.ok(r.ok);
-  if (r.ok) assert.deepEqual(r.state.canDo, []);
+test('annonce « je peux » : possible hors tour, conservée seulement si le coup suivant ne la touche pas', () => {
+  let kept = 0, dropped = 0;
+  for (let seed = 1; seed <= 400; seed++) {
+    const s0 = newGame(3, seeded(seed));
+    const who = (s0.current + 1) % 3;
+    const reach = reachableMissions(s0, who);
+    if (!reach.length) continue;
+    const s = setCanDo(s0, who, reach);
+    assert.equal(announcedBy(s, who)?.player, who);
+    for (const c of s.hands[s.current]) for (const pile of playablePiles(s, c)) {
+      const r = play(s, c.id, pile, seeded(seed));
+      assert.ok(r.ok);
+      if (!r.ok) continue;
+      const still = reach.filter((id) => r.state.missions.some((m) => m.id === id) && reachableMissions(r.state, who).includes(id));
+      const a = announcedBy(r.state, who);
+      if (still.length) { kept++; assert.deepEqual(a?.missions, still, `seed ${seed} : l'annonce intacte reste positionnée`); }
+      else { dropped++; assert.equal(a, null, `seed ${seed} : annonce touchée, elle tombe`); }
+      assert.deepEqual(r.state.passed, []);
+    }
+  }
+  assert.ok(kept > 0 && dropped > 0, `cas couverts : conservée ${kept}, tombée ${dropped}`);
 });
 
 test('coup de pouce : chaque coup proposé réussit bien ses missions, tous les joueurs, hors tour compris', () => {

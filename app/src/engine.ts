@@ -130,7 +130,7 @@ export function play(prev: GameState, cardId: number, pile: number, rng: Rng = M
     symbolDeck: [...prev.symbolDeck],
     missions: [...prev.missions],
     missionDeck: [...prev.missionDeck],
-    canDo: [],
+    canDo: prev.canDo, // revu plus bas : une annonce que ce coup n'a pas touchée reste en place
     passed: [],
     signals: [...prev.signals],
   };
@@ -144,6 +144,14 @@ export function play(prev: GameState, cardId: number, pile: number, rng: Rng = M
   s.piles[pile].push(hand.splice(ci, 1)[0]);
   refill(s);
   resolveMissions(s, rng);
+
+  // Une mission annoncée « réalisable » reste positionnée si ce coup ne l'a pas touchée : elle est toujours sur le tapis
+  // et son annonceur peut toujours la réussir d'un seul coup. Sinon, l'annonce tombe et il devra se reprononcer.
+  s.canDo = prev.canDo.flatMap((a) => {
+    const reach = reachableMissions(s, a.player);
+    const missions = a.missions.filter((id) => s.missions.some((m) => m.id === id) && reach.includes(id));
+    return missions.length ? [{ player: a.player, missions }] : [];
+  });
 
   // Les annonces portaient sur l'ancienne situation : effacées dès qu'une carte est posée.
   // Une phrase du livret ne vaut que pour sa cible : tas recouvert, mission remplacée.
