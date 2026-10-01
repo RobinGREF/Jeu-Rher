@@ -414,7 +414,7 @@ test('une machine ne défait pas la mission annoncée par un autre joueur', () =
 test('tour de table : chacun répond (je peux / je ne peux pas) avant le coup, effacé à chaque carte posée', async () => {
   const { setPass, unanswered } = await import('./engine');
   let s = newGame(3, seeded(11));
-  assert.deepEqual(unanswered(s), [(s.current + 1) % 3, (s.current + 2) % 3].sort());
+  assert.deepEqual(unanswered(s), [0, 1, 2], 'tous répondent, y compris celui qui va jouer');
   const other = unanswered(s)[0];
   s = setPass(s, other);
   assert.deepEqual(s.passed, [other]);
@@ -432,7 +432,6 @@ test('tour de table : chacun répond (je peux / je ne peux pas) avant le coup, e
   const bots = [1, 2];
   const synced = syncBotAnnouncements(newGame(3, seeded(11)), bots);
   for (const b of bots) {
-    if (b === synced.current) continue;
     assert.ok(synced.passed.includes(b) !== synced.canDo.some((a) => a.player === b), `machine ${b} : oui ou non, pas les deux ni aucun`);
   }
   // poser une carte efface les réponses

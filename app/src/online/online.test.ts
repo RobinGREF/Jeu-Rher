@@ -432,6 +432,11 @@ test('tour de table en ligne : personne ne joue (ni machine) tant que chacun n\'
     assert.equal(host.snapshot.view!.current, first);
     other.pass();
     await until(() => host.snapshot.view!.passed.includes(1 - first) || host.snapshot.view!.canDo.some((x) => x.player === 1 - first), 'réponse reçue');
+    me.play(mv.cardId, mv.pile); // refusé aussi : celui qui va jouer doit répondre lui-même
+    await sleep(80);
+    assert.equal(host.snapshot.pub!.last, null, 'celui qui joue doit aussi répondre');
+    me.pass();
+    await until(() => host.snapshot.view!.passed.includes(first) || host.snapshot.view!.canDo.some((x) => x.player === first), 'ma réponse reçue');
     const mv2 = firstLegal(host.snapshot.view!, first)!;
     me.play(mv2.cardId, mv2.pile);
     await until(() => host.snapshot.pub!.last !== null, 'coup accepté après la réponse');

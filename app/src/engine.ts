@@ -184,9 +184,9 @@ export function setPass(prev: GameState, player: number): GameState {
   return { ...prev, canDo: prev.canDo.filter((a) => a.player !== player), passed: prev.passed.includes(player) ? prev.passed : [...prev.passed, player].sort((x, y) => x - y) };
 }
 
-/** Joueurs qui n'ont pas encore dit s'ils peuvent ou non réussir une mission (celui qui va jouer n'a pas à répondre). */
+/** Joueurs qui n'ont pas encore dit s'ils peuvent ou non réussir une mission : tous, y compris celui qui va jouer (avec la nouvelle carte posée et sa nouvelle carte en main). */
 export const unanswered = (s: GameState): number[] =>
-  s.over ? [] : Array.from({ length: s.players }, (_, i) => i).filter((i) => i !== s.current && !s.passed.includes(i) && !s.canDo.some((a) => a.player === i));
+  s.over ? [] : Array.from({ length: s.players }, (_, i) => i).filter((i) => !s.passed.includes(i) && !s.canDo.some((a) => a.player === i));
 
 export type MissionMove = { cardId: number; pile: number; missions: string[] };
 
@@ -241,9 +241,9 @@ export function botMove(s: GameState, player: number, rng: Rng = Math.random): M
 export function syncBotAnnouncements(s: GameState, bots: number[]): GameState {
   const others = s.canDo.filter((a) => !bots.includes(a.player));
   const mine = bots.flatMap((b) => { const missions = reachableMissions(s, b); return missions.length ? [{ player: b, missions }] : []; });
-  // Les machines répondent aussi « je ne peux pas » quand elles n'ont rien à annoncer (sauf celle qui va jouer).
+  // Les machines répondent aussi « je ne peux pas » quand elles n'ont rien à annoncer.
   const said = new Set(mine.map((a) => a.player));
-  const no = bots.filter((b) => !said.has(b) && b !== s.current);
+  const no = bots.filter((b) => !said.has(b));
   const passed = [...s.passed.filter((p) => !bots.includes(p)), ...no].sort((x, y) => x - y);
   return { ...s, canDo: [...others, ...mine].sort((x, y) => x.player - y.player), passed };
 }
