@@ -18,12 +18,13 @@ import { missionById } from './src/online/wire';
 import { MissionToken } from './src/MissionToken';
 import { TableScene, type LastPlay, type PileView } from './src/TableScene';
 import { SYMBOLS } from './src/symbols';
+import { alertPlayer, joinedNames } from './src/alerts';
 import { clearLocal, clearRoom, loadLocal, loadRoom, saveLocal, saveRoom } from './src/resume';
 
 type Mode = 'solo' | 'together' | 'online';
 type Screen = 'home' | 'together' | 'settings';
 
-const DEFAULTS = { bots: 2, pauseMs: 5000, manual: true, phrasesOn: false, openHands: false };
+const DEFAULTS = { bots: 2, pauseMs: 5000, manual: true, phrasesOn: false, openHands: false, alertsOn: true };
 /** Réglages gardés d'une visite à l'autre (facultatif : sans stockage, on repart des valeurs par défaut). */
 function loadSettings(): typeof DEFAULTS {
   try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem('50m-settings') ?? '{}') }; } catch { return DEFAULTS; }
@@ -66,6 +67,7 @@ export default function App() {
   const [openHands, setOpenHands] = useState(saved.openHands);
   const [phrasesOn, setPhrasesOn] = useState(saved.phrasesOn);
   const [manual, setManual] = useState(saved.manual); // les machines attendent mon clic
+  const [alertsOn, setAlertsOn] = useState(saved.alertsOn); // son, vibration et titre : un joueur arrive, c'est ton tour
 
   const [localGame, setGame] = useState<GameState | null>(null);
   const [myName, setMyName] = useState(() => {
@@ -206,8 +208,28 @@ export default function App() {
   }, [pub?.v]);
 
   useEffect(() => {
-    try { localStorage.setItem('50m-settings', JSON.stringify({ bots, pauseMs, manual, phrasesOn, openHands })); } catch { /* sans stockage */ }
-  }, [bots, pauseMs, manual, phrasesOn, openHands]);
+    try { localStorage.setItem('50m-settings', JSON.stringify({ bots, pauseMs, manual, phrasesOn, openHands, alertsOn })); } catch { /* sans stockage */ }
+  }, [bots, pauseMs, manual, phrasesOn, openHands, alertsOn]);
+
+  // Alertes en ligne : un joueur rejoint le salon, la partie démarre, c'est ton tour.
+  const seenPlayers = useRef<string[] | null>(null);
+  useEffect(() => {
+    if (!online || !osnap) { seenPlayers.current = null; return; }
+    if (osnap.phase === 'lobby') {
+      const names = joinedNames(seenPlayers.current, osnap.players, osnap.uid);
+      if (names.length) alertPlayer(`${names.join(', ')} a rejoint le salon`, 'join', alertsOn);
+    }
+    seenPlayers.current = osnap.players.map((p) => p.uid);
+  }, [online, osnap?.players, osnap?.phase]);
+  const wasPlaying = useRef(false);
+  const wasMyTurn = useRef(false);
+  useEffect(() => {
+    const playing = online && osnap?.phase === 'playing';
+    const mine = !!playing && osnap!.mySeat >= 0 && osnap!.pub?.current === osnap!.mySeat;
+    if (playing && !wasPlaying.current && !osnap!.isHost) alertPlayer('La partie commence', 'join', alertsOn);
+    else if (mine && !wasMyTurn.current) alertPlayer("À toi de jouer", 'turn', alertsOn);
+    wasPlaying.current = !!playing; wasMyTurn.current = mine;
+  }, [online, osnap?.phase, osnap?.pub?.current, osnap?.mySeat]);
 
   // Partie à reprendre plus tard : machines / un téléphone (état complet), en ligne (code du salon).
   useEffect(() => {
@@ -316,6 +338,7 @@ export default function App() {
             <Text style={s.label}>Nombre de machines</Text>
             <Chips values={[1, 2, 3]} value={bots} onChange={setBots} />
             <Toggle on={manual} onPress={() => setManual(!manual)} title="👆 Machines : attendre mon clic" sub="Avant chaque machine, un message te prévient et elle ne joue que quand tu touches « Laisser jouer »." />
+            <Toggle on={alertsOn} onPress={() => setAlertsOn(!alertsOn)} title="🔔 Alertes (son, vibration, titre)" sub="En ligne : un bip et une vibration quand un joueur rejoint le salon ou quand c'est ton tour ; le titre de l'onglet clignote si la page est cachée." />
             <Text style={s.label}>Pause entre les coups</Text>
             <View style={s.row}>
               {([5000, 2000, 1000] as const).map((ms) => (
