@@ -27,7 +27,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: app/package-lock.json
+          cache-dependency-path: |
+            app/package-lock.json
+            solo/package-lock.json
       - run: npm ci
       - name: Vérifications (types et tests)
         run: |
@@ -50,6 +52,18 @@ jobs:
           # Famille Fight (Rumble Fighter) : site statique du dossier combat/
           mkdir -p site/famille-fight
           cp -r combat/. site/famille-fight/
+      - name: Petits jeux solo (Duel de savoir, Mémo des paires)
+        working-directory: solo
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+          for g in duel:duel-de-savoir memo:memo; do
+            id=${g%%:*}; dir=${g##*:}
+            EXPO_PUBLIC_GAME=$id EXPO_BASE_URL=/${{ github.event.repository.name }}/$dir CI=1 EXPO_NO_TELEMETRY=1 npx expo export --platform web --output-dir dist-$id
+            mkdir -p ../site/$dir
+            cp -r dist-$id/. ../site/$dir/
+          done
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
