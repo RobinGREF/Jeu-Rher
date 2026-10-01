@@ -76,6 +76,9 @@ export class Host {
   /** Tour de table obligatoire et quelqu'un n'a pas encore répondu : personne ne peut jouer. */
   private gated = () => this.options.ask === true && unanswered(this.g).length > 0;
 
+  /** « À mon clic » ne sert que sans tour de table : avec lui, la machine joue seule dès que tout le monde a répondu. */
+  private clickMode = () => this.options.manual && this.options.ask !== true;
+
   private botSeats = () => this.seats.flatMap((s, i) => (s.bot ? [i] : []));
   private sync(g: GameState): GameState {
     const bots = this.botSeats();
@@ -143,12 +146,12 @@ export class Host {
 
   /** Siège de la machine qui attend le feu vert d'un joueur (mode « à mon clic »), sinon null. */
   private waiting = (): number | null =>
-    this.options.manual && !this.stopped && !this.g.over && this.seats[this.g.current]?.bot ? this.g.current : null;
+    this.clickMode() && !this.stopped && !this.g.over && this.seats[this.g.current]?.bot ? this.g.current : null;
 
   private scheduleBots() {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
-    if (this.stopped || this.g.over || !this.seats[this.g.current]?.bot || this.options.manual || this.gated()) return;
+    if (this.stopped || this.g.over || !this.seats[this.g.current]?.bot || this.clickMode() || this.gated()) return;
     this.timer = setTimeout(() => {
       const seat = this.g.current;
       const mv = this.gated() ? null : botMove(this.g, seat, this.rng);

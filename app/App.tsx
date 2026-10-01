@@ -81,7 +81,10 @@ export default function App() {
   const pub = osnap?.pub ?? null;
   const game = online ? osnap?.view ?? null : localGame;
   // Tour de table : qui n'a pas encore dit s'il peut ou non réussir une mission (personne ne joue avant).
-  const pendingAns = game && (online ? !!pub?.options.ask : ask) ? unanswered(game) : [];
+  const askOn = online ? !!pub?.options.ask : ask;
+  const pendingAns = game && askOn ? unanswered(game) : [];
+  // Avec le tour de table, plus besoin de « Laisser jouer » : la machine joue toute seule dès que tout le monde a répondu.
+  const clickMode = manual && !askOn;
   const seenPlay = useRef<number | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [, bump] = useState(0); // relit les parties à reprendre sur l'accueil
@@ -155,12 +158,12 @@ export default function App() {
   // Tour d'une machine : une courte pause pour qu'on voie ce qui se passe, puis elle joue.
   useEffect(() => {
     if (!game || game.over) return;
-    if (!solo || game.current === 0 || manual || pendingAns.length) return; // « à mon clic » : la machine attend le bouton ; ou une réponse
+    if (!solo || game.current === 0 || clickMode || pendingAns.length) return; // « à mon clic » : la machine attend le bouton ; ou une réponse
     // Si une machine vient d'annoncer « je peux », on laisse plus de temps pour repérer sur quelles missions.
     const announced = game.canDo.some((a) => botSeats(game.players).includes(a.player));
     const id = setTimeout(() => doBotMove(game), botDelayMs(pauseMs, announced));
     return () => clearTimeout(id);
-  }, [game, mode, pauseMs, manual, pendingAns.length]);
+  }, [game, mode, pauseMs, clickMode, pendingAns.length]);
 
   // La saisie d'une annonce s'arrête dès que le tapis change (carte posée, mission remplacée).
   const boardKey = game ? game.piles.map((p) => p[p.length - 1].id).join('-') + game.missions.map((m) => m.id).join('') : '';
@@ -341,7 +344,9 @@ export default function App() {
             <Text style={s.label}>Nombre de machines</Text>
             <Chips values={[1, 2, 3]} value={bots} onChange={setBots} />
             <Toggle on={ask} onPress={() => setAsk(!ask)} title="🗣️ Tour de table" sub="Avant chaque coup, chaque joueur dit s'il peut réussir une mission ou non. Personne ne joue avant." />
-            <Toggle on={manual} onPress={() => setManual(!manual)} title="👆 Machines : attendre mon clic" sub="Avant chaque machine, un message te prévient et elle ne joue que quand tu touches « Laisser jouer »." />
+            {!ask && (
+              <Toggle on={manual} onPress={() => setManual(!manual)} title="👆 Machines : attendre mon clic" sub="Avant chaque machine, un message te prévient et elle ne joue que quand tu touches « Laisser jouer »." />
+            )}
             <Toggle on={alertsOn} onPress={() => setAlertsOn(!alertsOn)} title="🔔 Alertes (son, vibration, titre)" sub="En ligne : un bip et une vibration quand un joueur rejoint le salon ou quand c'est ton tour ; le titre de l'onglet clignote si la page est cachée." />
             <Text style={s.label}>Pause entre les coups</Text>
             <View style={s.row}>
@@ -482,7 +487,7 @@ export default function App() {
     ...signalTags('help', { mission: id }),
   ];
   // Une machine attend le feu vert (à mon clic) : message et bouton « Laisser jouer ».
-  const waitingBot = !game.over && (online ? pub?.awaitingGo != null && pub.awaitingGo === game.current : solo && manual && game.current !== 0);
+  const waitingBot = !game.over && (online ? pub?.awaitingGo != null && pub.awaitingGo === game.current : solo && clickMode && game.current !== 0);
   const goBot = () => { if (pendingAns.length) return setError('Chacun doit d\'abord dire s\'il peut réussir une mission'); if (online) session()?.go(); else doBotMove(game); setError(''); };
   const botName = seat(game.current).replace(' (machine)', '');
   const botShort = online ? botName : `J${game.current + 1}`;
@@ -586,7 +591,7 @@ export default function App() {
           onReveal={() => { setRevealed(true); setSigMode('play'); }} revealAll={openHands || review} scale={scale}
           lastPlay={lastPlay} pauseMs={effPause}
           who={(i) => (online ? (i === me ? 'Toi' : seat(i)) : solo && i === 0 ? 'Toi' : `J${i + 1}${solo ? ' (machine)' : ''}`)}
-          onSkip={() => { if (solo && game.current !== 0 && !manual) doBotMove(game); else setLastPlay(null); }} />
+          onSkip={() => { if (solo && game.current !== 0 && !clickMode) doBotMove(game); else setLastPlay(null); }} />
         {!!missionText && (
           <Pressable onPress={() => setTextFor(null)} style={s.tip}><Text style={s.tipTxt}>{missionText}</Text></Pressable>
         )}

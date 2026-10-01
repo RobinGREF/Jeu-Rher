@@ -442,3 +442,19 @@ test('tour de table en ligne : personne ne joue (ni machine) tant que chacun n\'
     await until(() => host.snapshot.pub!.last !== null, 'coup accepté après la réponse');
   }
 });
+
+test('tour de table : plus de « Laisser jouer », la machine joue seule dès que tout le monde a répondu', async () => {
+  const w = world();
+  const host = await create(w.client('h'), 'Robin');
+  await host.configure({ pauseMs: 2, phrases: false, manual: true, ask: true });
+  await host.startGame(2, seeded(seedFor(2, 1, 6)));
+  await until(() => host.snapshot.view !== null, 'vue');
+  host.pass();
+  await until(() => host.snapshot.view!.passed.includes(0) || host.snapshot.view!.canDo.some((x) => x.player === 0), 'ma réponse');
+  const mv = firstLegal(host.snapshot.view!, 0)!;
+  host.play(mv.cardId, mv.pile);
+  await until(() => host.snapshot.view!.current === 1, 'tour de la machine');
+  assert.equal(host.snapshot.pub!.awaitingGo, null, 'aucun feu vert demandé');
+  host.pass(); // ma réponse pour ce tour
+  await until(() => host.snapshot.pub!.last!.seat === 1, 'la machine a joué toute seule');
+});

@@ -35,7 +35,7 @@
 - Super-pros : aucune communication.
 
 ## Tour de table (réglable, activé par défaut)
-- Avant chaque coup, chaque joueur (celui qui va jouer compris, avec sa nouvelle carte et la nouvelle carte du tapis) dit « oui, je peux réussir une mission » (en choisissant lesquelles) ou « non, je ne peux pas ». Personne, machine comprise, ne joue tant que tout le monde n’a pas répondu. Les machines répondent toutes seules. Les réponses sont effacées à chaque carte posée.
+- Avant chaque coup, chaque joueur (celui qui va jouer compris, avec sa nouvelle carte et la nouvelle carte du tapis) dit « oui, je peux réussir une mission » (en choisissant lesquelles) ou « non, je ne peux pas ». Personne, machine comprise, ne joue tant que tout le monde n’a pas répondu. Les machines répondent toutes seules et jouent seules (plus de « Laisser jouer ») dès que tout le monde a répondu. Les réponses sont effacées à chaque carte posée.
 
 ## Quitter et reprendre
 - Contre des machines ou à plusieurs sur un téléphone : la partie est sauvegardée sur l’appareil à chaque coup ; l’accueil propose « Reprendre la partie en cours » (ou « Abandonner »). Oubliée après 3 jours ou à la fin de la partie.
