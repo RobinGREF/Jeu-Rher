@@ -1,12 +1,11 @@
 {
-  "name": "app",
+  "name": "solo",
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
     "@expo/metro-runtime": "~57.0.16",
     "expo": "~57.0.26",
     "expo-status-bar": "~57.0.1",
-    "firebase": "^12.19.0",
     "react": "19.2.3",
     "react-dom": "^19.2.3",
     "react-native": "0.86.3",
@@ -23,7 +22,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "tsx --test src/engine.test.ts src/scores.test.ts src/online/online.test.ts src/resume.test.ts src/alerts.test.ts src/names.test.ts src/hooks.test.ts",
+    "test": "tsx --test src/duel/engine.test.ts src/memo/engine.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "private": true
