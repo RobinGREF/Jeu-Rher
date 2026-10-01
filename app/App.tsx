@@ -60,7 +60,7 @@ function Chips({ values, value, onChange }: { values: number[]; value: number; o
   );
 }
 
-export default function App({ onHome }: { onHome?: () => void } = {}) {
+export default function App() {
   const saved = useRef(loadSettings()).current;
   const [mode, setMode] = useState<Mode>('online'); // en ligne par défaut
   const [screen, setScreen] = useState<Screen>('home');
@@ -412,7 +412,6 @@ export default function App({ onHome }: { onHome?: () => void } = {}) {
       <SafeAreaView style={s.root}>
         <StatusBar style="light" />
         <ScrollView contentContainerStyle={s.home}>
-          {onHome && <Pressable onPress={onHome} style={s.link} accessibilityLabel="Retour à la liste des jeux"><Text style={s.linkTxt}>← Mes jeux</Text></Pressable>}
           <Text style={s.title}>50 Missions</Text>
           <Text style={s.sub}>Jeu de cartes coopératif, en ligne avec tes amis</Text>
 
