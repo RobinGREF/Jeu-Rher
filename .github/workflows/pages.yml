@@ -47,6 +47,9 @@ jobs:
           mkdir -p site/50-missions
           cp -r hub/. site/
           cp -r app/dist/. site/50-missions/
+          # Famille Fight (Rumble Fighter) : site statique du dossier combat/
+          mkdir -p site/famille-fight
+          cp -r combat/. site/famille-fight/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

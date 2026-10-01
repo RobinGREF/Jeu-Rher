@@ -31,3 +31,4 @@ Réglages : dossier de départ `app`, commande `npm ci && npx expo export --plat
 
 ## Page d'accueil « Jeu Robin »
 `https://robingref.github.io/Jeu-Rher/` affiche la liste de mes jeux (dossier `hub/`). 50 Missions est servi sous `/50-missions/`. Pour ajouter un jeu : ajouter un bloc dans `hub/games.json` (titre, description, emoji, couleur, `url` ; `url` vide = « Bientôt »). Un autre jeu hébergé ailleurs se met avec son adresse complète ; un jeu de ce dépôt va dans un nouveau sous-dossier assemblé par `.github/workflows/pages.yml`.
+Tous les jeux vivent dans ce dépôt : `app/` (50 Missions, → `/50-missions/`) et `combat/` (Famille Fight / Rumble Fighter, site statique, → `/famille-fight/`). Duel de savoir : à ajouter quand son code sera dans le dépôt (dossier + ligne d'assemblage dans le workflow + `url` dans `hub/games.json`).
