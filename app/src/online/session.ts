@@ -2,10 +2,11 @@ import type { GameState, SignalKind } from '../engine';
 import type { Card } from '../types';
 import type { Backend } from './backend';
 import { Host, type Intent } from './host';
+import { botNames } from '../names';
 import { buildView, type Options, type PublicState, type SeatInfo } from './wire';
 
 export const MAX_PLAYERS = 4;
-export const DEFAULT_OPTIONS: Options = { pauseMs: 5000, phrases: false, manual: true, ask: true, hint: true };
+export const DEFAULT_OPTIONS: Options = { pauseMs: 5000, phrases: false, manual: true, ask: true };
 
 type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never;
 type Meta = { hostUid: string; createdAt: number; phase: 'lobby' | 'playing'; options: Options };
@@ -184,7 +185,7 @@ export class OnlineSession {
     const n = Math.max(2, Math.min(MAX_PLAYERS, Math.max(total, humans.length)));
     const seats: SeatInfo[] = [
       ...humans.map((p) => ({ name: p.name, bot: false, uid: p.uid })),
-      ...Array.from({ length: n - humans.length }, (_, i) => ({ name: `Machine ${i + 1}`, bot: true })),
+      ...botNames(n - humans.length, humans.map((p) => p.name)).map((name) => ({ name, bot: true })),
     ];
     this.host = await Host.launch(this.be, this.snap.code, seats, this.meta.options, rng);
     await this.be.set(this.path('meta'), { ...this.meta, phase: 'playing' });
@@ -217,7 +218,7 @@ export class OnlineSession {
   /** Feu vert : la machine dont c'est le tour peut jouer. */
   go() { this.send({ type: 'go' }); }
   /** « Je peux réussir » ces missions (liste vide : retire l'annonce). */
-  announce(missions: string[]) { this.send({ type: 'canDo', missions }); }
+  announce(missions: string[], free = false) { this.send({ type: 'canDo', missions, free }); }
   /** « Je ne peux pas réussir de mission » pour ce tour. */
   pass() { this.send({ type: 'pass' }); }
   toggleSignal(kind: SignalKind, target: { mission?: string; pile?: number }) {

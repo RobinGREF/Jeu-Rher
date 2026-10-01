@@ -20,6 +20,7 @@ import { TableScene, type LastPlay, type PileView } from './src/TableScene';
 import { SYMBOLS } from './src/symbols';
 import { alertPlayer, joinedNames } from './src/alerts';
 import { setMusic } from './src/music';
+import { BOT_NAMES, shortName } from './src/names';
 import { clearLocal, clearRoom, loadLocal, loadRoom, saveLocal, saveRoom } from './src/resume';
 
 type Mode = 'solo' | 'together' | 'online';
@@ -85,7 +86,7 @@ export default function App() {
   const game = online ? osnap?.view ?? null : localGame;
   // Tour de table : qui n'a pas encore dit s'il peut ou non réussir une mission (personne ne joue avant).
   const askOn = online ? !!pub?.options.ask : ask;
-  const hintOn = online ? pub?.options.hint !== false : hint;
+  const hintOn = hint; // réglage personnel : chacun choisit pour lui, même en ligne
   const pendingAns = game && askOn ? unanswered(game) : [];
   // Avec le tour de table, plus besoin de « Laisser jouer » : la machine joue toute seule dès que tout le monde a répondu.
   const clickMode = manual && !askOn;
@@ -124,7 +125,7 @@ export default function App() {
 
   const solo = mode === 'solo';
   const botSeats = (n: number) => (solo ? Array.from({ length: n - 1 }, (_, i) => i + 1) : []);
-  const seat = (p: number) => (online ? pub?.seats[p]?.name ?? `Joueur ${p + 1}` : `Joueur ${p + 1}${botSeats(99).includes(p) ? ' (machine)' : ''}`);
+  const seat = (p: number) => (online ? pub?.seats[p]?.name ?? `Joueur ${p + 1}` : solo ? (p === 0 ? cleanName(myName, 'Moi') : BOT_NAMES[p - 1] ?? `Machine ${p}`) : `Joueur ${p + 1}`);
   const effPause = online ? pub?.options.pauseMs ?? 5000 : pauseMs;
   /** Applique les annonces automatiques des machines après chaque changement du tapis. */
   const sync = (g: GameState) => {
@@ -182,7 +183,7 @@ export default function App() {
     const players = online
       ? (pub?.seats ?? []).map((s) => ({ name: s.name, bot: s.bot }))
       : solo
-        ? [{ name: cleanName(myName, 'Moi'), bot: false }, ...Array.from({ length: game.players - 1 }, (_, i) => ({ name: `Machine ${i + 1}`, bot: true }))]
+        ? [{ name: cleanName(myName, 'Moi'), bot: false }, ...Array.from({ length: game.players - 1 }, (_, i) => ({ name: BOT_NAMES[i] ?? `Machine ${i + 1}`, bot: true }))]
         : Array.from({ length: game.players }, (_, i) => ({ name: `Joueur ${i + 1}`, bot: false }));
     const entry: ScoreEntry = {
       id: `${key}-${game.completed}`, at: Date.now(), completed: game.completed, medal: game.medal,
@@ -326,26 +327,6 @@ export default function App() {
   if (!game) {
     const back = <Pressable onPress={() => setScreen('home')} style={s.link}><Text style={s.linkTxt}>← Retour</Text></Pressable>;
 
-    if (screen === 'together') {
-      return (
-        <SafeAreaView style={s.root}>
-          <StatusBar style="light" />
-          <ScrollView contentContainerStyle={s.home}>
-            <Text style={s.title}>À plusieurs</Text>
-            <Text style={s.sub}>Un seul téléphone, on se le passe.{'\n'}Combien de joueurs ?</Text>
-            <View style={s.row}>
-              {[2, 3, 4].map((n) => (
-                <Pressable key={n} onPress={() => { setMode('together'); setPlayers(n); setPendingStart(true); }} style={s.chip}>
-                  <Text style={s.chipTxt}>{n}</Text>
-                </Pressable>
-              ))}
-            </View>
-            {back}
-          </ScrollView>
-        </SafeAreaView>
-      );
-    }
-
     if (screen === 'settings') {
       return (
         <SafeAreaView style={s.root}>
@@ -354,7 +335,7 @@ export default function App() {
             <Text style={s.title}>Réglages</Text>
             <Text style={s.label}>Nombre de machines</Text>
             <Chips values={[1, 2, 3]} value={bots} onChange={setBots} />
-            <Toggle on={hint} onPress={() => setHint(!hint)} title="💡 Indice « je peux »" sub="Le jeu te propose « Oui, je peux » seulement quand tu peux vraiment réussir une mission. Désactivé : le bouton est toujours là, à toi de juger (l'annonce est refusée si tu ne peux pas)." />
+            <Toggle on={hint} onPress={() => setHint(!hint)} title="💡 Indice « je peux » (pour moi)" sub="Activé : le jeu te propose « Oui, je peux » seulement quand tu peux vraiment réussir une mission. Désactivé : le bouton est toujours là et tu peux te positionner sur une mission même si aucune n'est faisable (à toi de juger). Réglage personnel à chaque joueur." />
             <Toggle on={ask} onPress={() => setAsk(!ask)} title="🗣️ Tour de table" sub="Avant chaque coup, chaque joueur dit s'il peut réussir une mission ou non. Personne ne joue avant." />
             {!ask && (
               <Toggle on={manual} onPress={() => setManual(!manual)} title="👆 Machines : attendre mon clic" sub="Avant chaque machine, un message te prévient et elle ne joue que quand tu touches « Laisser jouer »." />
@@ -372,14 +353,13 @@ export default function App() {
             <Text style={s.hint}>Temps pendant lequel on voit la carte se poser sur celle qu'elle recouvre. Sans « attendre mon clic », c'est aussi le délai avant que la machine suivante joue.</Text>
             <Text style={s.label}>Options</Text>
             <Toggle on={phrasesOn} onPress={() => setPhrasesOn(!phrasesOn)} title="💬 Phrases du livret" sub="En plus de l'annonce « je peux » : « je peux aider », « bonne carte ici », « ne jouez pas ici »." />
-            <Toggle on={openHands} onPress={() => setOpenHands(!openHands)} title="👀 Mains visibles (test)" sub="À plusieurs sur un téléphone : toutes les mains sont affichées." />
             <Pressable style={s.btn} onPress={() => setScreen('home')}><Text style={s.btnTxt}>Terminé</Text></Pressable>
           </ScrollView>
         </SafeAreaView>
       );
     }
 
-    const resLocal = loadLocal();
+    const resLocal = loadLocal()?.mode === 'solo' ? loadLocal() : null; // l'ancien mode « un téléphone » n'existe plus
     const resRoom = onl.kind ? loadRoom() : null;
     const createOnline = () => { setMode('online'); onl.create(myName); };
     const joinOnline = () => { setMode('online'); onl.join(codeInput, myName); };
@@ -403,7 +383,7 @@ export default function App() {
             <View style={s.resume}>
               <Pressable style={s.resumeBtn} onPress={resumeLocal} accessibilityLabel="Reprendre la partie en cours">
                 <Text style={s.resumeTitle}>▶ Reprendre la partie en cours</Text>
-                <Text style={s.resumeSub}>{resLocal.mode === 'solo' ? '🤖 Contre des machines' : '📱 Un téléphone'} · {resLocal.game.completed}/50 missions · {resLocal.game.players} joueurs</Text>
+                <Text style={s.resumeSub}>🤖 Contre des machines · {resLocal.game.completed}/50 missions · {resLocal.game.players} joueurs</Text>
               </Pressable>
               <Pressable onPress={() => { clearLocal(); bump((n) => n + 1); }} style={s.link}><Text style={s.linkTxt}>Abandonner</Text></Pressable>
             </View>
@@ -438,10 +418,6 @@ export default function App() {
             <Text style={s.bigTitle}>🤖 Contre des machines</Text>
             <Text style={s.bigSub}>Seul, avec {bots} joueur{bots > 1 ? 's' : ''} machine</Text>
           </Pressable>
-          <Pressable style={s.bigBtn} onPress={() => setScreen('together')}>
-            <Text style={s.bigTitle}>📱 À plusieurs, un téléphone</Text>
-            <Text style={s.bigSub}>On se passe le téléphone</Text>
-          </Pressable>
           <View style={s.row}>
             <Pressable onPress={openScores} style={s.link}><Text style={s.linkTxt}>🏆 Meilleurs scores</Text></Pressable>
             <Pressable onPress={() => setScreen('settings')} style={s.link}><Text style={s.linkTxt}>⚙️ Réglages</Text></Pressable>
@@ -468,7 +444,7 @@ export default function App() {
           {status}
           {game.completed < 50 && game.goldReached && <Text style={s.sub}>Il manquait {missionsLeft(game)} missions.</Text>}
           {lastRank !== null && <Text style={s.record}>{lastRank === 1 ? '🏆 Nouveau record !' : `🏅 ${lastRank}ᵉ au classement des meilleurs scores`}</Text>}
-          <Text style={s.sub}>{(online ? (pub?.seats ?? []).map((x) => x.name) : solo ? [cleanName(myName, 'Moi'), ...Array.from({ length: game.players - 1 }, (_, i) => `Machine ${i + 1}`)] : Array.from({ length: game.players }, (_, i) => `Joueur ${i + 1}`)).join(' · ')}</Text>
+          <Text style={s.sub}>{(online ? (pub?.seats ?? []).map((x) => x.name) : solo ? [cleanName(myName, 'Moi'), ...Array.from({ length: game.players - 1 }, (_, i) => BOT_NAMES[i] ?? `Machine ${i + 1}`)] : Array.from({ length: game.players }, (_, i) => `Joueur ${i + 1}`)).join(' · ')}</Text>
           <Text style={s.sub}>{online ? pub?.last?.n ?? 0 : history.length} coups joués</Text>
           <Pressable style={s.bigBtn} onPress={openScores}><Text style={s.bigTitle}>🏆 Meilleurs scores</Text></Pressable>
           <Pressable style={s.btn} onPress={quit}><Text style={s.btnTxt}>{online ? 'Quitter' : 'Rejouer'}</Text></Pressable>
@@ -491,9 +467,10 @@ export default function App() {
   const who = online || solo ? me : speaker ?? (game.current + 1) % game.players;
 
   const signalTags = (kind: SignalKind, target: { mission?: string; pile?: number }) =>
-    game.signals.filter((g) => g.kind === kind && g.mission === target.mission && g.pile === target.pile).map((g) => `${KIND_ICON[kind]} J${g.player + 1}`);
+    game.signals.filter((g) => g.kind === kind && g.mission === target.mission && g.pile === target.pile).map((g) => `${KIND_ICON[kind]} ${who2(g.player)}`);
 
-  const who2 = (p: number) => (online || solo ? (p === me ? 'Toi' : `J${p + 1}`) : `J${p + 1}`);
+  // Sur les missions : « Toi » ou le début du prénom, jamais J1, J2…
+  const who2 = (p: number) => (online || solo ? (!spectator && p === me ? 'Toi' : shortName(seat(p))) : `J${p + 1}`);
   /** Qui se positionne sur quelle mission (annonces « je peux »), et ce que tu es en train de choisir. */
   const missionBadges = (id: string) => [
     ...(picking !== null && picked.includes(id) ? ['✅'] : []),
@@ -504,7 +481,7 @@ export default function App() {
   const waitingBot = !game.over && (online ? pub?.awaitingGo != null && pub.awaitingGo === game.current : solo && clickMode && game.current !== 0);
   const goBot = () => { if (pendingAns.length) return setError('Chacun doit d\'abord dire s\'il peut réussir une mission'); if (online) session()?.go(); else doBotMove(game); setError(''); };
   const botName = seat(game.current).replace(' (machine)', '');
-  const botShort = online ? botName : `J${game.current + 1}`;
+  const botShort = online || solo ? botName : `J${game.current + 1}`;
   const announced = (p: number) => game.canDo.some((a) => a.player === p);
   // Le bouton d'annonce n'apparaît que si le joueur peut vraiment réussir une mission : c'est l'indice, sans dire laquelle ni avec quelle carte.
   // Sans l'indice (réglage), le bouton est toujours là : à chacun de juger, et l'annonce est refusée si elle est fausse.
@@ -514,14 +491,14 @@ export default function App() {
     ? (me !== game.current && can(me) ? [me] : [])
     : openHands ? game.hands.map((_, i) => i).filter((i) => i !== game.current && can(i)) : handShown && me !== game.current && can(me) ? [me] : [];
   const sendAnnounce = (p: number, ids: string[]) => {
-    if (online) session()?.announce(ids);
-    else setGame(setCanDo(game, p, ids));
+    if (online) session()?.announce(ids, !hintOn);
+    else setGame(setCanDo(game, p, ids, !hintOn));
   };
   const answerNo = (p: number) => { if (online) session()?.pass(); else setGame(setPass(game, p)); setError(''); };
   const askTogether = (p: number) => { if (!canAnnounce(game, p)) return setError(`J${p + 1} ne peut réussir aucune mission d'un seul coup`); onAnnounceButton(p); };
   const onAnnounceButton = (p: number) => {
     if (announced(p)) return sendAnnounce(p, []); // retirer son annonce
-    if (!canAnnounce(game, p)) return setError(online || solo ? "Tu ne peux réussir aucune mission d'un seul coup" : `J${p + 1} ne peut réussir aucune mission d'un seul coup`);
+    if (hintOn && !canAnnounce(game, p)) return setError(online || solo ? "Tu ne peux réussir aucune mission d'un seul coup" : `J${p + 1} ne peut réussir aucune mission d'un seul coup`);
     setPicking(p); setPicked([]); setTextFor(null); setSigMode('play'); setError('');
   };
   const confirmPick = () => {
@@ -582,7 +559,7 @@ export default function App() {
   const why = review
     ? `${stuckYou ? "Tu n'as" : `${stuckName} n'a`} ${game.hands[stuck].length ? `aucune carte jouable : ${game.hands[stuck].map(show).join(' ')} ne vont sur aucun des tas (${t.map(show).join(' ')}).` : 'plus aucune carte en main.'}`
     : '';
-  const labels = online ? game.hands.map((_, i) => ({ name: !spectator && i === me ? 'Toi' : seat(i).replace(' (machine)', ''), avatar: pub?.seats[i]?.bot ? '🤖' : !spectator && i === me ? '🙂' : '👤' })) : undefined;
+  const labels = solo ? game.hands.map((_, i) => ({ name: i === 0 ? 'Toi' : seat(i), avatar: i === 0 ? '🙂' : '🤖' })) : online ? game.hands.map((_, i) => ({ name: !spectator && i === me ? 'Toi' : seat(i).replace(' (machine)', ''), avatar: pub?.seats[i]?.bot ? '🤖' : !spectator && i === me ? '🙂' : '👤' })) : undefined;
 
   return (
     <SafeAreaView style={s.game}>
@@ -610,7 +587,7 @@ export default function App() {
           onSelect={(id) => { setSelected(id); setError(''); setSigMode('play'); }}
           onReveal={() => { setRevealed(true); setSigMode('play'); }} revealAll={openHands || review} scale={scale}
           lastPlay={lastPlay} pauseMs={effPause}
-          who={(i) => (online ? (i === me ? 'Toi' : seat(i)) : solo && i === 0 ? 'Toi' : `J${i + 1}${solo ? ' (machine)' : ''}`)}
+          who={(i) => (online ? (i === me ? 'Toi' : seat(i)) : solo ? (i === 0 ? 'Toi' : seat(i)) : `J${i + 1}`)}
           onSkip={() => { if (solo && game.current !== 0 && !clickMode) doBotMove(game); else setLastPlay(null); }} />
         {!!missionText && (
           <Pressable onPress={() => setTextFor(null)} style={s.tip}><Text style={s.tipTxt}>{missionText}</Text></Pressable>
@@ -716,7 +693,7 @@ export default function App() {
 
       {info && (
         <InfoPanel game={game} solo={solo} onClose={() => setInfo(false)} options={{ phrases: online ? !!pub?.options.phrases : phrasesOn }}
-          nameOf={online ? (i) => (i === me ? 'Toi' : seat(i)) : undefined} />
+          nameOf={online || solo ? (i) => (i === me && !spectator ? 'Toi' : seat(i)) : undefined} />
       )}
 
       {menu && (
@@ -731,6 +708,7 @@ export default function App() {
               <Text style={s.quitTxt}>Remplacer {sd.name} par une machine</Text>
             </Pressable>
           ) : null))}
+          <Pressable onPress={() => setHint(!hint)} style={s.quit}><Text style={s.quitTxt}>{hint ? '💡 Indice « je peux » : activé' : '💡 Indice « je peux » : désactivé'}</Text></Pressable>
           <Pressable onPress={quit} style={s.quit}><Text style={s.quitTxt}>Quitter (tu pourras reprendre)</Text></Pressable>
         </View>
       )}

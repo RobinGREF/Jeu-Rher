@@ -42,7 +42,7 @@
 - Avant chaque coup, chaque joueur sauf celui dont c’est le tour dit « oui, je peux réussir une mission » (en choisissant lesquelles) ou « non, je ne peux pas ». Personne, machine comprise, ne joue tant que tout le monde n’a pas répondu. Les machines répondent toutes seules et jouent seules (plus de « Laisser jouer ») dès que tout le monde a répondu. À chaque carte posée, les « non » sont effacés ; une annonce « je peux » reste positionnée si le coup ne l’a pas touchée (mission toujours là et toujours réalisable), sinon elle tombe et le joueur se reprononce.
 
 ## Quitter et reprendre
-- Contre des machines ou à plusieurs sur un téléphone : la partie est sauvegardée sur l’appareil à chaque coup ; l’accueil propose « Reprendre la partie en cours » (ou « Abandonner »). Oubliée après 3 jours ou à la fin de la partie.
+- Contre des machines : la partie est sauvegardée sur l’appareil à chaque coup ; l’accueil propose « Reprendre la partie en cours » (ou « Abandonner »). Oubliée après 3 jours ou à la fin de la partie.
 - En ligne : l’accueil propose « Reprendre la partie en ligne » (code du salon). Si l’hôte quitte, la partie est reprise à son retour ; les autres peuvent le remplacer par une machine.
 
 ## Variante « 50 Missions de folie »
@@ -64,3 +64,8 @@ Symboles : Jumelles (vert), Boussoles (jaune), Briquets (bleu), Couteaux (rouge)
 - Bronze : « Félicitations pour cette médaille de bronze, posez-la près de vous… »
 - Argent : « …et en avant pour la médaille d'or ».
 - Or : « Reformez une pioche avec les cartes Symbole présentes sous les 4 piles et essayez de réaliser les 50 missions ».
+
+## Modes de jeu
+- En ligne (un téléphone par joueur) et contre des machines. Le mode « on se passe un téléphone » a été retiré : trop d’échanges à prévoir. À venir (pas prioritaire) : un mode d’affichage pour suivre le tapis ensemble sur une télé.
+- Les machines ont des prénoms (Jack, Anne, Morgan…) ; sur les missions, une pastille donne « Toi » ou le début du prénom.
+- L’indice « je peux » est un réglage personnel (également dans le menu ☰) : désactivé, on peut se positionner sur une mission même si aucune n’est faisable.

@@ -188,7 +188,7 @@ test('partie à 3 humains + 1 machine, jusqu\'au bout : confidentialité et coh�
   assert.equal(shared[0].mode, 'online');
   assert.equal(shared[0].completed, finals[0].completed);
   assert.deepEqual(shared[0].players, [
-    { name: 'Robin', bot: false }, { name: 'Alice', bot: false }, { name: 'Bob', bot: false }, { name: 'Machine 1', bot: true },
+    { name: 'Robin', bot: false }, { name: 'Alice', bot: false }, { name: 'Bob', bot: false }, { name: 'Jack', bot: true },
   ]);
   // personne ne peut écraser ni falsifier : ni un joueur, ni même l'hôte une seconde fois, ni une valeur hors limites
   const forged = toWireScore({ ...shared[0], completed: 50 });
@@ -484,6 +484,7 @@ test('retardataire : spectateur, demande la place d\'une machine, l\'hôte accep
   const seat = l1.snapshot.mySeat;
   assert.equal(host.snapshot.pub!.seats[seat].bot, false);
   assert.equal(host.snapshot.pub!.seats[seat].name, 'Léo');
+  assert.ok(host.snapshot.pub!.seats.filter((s) => s.bot).every((s) => /^[A-Z][a-z]+$/.test(s.name)), 'les machines ont des prénoms');
   assert.ok(l1.snapshot.view!.hands[seat].every((c) => c.value >= 1 && c.value <= 7), 'Léo voit sa vraie main');
   // plus qu\'une machine : on peut encore remplacer, puis plus de place
   host.acceptSeat(l2.snapshot.uid); // déjà refusée mais l\'hôte peut changer d\'avis

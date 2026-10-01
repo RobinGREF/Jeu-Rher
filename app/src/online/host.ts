@@ -10,7 +10,7 @@ import { fromWire, toWire, type LastWire, type Options, type PublicState, type S
 /** Demande d'un joueur à l'hôte. */
 export type Intent =
   | { uid: string; type: 'play'; cardId: number; pile: number }
-  | { uid: string; type: 'canDo'; missions: string[] }
+  | { uid: string; type: 'canDo'; missions: string[]; free?: boolean }
   | { uid: string; type: 'pass' }
   | { uid: string; type: 'go' }
   | { uid: string; type: 'signal'; kind: SignalKind; mission?: string; pile?: number };
@@ -119,7 +119,7 @@ export class Host {
       const mv = botMove(this.g, s, this.rng);
       if (!mv || !this.apply(s, mv.cardId, mv.pile)) return;
     } else if (it.type === 'canDo') {
-      this.g = setCanDo(this.g, seat, Array.isArray(it.missions) ? it.missions : []); // refusée si le joueur ne peut rien réussir
+      this.g = setCanDo(this.g, seat, Array.isArray(it.missions) ? it.missions : [], it.free === true); // refusée si le joueur ne peut rien réussir (sauf s'il a coupé l'indice)
     } else if (it.type === 'pass') {
       this.g = setPass(this.g, seat);
     } else if (it.type === 'signal') {

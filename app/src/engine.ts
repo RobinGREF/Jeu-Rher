@@ -175,14 +175,14 @@ export const canAnnounce = (s: GameState, player: number) => !s.over && reachabl
 
 /**
  * Annonce « je peux réussir » ces missions (à tout moment, hors tour compris), ou retire l'annonce si la liste est vide.
- * Refusée si le joueur ne peut en réussir aucune. Les missions inconnues sont ignorées.
+ * Refusée si le joueur ne peut en réussir aucune (sauf `free`, quand le joueur a coupé l'indice). Les missions inconnues sont ignorées.
  */
-export function setCanDo(prev: GameState, player: number, missions: string[]): GameState {
+export function setCanDo(prev: GameState, player: number, missions: string[], free = false): GameState {
   if (prev.over || player < 0 || player >= prev.players) return prev;
   const ids = [...new Set(missions)].filter((id) => prev.missions.some((m) => m.id === id));
   const rest = prev.canDo.filter((a) => a.player !== player);
   if (!ids.length) return { ...prev, canDo: rest };
-  if (!canAnnounce(prev, player)) return prev;
+  if (!free && !canAnnounce(prev, player)) return prev; // `free` : sans l'indice, le jeu ne bloque pas une annonce qui ne serait pas réalisable
   return { ...prev, canDo: [...rest, { player, missions: ids }].sort((x, y) => x.player - y.player), passed: prev.passed.filter((p) => p !== player) };
 }
 
@@ -295,10 +295,11 @@ export function botMove(s: GameState, player: number, rng: Rng = Math.random): M
       let score = (r.state.completed - s.completed) * 100 - (r.state.over && r.state.completed < 50 ? 1000 : 0) + rng();
       score += 4 * r.state.missions.reduce((acc, m) => acc + weight(m) * chance(r.state, m), 0);
       for (const a of promised) {
+        const before = reachableMissions(s, a.player);
         const still = reachableMissions(r.state, a.player);
         for (const id of a.missions) {
           const m = s.missions.find((x) => x.id === id);
-          if (m && r.state.missions.some((x) => x.id === id) && !still.includes(id)) score -= KEEP_ANNOUNCED_PENALTY * (0.7 + 0.6 * hard(m));
+          if (m && before.includes(id) && r.state.missions.some((x) => x.id === id) && !still.includes(id)) score -= KEEP_ANNOUNCED_PENALTY * (0.7 + 0.6 * hard(m));
         }
       }
       if (score > bestScore) { bestScore = score; best = { cardId: card.id, pile }; }
