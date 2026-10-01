@@ -383,3 +383,30 @@ test('délai des machines : plus long quand une machine vient d\'annoncer, pour 
   assert.equal(botDelayMs(1000, true), 1600);
   assert.ok(botDelayMs(2, true) >= 2);
 });
+
+test('une machine ne défait pas la mission annoncée par un autre joueur', () => {
+  let checked = 0;
+  for (let seed = 1; seed < 4000 && checked < 5; seed++) {
+    const s0 = newGame(3, seeded(seed));
+    // le joueur courant (machine) joue ; le joueur suivant annonce
+    const bot = s0.current;
+    const other = (bot + 1) % 3;
+    const reach = reachableMissions(s0, other);
+    if (!reach.length) continue;
+    const base = botMove(s0, bot, seeded(5))!;
+    const ruins = (mv: { cardId: number; pile: number }) => {
+      const r = play(s0, mv.cardId, mv.pile, seeded(5));
+      if (!r.ok) return true;
+      const still = reachableMissions(r.state, other);
+      return reach.some((id) => r.state.missions.some((m) => m.id === id) && !still.includes(id));
+    };
+    // existe-t-il un coup qui préserve l'annonce ? alors la machine doit le choisir
+    const safe = s0.hands[bot].some((c) => playablePiles(s0, c).some((p) => !ruins({ cardId: c.id, pile: p })));
+    if (!safe || !ruins(base)) continue;
+    checked++;
+    const s1 = setCanDo(s0, other, reach);
+    const mv = botMove(s1, bot, seeded(5))!;
+    assert.ok(!ruins(mv), `seed ${seed} : la machine a défait l'annonce`);
+  }
+  assert.ok(checked > 0, 'aucune situation de test trouvée');
+});

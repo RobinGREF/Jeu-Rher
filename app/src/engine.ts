@@ -199,16 +199,25 @@ export type Move = { cardId: number; pile: number };
 /**
  * Coup d'un joueur machine : celui qui réussit le plus de missions, en évitant de bloquer
  * le joueur suivant (ce qui terminerait la partie). Simule chaque coup avec `play`.
+ * On joue ensemble : une machine ne défait pas la mission qu'un autre joueur (humain ou machine) a
+ * annoncée pouvoir réussir, tant qu'un autre coup lui permet de l'éviter.
  */
+export const KEEP_ANNOUNCED_PENALTY = 150;
 export function botMove(s: GameState, player: number, rng: Rng = Math.random): Move | null {
   if (s.over || s.current !== player) return null;
+  const promised = s.canDo.filter((a) => a.player !== player);
   let best: Move | null = null;
   let bestScore = -Infinity;
   for (const card of s.hands[player]) {
     for (const pile of playablePiles(s, card)) {
       const r = play(s, card.id, pile, rng);
       if (!r.ok) continue;
-      const score = (r.state.completed - s.completed) * 100 - (r.state.over && r.state.completed < 50 ? 1000 : 0) + rng();
+      let score = (r.state.completed - s.completed) * 100 - (r.state.over && r.state.completed < 50 ? 1000 : 0) + rng();
+      for (const a of promised) {
+        const still = reachableMissions(r.state, a.player);
+        const lost = a.missions.filter((id) => r.state.missions.some((m) => m.id === id) && !still.includes(id));
+        score -= lost.length * KEEP_ANNOUNCED_PENALTY;
+      }
       if (score > bestScore) { bestScore = score; best = { cardId: card.id, pile }; }
     }
   }
