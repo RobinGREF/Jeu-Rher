@@ -109,7 +109,7 @@ function Plus({ n, x, y }: { n: number; x: number; y: number }) {
   );
 }
 
-function Banner({ text, y }: { text: string; y: number }) {
+function Banner({ text, y, small }: { text: string; y: number; small?: boolean }) {
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.sequence([
@@ -118,8 +118,8 @@ function Banner({ text, y }: { text: string; y: number }) {
     ]).start();
   }, []);
   return (
-    <Animated.View style={[s.banner, { top: y, opacity: v, transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }] }]}>
-      <Text style={s.bannerTxt}>{text}</Text>
+    <Animated.View style={[s.banner, small && { maxWidth: '88%', paddingVertical: 6, paddingHorizontal: 12 }, { top: y, opacity: v, transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }] }]}>
+      <Text style={small ? s.bannerSmall : s.bannerTxt}>{text}</Text>
     </Animated.View>
   );
 }
@@ -141,6 +141,8 @@ export function Celebration({ c, width, height, tokenSize, rowY, target }: {
           x={16 + idx * (tokenSize + gap) + tokenSize / 2} y={rowY + tokenSize / 2} />
       ))}
       <Banner key={`b${c.key}`} text={text} y={rowY + tokenSize + 34} />
+      {/* Ce qui a été validé, en toutes lettres : pour pouvoir vérifier. */}
+      <Banner key={`l${c.key}`} small text={c.done.map(({ def }) => def.label).join('\n')} y={rowY + tokenSize + 90} />
       <Plus key={`p${c.key}`} n={c.gained} x={target.x} y={target.y + 6} />
     </View>
   );
@@ -153,5 +155,6 @@ const s = StyleSheet.create({
   glow: { borderRadius: 999, shadowColor: '#fde047', shadowOpacity: 1, shadowRadius: 16, shadowOffset: { width: 0, height: 0 }, elevation: 12 },
   plus: { position: 'absolute', width: 48, textAlign: 'center', color: '#fde047', fontSize: 22, fontWeight: '900', textShadowColor: '#000', textShadowRadius: 4 },
   banner: { position: 'absolute', alignSelf: 'center', backgroundColor: '#f59e0b', borderRadius: 16, paddingVertical: 10, paddingHorizontal: 20, borderWidth: 3, borderColor: '#fef3c7' },
+  bannerSmall: { color: '#111827', fontSize: 13, fontWeight: '800', textAlign: 'center' },
   bannerTxt: { color: '#111827', fontSize: 20, fontWeight: '900' },
 });

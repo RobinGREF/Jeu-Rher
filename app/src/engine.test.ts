@@ -452,3 +452,21 @@ test('tour de table : chacun répond (je peux / je ne peux pas) avant le coup, e
   assert.ok(r.ok);
   assert.deepEqual(r.state.passed, []);
 });
+
+test('missions « exactement 2 cartes d\'un symbole » : 3 cartes du symbole ne valident jamais les missions à 2 (1024 configurations)', () => {
+  const defs = buildMissionDefs();
+  const names = ['Jumelles', 'Boussoles', 'Briquets', 'Couteaux'];
+  const find = (s: number, end: string) => defs.find((d) => d.label.includes(names[s]) && d.label.endsWith(end))!;
+  for (let k = 0; k < 256; k++) {
+    const syms = [k & 3, (k >> 2) & 3, (k >> 4) & 3, (k >> 6) & 3];
+    const t = syms.map((symbol, i) => ({ id: i, symbol, value: 1 + ((i * 2) % 7) })) as never;
+    for (let s = 0; s < 4; s++) {
+      const pos = syms.flatMap((x, i) => (x === s ? [i] : []));
+      const two = pos.length === 2;
+      assert.equal(find(s, 'elles se touchent').check(t), two && pos[1] - pos[0] === 1);
+      assert.equal(find(s, 'elles ne se touchent pas').check(t), two && pos[1] - pos[0] > 1);
+      assert.equal(find(s, "espacées d'une seule carte").check(t), two && pos[1] - pos[0] === 2);
+      assert.equal(defs.find((d) => d.label === `Exactement 3 des 4 cartes sont des ${names[s]}`)!.check(t), pos.length === 3);
+    }
+  }
+});
