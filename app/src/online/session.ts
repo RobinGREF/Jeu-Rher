@@ -5,7 +5,7 @@ import { Host, type Intent } from './host';
 import { buildView, type Options, type PublicState, type SeatInfo } from './wire';
 
 export const MAX_PLAYERS = 4;
-export const DEFAULT_OPTIONS: Options = { pauseMs: 5000, phrases: false, manual: true, ask: true };
+export const DEFAULT_OPTIONS: Options = { pauseMs: 5000, phrases: false, manual: true, ask: true, hint: true };
 
 type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never;
 type Meta = { hostUid: string; createdAt: number; phase: 'lobby' | 'playing'; options: Options };

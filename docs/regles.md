@@ -35,6 +35,9 @@
 - Débutants : permis de regarder sous les 4 cartes exposées (cartes déjà jouées).
 - Super-pros : aucune communication.
 
+## Indice « je peux » (réglable, activé par défaut)
+- Activé : le bouton « Oui, je peux » n’apparaît que si le joueur peut réellement réussir une mission d’un seul coup. Désactivé : le bouton est toujours là, à chacun de juger ; une annonce fausse est refusée (« Tu ne peux réussir aucune mission d’un seul coup »).
+
 ## Tour de table (réglable, activé par défaut)
 - Avant chaque coup, chaque joueur sauf celui dont c’est le tour dit « oui, je peux réussir une mission » (en choisissant lesquelles) ou « non, je ne peux pas ». Personne, machine comprise, ne joue tant que tout le monde n’a pas répondu. Les machines répondent toutes seules et jouent seules (plus de « Laisser jouer ») dès que tout le monde a répondu. À chaque carte posée, les « non » sont effacés ; une annonce « je peux » reste positionnée si le coup ne l’a pas touchée (mission toujours là et toujours réalisable), sinon elle tombe et le joueur se reprononce.
 

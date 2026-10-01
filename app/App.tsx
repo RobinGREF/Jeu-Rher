@@ -25,7 +25,7 @@ import { clearLocal, clearRoom, loadLocal, loadRoom, saveLocal, saveRoom } from 
 type Mode = 'solo' | 'together' | 'online';
 type Screen = 'home' | 'together' | 'settings';
 
-const DEFAULTS = { bots: 2, pauseMs: 5000, manual: true, phrasesOn: false, openHands: false, alertsOn: true, ask: true, musicOn: true };
+const DEFAULTS = { bots: 2, pauseMs: 5000, manual: true, phrasesOn: false, openHands: false, alertsOn: true, ask: true, musicOn: true, hint: true };
 /** Réglages gardés d'une visite à l'autre (facultatif : sans stockage, on repart des valeurs par défaut). */
 function loadSettings(): typeof DEFAULTS {
   try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem('50m-settings') ?? '{}') }; } catch { return DEFAULTS; }
@@ -69,6 +69,7 @@ export default function App() {
   const [phrasesOn, setPhrasesOn] = useState(saved.phrasesOn);
   const [manual, setManual] = useState(saved.manual); // les machines attendent mon clic
   const [musicOn, setMusicOn] = useState(saved.musicOn); // musique de fond
+  const [hint, setHint] = useState(saved.hint); // le jeu m'indique si je peux réussir une mission (bouton « je peux » seulement si c'est vrai)
   const [ask, setAsk] = useState(saved.ask); // tour de table : chacun dit s'il peut ou non avant que le joueur ne joue
   const [alertsOn, setAlertsOn] = useState(saved.alertsOn); // son, vibration et titre : un joueur arrive, c'est ton tour
 
@@ -84,6 +85,7 @@ export default function App() {
   const game = online ? osnap?.view ?? null : localGame;
   // Tour de table : qui n'a pas encore dit s'il peut ou non réussir une mission (personne ne joue avant).
   const askOn = online ? !!pub?.options.ask : ask;
+  const hintOn = online ? pub?.options.hint !== false : hint;
   const pendingAns = game && askOn ? unanswered(game) : [];
   // Avec le tour de table, plus besoin de « Laisser jouer » : la machine joue toute seule dès que tout le monde a répondu.
   const clickMode = manual && !askOn;
@@ -216,8 +218,8 @@ export default function App() {
   }, [pub?.v]);
 
   useEffect(() => {
-    try { localStorage.setItem('50m-settings', JSON.stringify({ bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask, musicOn })); } catch { /* sans stockage */ }
-  }, [bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask, musicOn]);
+    try { localStorage.setItem('50m-settings', JSON.stringify({ bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask, musicOn, hint })); } catch { /* sans stockage */ }
+  }, [bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask, musicOn, hint]);
   useEffect(() => { setMusic(musicOn); }, [musicOn]);
 
   // Alertes en ligne : un joueur rejoint le salon, la partie démarre, c'est ton tour.
@@ -352,6 +354,7 @@ export default function App() {
             <Text style={s.title}>Réglages</Text>
             <Text style={s.label}>Nombre de machines</Text>
             <Chips values={[1, 2, 3]} value={bots} onChange={setBots} />
+            <Toggle on={hint} onPress={() => setHint(!hint)} title="💡 Indice « je peux »" sub="Le jeu te propose « Oui, je peux » seulement quand tu peux vraiment réussir une mission. Désactivé : le bouton est toujours là, à toi de juger (l'annonce est refusée si tu ne peux pas)." />
             <Toggle on={ask} onPress={() => setAsk(!ask)} title="🗣️ Tour de table" sub="Avant chaque coup, chaque joueur dit s'il peut réussir une mission ou non. Personne ne joue avant." />
             {!ask && (
               <Toggle on={manual} onPress={() => setManual(!manual)} title="👆 Machines : attendre mon clic" sub="Avant chaque machine, un message te prévient et elle ne joue que quand tu touches « Laisser jouer »." />
@@ -504,9 +507,11 @@ export default function App() {
   const botShort = online ? botName : `J${game.current + 1}`;
   const announced = (p: number) => game.canDo.some((a) => a.player === p);
   // Le bouton d'annonce n'apparaît que si le joueur peut vraiment réussir une mission : c'est l'indice, sans dire laquelle ni avec quelle carte.
-  const announcers: number[] = spectator ? [] : online || solo
-    ? (canAnnounce(game, me) ? [me] : [])
-    : openHands ? game.hands.map((_, i) => i).filter((i) => canAnnounce(game, i)) : handShown && canAnnounce(game, me) ? [me] : [];
+  // Sans l'indice (réglage), le bouton est toujours là : à chacun de juger, et l'annonce est refusée si elle est fausse.
+  const can = (p: number) => !hintOn || canAnnounce(game, p);
+  const announcers: number[] = spectator || game.over ? [] : online || solo
+    ? (can(me) ? [me] : [])
+    : openHands ? game.hands.map((_, i) => i).filter((i) => can(i)) : handShown && can(me) ? [me] : [];
   const sendAnnounce = (p: number, ids: string[]) => {
     if (online) session()?.announce(ids);
     else setGame(setCanDo(game, p, ids));
@@ -515,6 +520,7 @@ export default function App() {
   const askTogether = (p: number) => { if (!canAnnounce(game, p)) return setError(`J${p + 1} ne peut réussir aucune mission d'un seul coup`); onAnnounceButton(p); };
   const onAnnounceButton = (p: number) => {
     if (announced(p)) return sendAnnounce(p, []); // retirer son annonce
+    if (!canAnnounce(game, p)) return setError(online || solo ? "Tu ne peux réussir aucune mission d'un seul coup" : `J${p + 1} ne peut réussir aucune mission d'un seul coup`);
     setPicking(p); setPicked([]); setTextFor(null); setSigMode('play'); setError('');
   };
   const confirmPick = () => {
@@ -659,7 +665,7 @@ export default function App() {
             </>
           ) : pendingAns.length > 0 ? ((solo || online) ? (pendingAns.includes(me) ? (
             <>
-              {canAnnounce(game, me) && (
+              {can(me) && (
                 <Pressable onPress={() => onAnnounceButton(me)} style={[s.mode, s.grow, s.modeOn]} accessibilityLabel="Oui, je peux réussir une mission"><Text style={[s.modeTxt, s.modeTxtOn]} numberOfLines={1}>🙋 Oui, je peux</Text></Pressable>
               )}
               <Pressable onPress={() => answerNo(me)} style={[s.mode, s.grow]} accessibilityLabel="Non, je ne peux pas"><Text style={s.modeTxt} numberOfLines={1}>🚫 Non, je ne peux pas</Text></Pressable>

@@ -35,7 +35,7 @@ export function fromWire(json: string): GameState {
 
 export type SeatInfo = { name: string; bot: boolean; uid?: string };
 /** `manual` : chaque machine attend qu'un joueur touche « Laisser jouer » (sinon, elle joue toute seule après la pause). */
-export type Options = { pauseMs: number; phrases: boolean; manual: boolean; /** Tour de table : chacun dit s'il peut ou non avant que le joueur ne joue. */ ask?: boolean };
+export type Options = { pauseMs: number; phrases: boolean; manual: boolean; /** Tour de table : chacun dit s'il peut ou non avant que le joueur ne joue. */ ask?: boolean; /** Indice : le bouton « je peux » n'apparaît que si le joueur peut vraiment (défaut : oui). */ hint?: boolean };
 
 /** Dernier coup joué, pour l'animation de la carte et la fête. */
 export type LastWire = {
