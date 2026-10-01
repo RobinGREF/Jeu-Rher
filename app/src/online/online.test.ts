@@ -400,3 +400,13 @@ test('tableau partagé : lecture tolérante (listes Firebase, entrées abîmées
   assert.deepEqual(fromWireScores(null), []);
   assert.deepEqual(fromWireScores('n\'importe quoi'), []);
 });
+
+test('fin de partie : les mains de tous sont visibles, avant elles restent des dos', async () => {
+  const { buildView } = await import('./wire');
+  const card = (id: number): any => ({ id, symbol: 1, value: 3 });
+  const pub: any = { seats: [{ name: 'A', bot: false }, { name: 'B', bot: false }], current: 1, completed: 4, medal: null, goldReached: false, over: false,
+    missions: [], piles: [0, 1, 2, 3].map((i) => ({ top: card(i), depth: 0 })), deckCount: 0, handCounts: [1, 1], canDo: [], signals: [], nextMedal: null,
+    finalHands: [[card(10)], [card(11)]] };
+  assert.equal(buildView(pub, [card(10)], 0).hands[1][0].id < 0, true);
+  assert.equal(buildView({ ...pub, over: true }, [card(10)], 0).hands[1][0].id, 11);
+});

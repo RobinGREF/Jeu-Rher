@@ -78,6 +78,7 @@ export default function App() {
   const game = online ? osnap?.view ?? null : localGame;
   const seenPlay = useRef<number | null>(null);
   const [revealed, setRevealed] = useState(false);
+  const [resultSeen, setResultSeen] = useState(false); // fin de partie perdue : on laisse regarder le tapis avant le résultat
   const [selected, setSelected] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [textFor, setTextFor] = useState<string | null>(null);
@@ -141,6 +142,8 @@ export default function App() {
     log(`${seat(who)} : ${card.value}${SYMBOLS[card.symbol].emoji} sur le tas ${mv.pile + 1}${gained ? ` · 🎯 +${gained} mission${gained > 1 ? 's' : ''}` : ''}`);
     setGame(sync(r.state));
   };
+
+  useEffect(() => { if (!game?.over) setResultSeen(false); }, [game?.over]);
 
   // Tour d'une machine : une courte pause pour qu'on voie ce qui se passe, puis elle joue.
   useEffect(() => {
@@ -356,7 +359,9 @@ export default function App() {
     </Text>
   );
 
-  if (game.over) {
+  const review = game.over && game.completed < 50 && !resultSeen;
+
+  if (game.over && !review) {
     return (
       <SafeAreaView style={s.root}>
         <StatusBar style="light" />
@@ -462,7 +467,14 @@ export default function App() {
   const missionText = game.missions.find((m) => m.id === textFor)?.label;
   const sigHint = { play: '', help: 'Touche la mission pour laquelle tu peux aider', good: 'Touche le tas où tu as une bonne carte', stop: 'Touche le tas où il ne faut pas jouer' }[sigMode];
   const toggleSig = (k: SignalKind) => setSigMode(sigMode === k ? 'play' : k);
-  const turnTitle = solo || online ? (game.current === me ? 'À toi de jouer' : waitingBot ? `${botName} va jouer` : `${seat(game.current)} joue…`) : `Joueur ${game.current + 1} joue`;
+  const turnTitle = review ? '🛑 Fin de partie' : solo || online ? (game.current === me ? 'À toi de jouer' : waitingBot ? `${botName} va jouer` : `${seat(game.current)} joue…`) : `Joueur ${game.current + 1} joue`;
+  const stuck = game.current;
+  const stuckYou = (online || solo) && stuck === me;
+  const stuckName = seat(stuck).replace(' (machine)', '');
+  const show = (c: { value: number; symbol: number }) => `${c.value}${SYMBOLS[c.symbol].emoji}`;
+  const why = review
+    ? `${stuckYou ? "Tu n'as" : `${stuckName} n'a`} ${game.hands[stuck].length ? `aucune carte jouable : ${game.hands[stuck].map(show).join(' ')} ne vont sur aucun des tas (${t.map(show).join(' ')}).` : 'plus aucune carte en main.'}`
+    : '';
   const labels = online ? game.hands.map((_, i) => ({ name: i === me ? 'Toi' : seat(i).replace(' (machine)', ''), avatar: pub?.seats[i]?.bot ? '🤖' : i === me ? '🙂' : '👤' })) : undefined;
 
   return (
@@ -488,7 +500,7 @@ export default function App() {
         <TableScene game={game} solo={solo} labels={labels} piles={pileViews} onPile={drop}
           meIndex={me} hand={hand} handShown={handShown} selectedId={selected}
           onSelect={(id) => { setSelected(id); setError(''); setSigMode('play'); }}
-          onReveal={() => { setRevealed(true); setSigMode('play'); }} revealAll={openHands} scale={scale}
+          onReveal={() => { setRevealed(true); setSigMode('play'); }} revealAll={openHands || review} scale={scale}
           lastPlay={lastPlay} pauseMs={effPause}
           who={(i) => (online ? (i === me ? 'Toi' : seat(i)) : solo && i === 0 ? 'Toi' : `J${i + 1}${solo ? ' (machine)' : ''}`)}
           onSkip={() => { if (solo && game.current !== 0 && !manual) doBotMove(game); else setLastPlay(null); }} />
@@ -497,6 +509,14 @@ export default function App() {
         )}
       </View>
 
+      {review ? (
+        <View style={s.bar}>
+          <Text style={s.whyTitle}>La partie s'arrête : {game.completed}/50 missions</Text>
+          <Text style={s.whyTxt}>{why}</Text>
+          <Text style={s.barTxt}>Quand un joueur ne peut pas jouer, c'est fini. Les mains sont dévoilées.</Text>
+          <Pressable onPress={() => setResultSeen(true)} style={[s.goBtn, s.grow]} accessibilityLabel="Voir le résultat"><Text style={s.goTxt}>Voir le résultat</Text></Pressable>
+        </View>
+      ) : (
       <View style={s.bar}>
         {!!error ? <Text style={s.barErr} numberOfLines={1}>{error}</Text>
           : picking !== null ? <Text style={s.barTxt} numberOfLines={1}>Touche la ou les missions que tu peux réussir, puis valide</Text>
@@ -545,6 +565,7 @@ export default function App() {
           </View>
         )}
       </View>
+      )}
 
       {party && (
         <Celebration c={party} width={width} height={height} tokenSize={tokenSize} rowY={rowY} target={{ x: width - 126, y: 16 }} />
@@ -587,6 +608,8 @@ const s = StyleSheet.create({
   tip: { position: 'absolute', top: 6, left: 8, right: 8, backgroundColor: '#f59e0b', borderRadius: 10, padding: 8 },
   tipTxt: { color: '#111827', fontWeight: '800', fontSize: 13, textAlign: 'center' },
   bar: { gap: 4 },
+  whyTitle: { color: '#fca5a5', fontWeight: '900', fontSize: 15, textAlign: 'center' },
+  whyTxt: { color: '#f8fafc', fontWeight: '700', fontSize: 14, textAlign: 'center' },
   barTxt: { color: '#94a3b8', fontSize: 12, textAlign: 'center' },
   barErr: { color: '#fca5a5', fontSize: 12, textAlign: 'center', fontWeight: '700' },
   barRow: { flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' },

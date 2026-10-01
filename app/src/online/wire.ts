@@ -52,6 +52,8 @@ export type PublicState = {
   piles: { top: Card; depth: number }[];
   deckCount: number;
   handCounts: number[];
+  /** Fin de partie seulement : les mains de tous, pour voir pourquoi on a perdu. */
+  finalHands?: Card[][];
   canDo: Announce[]; signals: Signal[];
   nextMedal: { medal: Medal; needed: number } | null;
   /** Siège de la machine qui attend le feu vert d'un joueur, sinon null. */
@@ -76,7 +78,7 @@ export function buildView(pub: PublicState, hand: Card[], mySeat: number): GameS
     : [];
   return {
     players: pub.seats.length, current: pub.current,
-    hands: pub.handCounts.map((n, i) => (i === mySeat ? hand : filler(n))),
+    hands: pub.handCounts.map((n, i) => (i === mySeat ? hand : pub.over && pub.finalHands?.[i] ? pub.finalHands[i] : filler(n))),
     piles: pub.piles.map((p) => [...filler(p.depth), p.top]),
     symbolDeck: filler(pub.deckCount),
     missions, missionDeck, canDo: pub.canDo, signals: pub.signals,

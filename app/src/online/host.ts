@@ -167,7 +167,7 @@ export class Host {
       current: g.current, completed: g.completed, medal: g.medal, goldReached: g.goldReached, over: g.over,
       missions: g.missions.map((m) => m.id),
       piles: g.piles.map((p) => ({ top: p[p.length - 1], depth: p.length - 1 })),
-      deckCount: g.symbolDeck.length, handCounts: g.hands.map((h) => h.length),
+      deckCount: g.symbolDeck.length, handCounts: g.hands.map((h) => h.length), ...(g.over ? { finalHands: g.hands } : {}),
       canDo: g.canDo, signals: g.signals,
       nextMedal: nm ? { medal: nm.medal, needed: nm.missionsNeeded } : null,
       awaitingGo: this.waiting(),
