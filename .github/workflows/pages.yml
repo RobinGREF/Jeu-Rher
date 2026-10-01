@@ -40,7 +40,7 @@ jobs:
         env:
           CI: '1'
           EXPO_NO_TELEMETRY: '1'
-          # Le hub « Jeu Robin » est à la racine https://<compte>.github.io/<dépôt>/ ; 50 Missions est dans /50-missions/
+          # Le hub « Jeu des vacances » est à la racine https://<compte>.github.io/<dépôt>/ ; 50 Missions est dans /50-missions/
           EXPO_BASE_URL: /${{ github.event.repository.name }}/50-missions
           # La configuration Firebase (publique) est lue dans app/.env.
       - name: Assembler le site (hub à la racine, jeux dans des sous-dossiers)

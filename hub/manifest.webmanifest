@@ -1,6 +1,6 @@
 {
-  "name": "Jeu Robin",
-  "short_name": "Jeu Robin",
+  "name": "Jeu des vacances",
+  "short_name": "Jeu des vacances",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
