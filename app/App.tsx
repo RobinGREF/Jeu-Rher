@@ -509,9 +509,10 @@ export default function App() {
   // Le bouton d'annonce n'apparaît que si le joueur peut vraiment réussir une mission : c'est l'indice, sans dire laquelle ni avec quelle carte.
   // Sans l'indice (réglage), le bouton est toujours là : à chacun de juger, et l'annonce est refusée si elle est fausse.
   const can = (p: number) => !hintOn || canAnnounce(game, p);
+  // Pas pendant ton propre tour : tu joues. L'annonce se fait hors de ton tour, ou juste après avoir joué (avec ta nouvelle carte).
   const announcers: number[] = spectator || game.over ? [] : online || solo
-    ? (can(me) ? [me] : [])
-    : openHands ? game.hands.map((_, i) => i).filter((i) => can(i)) : handShown && can(me) ? [me] : [];
+    ? (me !== game.current && can(me) ? [me] : [])
+    : openHands ? game.hands.map((_, i) => i).filter((i) => i !== game.current && can(i)) : handShown && me !== game.current && can(me) ? [me] : [];
   const sendAnnounce = (p: number, ids: string[]) => {
     if (online) session()?.announce(ids);
     else setGame(setCanDo(game, p, ids));
