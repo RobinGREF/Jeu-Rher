@@ -38,13 +38,19 @@ jobs:
         env:
           CI: '1'
           EXPO_NO_TELEMETRY: '1'
-          # Le site est servi sous https://<compte>.github.io/<dépôt>/
-          EXPO_BASE_URL: /${{ github.event.repository.name }}
+          # Le hub « Jeu Robin » est à la racine https://<compte>.github.io/<dépôt>/ ; 50 Missions est dans /50-missions/
+          EXPO_BASE_URL: /${{ github.event.repository.name }}/50-missions
           # La configuration Firebase (publique) est lue dans app/.env.
+      - name: Assembler le site (hub à la racine, jeux dans des sous-dossiers)
+        working-directory: .
+        run: |
+          mkdir -p site/50-missions
+          cp -r hub/. site/
+          cp -r app/dist/. site/50-missions/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: app/dist
+          path: site
 
   deploy:
     needs: build

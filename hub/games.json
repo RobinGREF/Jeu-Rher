@@ -1,0 +1,26 @@
+{
+  "_aide": "Pour ajouter un jeu : copier un bloc, remplir titre, description, emoji, couleur et url (laisser url vide = « bientôt »). Il apparaît en bas de la liste.",
+  "games": [
+    {
+      "titre": "50 Missions",
+      "description": "Jeu de cartes coopératif : 4 tas, 50 missions, jusqu'à 4 joueurs en ligne ou contre des machines.",
+      "emoji": "🧭",
+      "couleur": "#d97706",
+      "url": "50-missions/"
+    },
+    {
+      "titre": "Famille Fight",
+      "description": "Bientôt.",
+      "emoji": "🥊",
+      "couleur": "#dc2626",
+      "url": ""
+    },
+    {
+      "titre": "Duel de savoir",
+      "description": "Bientôt.",
+      "emoji": "🧠",
+      "couleur": "#2563eb",
+      "url": ""
+    }
+  ]
+}
