@@ -18,6 +18,7 @@ import { missionById } from './src/online/wire';
 import { MissionToken } from './src/MissionToken';
 import { TableScene, type LastPlay, type PileView } from './src/TableScene';
 import { SYMBOLS } from './src/symbols';
+import { clearLocal, clearRoom, loadLocal, loadRoom, saveLocal, saveRoom } from './src/resume';
 
 type Mode = 'solo' | 'together' | 'online';
 type Screen = 'home' | 'together' | 'settings';
@@ -78,6 +79,7 @@ export default function App() {
   const game = online ? osnap?.view ?? null : localGame;
   const seenPlay = useRef<number | null>(null);
   const [revealed, setRevealed] = useState(false);
+  const [, bump] = useState(0); // relit les parties à reprendre sur l'accueil
   const [resultSeen, setResultSeen] = useState(false); // fin de partie perdue : on laisse regarder le tapis avant le résultat
   const [selected, setSelected] = useState<number | null>(null);
   const [error, setError] = useState('');
@@ -207,6 +209,22 @@ export default function App() {
     try { localStorage.setItem('50m-settings', JSON.stringify({ bots, pauseMs, manual, phrasesOn, openHands })); } catch { /* sans stockage */ }
   }, [bots, pauseMs, manual, phrasesOn, openHands]);
 
+  // Partie à reprendre plus tard : machines / un téléphone (état complet), en ligne (code du salon).
+  useEffect(() => {
+    if (online || !localGame) return;
+    if (localGame.over) clearLocal();
+    else saveLocal({ mode: mode === 'solo' ? 'solo' : 'together', game: localGame, history, startedAt: startedAt.current });
+  }, [localGame, history]);
+  useEffect(() => {
+    if (!online || !osnap?.code) return;
+    if (osnap.phase === 'over') clearRoom();
+    else if (osnap.phase === 'lobby' || osnap.phase === 'playing') saveRoom(osnap.code);
+  }, [online, osnap?.code, osnap?.phase]);
+  // Un salon qui n'existe plus ou déjà parti sans nous : on l'oublie.
+  useEffect(() => {
+    if (online && !osnap && onl.error && /Aucun salon|déjà commencé|complet/.test(onl.error)) clearRoom();
+  }, [onl.error]);
+
   useEffect(() => {
     if (pendingStart) { setPendingStart(false); start(); }
   }, [pendingStart]);
@@ -237,7 +255,21 @@ export default function App() {
       onClear={() => { clearScores(); setScores([]); setLastRank(null); setLastScoreId(null); }} />;
   }
 
-  const quit = () => { if (online) onl.leave(); setGame(null); setMenu(false); setScreen('home'); };
+  const quit = () => {
+    if (online && osnap?.phase === 'lobby') clearRoom(); // quitter le salon d'attente : rien à reprendre
+    if (online) onl.leave();
+    setGame(null); setMenu(false); setScreen('home');
+  };
+  /** Reprend la partie locale sauvegardée. */
+  const resumeLocal = () => {
+    const sv = loadLocal();
+    if (!sv) return;
+    setMode(sv.mode); setGame(sv.game); setHistory(sv.history);
+    setRevealed(false); setSelected(null); setError(''); setSigMode('play'); setSpeaker(null); setMenu(false); setInfo(false);
+    setTextFor(null); setLastPlay(null); setParty(null); setPicking(null); setPicked([]); setResultSeen(false);
+    startedAt.current = sv.startedAt; savedKey.current = null; setLastRank(null); setLastScoreId(null);
+  };
+  const resumeOnline = (code: string) => { setMode('online'); onl.join(code, myName); };
 
   if (online && osnap && osnap.phase !== 'playing' && osnap.phase !== 'over') {
     return <Lobby snap={osnap} session={onl.session.current} onLeave={quit} local={onl.kind === 'local'} />;
@@ -302,6 +334,8 @@ export default function App() {
       );
     }
 
+    const resLocal = loadLocal();
+    const resRoom = onl.kind ? loadRoom() : null;
     const createOnline = () => { setMode('online'); onl.create(myName); };
     const joinOnline = () => { setMode('online'); onl.join(codeInput, myName); };
     return (
@@ -310,6 +344,25 @@ export default function App() {
         <ScrollView contentContainerStyle={s.home}>
           <Text style={s.title}>50 Missions</Text>
           <Text style={s.sub}>Jeu de cartes coopératif, en ligne avec tes amis</Text>
+
+          {resRoom && (
+            <View style={s.resume}>
+              <Pressable style={s.resumeBtn} disabled={onl.busy} onPress={() => resumeOnline(resRoom.code)} accessibilityLabel="Reprendre la partie en ligne">
+                <Text style={s.resumeTitle}>▶ Reprendre la partie en ligne</Text>
+                <Text style={s.resumeSub}>Salon {resRoom.code}</Text>
+              </Pressable>
+              <Pressable onPress={() => { clearRoom(); bump((n) => n + 1); }} style={s.link}><Text style={s.linkTxt}>Oublier</Text></Pressable>
+            </View>
+          )}
+          {resLocal && (
+            <View style={s.resume}>
+              <Pressable style={s.resumeBtn} onPress={resumeLocal} accessibilityLabel="Reprendre la partie en cours">
+                <Text style={s.resumeTitle}>▶ Reprendre la partie en cours</Text>
+                <Text style={s.resumeSub}>{resLocal.mode === 'solo' ? '🤖 Contre des machines' : '📱 Un téléphone'} · {resLocal.game.completed}/50 missions · {resLocal.game.players} joueurs</Text>
+              </Pressable>
+              <Pressable onPress={() => { clearLocal(); bump((n) => n + 1); }} style={s.link}><Text style={s.linkTxt}>Abandonner</Text></Pressable>
+            </View>
+          )}
 
           <Text style={s.label}>Ton prénom</Text>
           <TextInput value={myName} onChangeText={(v) => { setMyName(v); try { localStorage.setItem('50m-name', v); } catch { /* sans stockage */ } }}
@@ -588,7 +641,7 @@ export default function App() {
               <Text style={s.quitTxt}>Remplacer {sd.name} par une machine</Text>
             </Pressable>
           ) : null))}
-          <Pressable onPress={quit} style={s.quit}><Text style={s.quitTxt}>Quitter la partie</Text></Pressable>
+          <Pressable onPress={quit} style={s.quit}><Text style={s.quitTxt}>Quitter (tu pourras reprendre)</Text></Pressable>
         </View>
       )}
     </SafeAreaView>
@@ -684,6 +737,10 @@ const s = StyleSheet.create({
   err: { color: '#fca5a5', textAlign: 'center' },
   input: { backgroundColor: '#1e293b', color: '#f8fafc', borderRadius: 12, padding: 14, fontSize: 18, fontWeight: '700', textAlign: 'center' },
   codeInput: { width: 130, letterSpacing: 6 },
+  resume: { gap: 2, alignItems: 'center' },
+  resumeBtn: { alignSelf: 'stretch', backgroundColor: '#16a34a', borderRadius: 14, padding: 14, alignItems: 'center', gap: 2 },
+  resumeTitle: { color: '#fff', fontSize: 18, fontWeight: '900' },
+  resumeSub: { color: '#dcfce7', fontSize: 13, fontWeight: '600' },
   quit: { alignSelf: 'center', padding: 10 },
   quitTxt: { color: '#94a3b8', textDecorationLine: 'underline' },
 });

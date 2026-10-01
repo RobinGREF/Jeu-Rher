@@ -34,6 +34,10 @@
 - Débutants : permis de regarder sous les 4 cartes exposées (cartes déjà jouées).
 - Super-pros : aucune communication.
 
+## Quitter et reprendre
+- Contre des machines ou à plusieurs sur un téléphone : la partie est sauvegardée sur l’appareil à chaque coup ; l’accueil propose « Reprendre la partie en cours » (ou « Abandonner »). Oubliée après 3 jours ou à la fin de la partie.
+- En ligne : l’accueil propose « Reprendre la partie en ligne » (code du salon). Si l’hôte quitte, la partie est reprise à son retour ; les autres peuvent le remplacer par une machine.
+
 ## Variante « 50 Missions de folie »
 - Temps limité de 5 minutes, sans ordre de jeu (chacun joue quand il veut).
 - À la médaille d'or : timer remis à 5 min. Puis essayer en 4 min, puis 3 min.
