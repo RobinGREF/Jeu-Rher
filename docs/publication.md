@@ -34,3 +34,6 @@ Réglages : dossier de départ `app`, commande `npm ci && npx expo export --plat
 Tous les jeux vivent dans ce dépôt : `app/` (50 Missions, → `/50-missions/`) et `combat/` (Famille Fight / Rumble Fighter, site statique, → `/famille-fight/`). Duel de savoir : à ajouter quand son code sera dans le dépôt (dossier + ligne d'assemblage dans le workflow + `url` dans `hub/games.json`).
 
 Les petits jeux solo (Duel de savoir, Mémo des paires) vivent dans `solo/` : un seul projet Expo, construit une fois par jeu (`EXPO_PUBLIC_GAME=duel|memo`) et servi sous `/duel-de-savoir/` et `/memo/`. Pour un nouveau jeu solo : ajouter son dossier dans `solo/src/`, un cas dans `solo/App.tsx`, une entrée dans la boucle du workflow, et une ligne dans `hub/games.json`.
+
+## Jeux installables
+Chaque jeu est installable (« Ajouter à l'écran d'accueil ») avec son icône : `hub/pwa.sh <dossier> <id> <nom> <couleur>` ajoute le manifeste et les icônes (`hub/icons/<id>-192.png` / `-512.png`) et les liens dans le `index.html` du jeu ; le workflow l'appelle pour chaque jeu. Nouveau jeu : ses deux icônes dans `hub/icons/`, une ligne dans le workflow. La page d'accueil affiche les jeux en grille de logos carrés (2 par ligne).
