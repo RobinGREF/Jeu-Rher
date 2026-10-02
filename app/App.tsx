@@ -6,7 +6,7 @@ import {
   syncBotAnnouncements, setPass, unanswered, syncBotSignals, toggleSignal, tops,
   type GameState, type SignalKind,
 } from './src/engine';
-import { Celebration, CELEBRATION_MS, type Celebrate } from './src/Celebration';
+import { Celebration, celebrationMs, type Celebrate } from './src/Celebration';
 import { InfoPanel } from './src/InfoPanel';
 import { ScoreBoard, type SharedScores } from './src/ScoreBoard';
 import { addScore, cleanName, clearScores, loadScores, saveScores, type ScoreEntry } from './src/scores';
@@ -202,7 +202,7 @@ export default function App() {
 
   useEffect(() => {
     if (!party) return;
-    const id = setTimeout(() => setParty((cur) => (cur && cur.key === party.key ? null : cur)), CELEBRATION_MS);
+    const id = setTimeout(() => setParty((cur) => (cur && cur.key === party.key ? null : cur)), celebrationMs(party));
     return () => clearTimeout(id);
   }, [party]);
 
