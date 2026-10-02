@@ -23,6 +23,7 @@ import { setMusic } from './src/music';
 import { BOT_NAMES, shortName } from './src/names';
 import { TvScreen } from './src/TvScreen';
 import { clearLocal, clearRoom, loadLocal, loadRoom, saveLocal, saveRoom } from './src/resume';
+import { reloadFresh } from './src/reload';
 
 type Mode = 'solo' | 'together' | 'online';
 type Screen = 'home' | 'together' | 'settings' | 'tv' | 'machines';
@@ -467,6 +468,7 @@ export default function App() {
           <View style={s.row}>
             <Pressable onPress={openScores} style={s.link}><Text style={s.linkTxt}>🏆 Meilleurs scores</Text></Pressable>
             <Pressable onPress={() => setScreen('settings')} style={s.link}><Text style={s.linkTxt}>⚙️ Réglages</Text></Pressable>
+            <Pressable onPress={reloadFresh} style={s.link} accessibilityLabel="Recharger la dernière version du jeu"><Text style={s.linkTxt}>↻ Mettre à jour</Text></Pressable>
           </View>
         </ScrollView>
       </SafeAreaView>

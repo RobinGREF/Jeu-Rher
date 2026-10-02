@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { reloadFresh } from '../reload';
 import { loadJson, saveJson } from '../storage';
 import { flip, hide, isDone, LEVELS, mismatch, newMemo, stars, type Level, type Memo } from './engine';
 
@@ -45,7 +46,7 @@ export function MemoGame({ onHome }: { onHome: () => void }) {
         <Text style={s.topTxt}>{memo ? '← Niveaux' : '← Jeux'}</Text>
       </Pressable>
       <Text style={s.topTitle}>Mémo des paires</Text>
-      <View style={s.topBtn} />
+      <Pressable onPress={reloadFresh} style={[s.topBtn, { alignItems: 'flex-end' }]} accessibilityLabel="Recharger la dernière version du jeu"><Text style={s.topTxt}>↻</Text></Pressable>
     </View>
   );
 
