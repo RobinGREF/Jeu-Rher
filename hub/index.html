@@ -29,6 +29,7 @@
   .d, .btn { display:none; }
   .soon { opacity:.55; } .soon .icon { filter:grayscale(.7); }
   .soon .t::after { content:" · bientôt"; font-weight:400; color:var(--dim); font-size:13px; }
+  .reload { display:block; margin:18px auto 0; padding:10px 18px; border-radius:12px; border:1px solid #475569; background:transparent; color:var(--fg); font:600 15px inherit; font-family:inherit; }
   footer { margin-top:28px; text-align:center; color:var(--dim); font-size:13px; }
 </style>
 </head>
@@ -37,6 +38,7 @@
   <h1>🎲 Jeu des vacances</h1>
   <p class="sub">Mes jeux, au même endroit</p>
   <ul id="liste"><li class="d" style="text-align:center">Chargement…</li></ul>
+  <button class="reload" id="reload" type="button">↻ Tout recharger (dernières versions)</button>
   <footer>La liste s'allonge au fil des jeux.</footer>
 </main>
 <script>
@@ -51,6 +53,14 @@
     }).join('');
   }).catch(() => { document.getElementById('liste').innerHTML = '<li class="d" style="text-align:center">Liste indisponible.</li>'; });
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  // Oublie les copies gardées par le navigateur (service worker, caches) puis recharge l'accueil avec une adresse neuve.
+  document.getElementById('reload').addEventListener('click', async () => {
+    try {
+      if ('serviceWorker' in navigator) await Promise.all((await navigator.serviceWorker.getRegistrations()).map((r) => r.unregister()));
+      if (window.caches) await Promise.all((await caches.keys()).map((k) => caches.delete(k)));
+    } catch (e) { /* on recharge quand même */ }
+    const u = new URL(location.href); u.searchParams.set('v', Date.now()); location.replace(u.toString());
+  });
 </script>
 </body>
 </html>

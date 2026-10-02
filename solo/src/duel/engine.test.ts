@@ -19,7 +19,11 @@ test('la banque est cohérente : 20 catégories, 4 propositions, une bonne répo
       assert.equal(new Set(q.choices).size, 4, q.q);
     }
   }
-  assert.equal(Object.values(QUESTIONS).flat().length, 744);
+  assert.equal(Object.values(QUESTIONS).flat().length, 1176);
+  // 432 questions difficiles : le nombre d'origine a été doublé dans chaque catégorie.
+  assert.equal(Object.values(QUESTIONS).flat().filter((q) => q.diff === 'difficile').length, 864);
+  const texts = Object.values(QUESTIONS).flat().map((q) => q.q);
+  assert.equal(new Set(texts).size, texts.length, 'aucune question en double');
 });
 
 test('le tirage ne répète pas avant épuisement, puis recommence un cycle', () => {
