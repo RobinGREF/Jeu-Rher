@@ -469,7 +469,9 @@ async function onlineCreate() {
     let code = randCode();
     for (let t = 0; t < 10 && (await be.get(`combat/rooms/${code}/meta`)); t++) code = randCode();
     const base = `combat/rooms/${code}`;
-    await be.set(base + '/meta', { hostUid: uid, char: G.picks[0], stage: G.stageIdx, at: Date.now() });
+    const meta = { hostUid: uid, char: G.picks[0], stage: G.stageIdx, at: Date.now() };
+    await be.set(base + '/meta', meta);
+    if (!(await be.get(base + '/meta'))) throw new Error('Le salon n\'a pas pu être enregistré.');
     const net = G.net = { be, uid, code, base, side: 0, isHost: true, guest: null, rtts: [], sent: {}, pingN: 0, unsubs: [], timers: [] };
     net.unsubs.push(be.onValue(base + '/guest', v => {
       const had = !!net.guest; net.guest = v;
@@ -481,6 +483,8 @@ async function onlineCreate() {
     }));
     net.timers.push(setInterval(() => {
       const k = ++net.pingN; net.sent[k] = performance.now(); be.set(base + '/net/ping', { n: k }).catch(() => {});
+      // le salon doit rester là tant que l'hôte est dans le jeu : on le recrée s'il a disparu
+      if (k % 5 === 0) be.get(base + '/meta').then(m => { if (!m && G.net === net) be.set(base + '/meta', meta); }).catch(() => {});
     }, 900));
     G.netMsg = '';
   } catch (e) { netErr(e); leaveOnline('online'); }
@@ -490,8 +494,9 @@ async function onlineJoin(code) {
   try {
     const { be, uid } = await netConnect();
     const base = `combat/rooms/${code}`;
-    const meta = await be.get(base + '/meta');
-    if (!meta) throw new Error('Salon introuvable : vérifie le code.');
+    let meta = await be.get(base + '/meta');
+    for (let t = 0; !meta && t < 3; t++) { await new Promise(r => setTimeout(r, 900)); meta = await be.get(base + '/meta'); }
+    if (!meta) throw new Error('Salon ' + code + ' introuvable : vérifie le code, et que l\'hôte est bien dans son salon.');
     const g = await be.get(base + '/guest');
     if (g && g.uid !== uid) throw new Error('Ce salon est déjà complet.');
     G.net = { be, uid, code, base, side: 1, isHost: false, meta, unsubs: [], timers: [], lastStartId: null, t0: performance.now() };
