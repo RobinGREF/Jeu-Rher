@@ -22,6 +22,7 @@
   #tk{right:2vw;bottom:calc(var(--b) + var(--s)*0.9 + var(--g));background:rgba(47,110,214,.5)!important}
   #ts{right:calc(2vw + var(--s)*0.5 + var(--g)/2);bottom:calc(var(--b) + var(--s)*2 + var(--g)*2);background:rgba(230,160,20,.55)!important}
   #tpause{right:8px;top:8px;width:40px!important;height:40px!important;font-size:14px!important}
+  #codeIn{display:none;position:fixed;left:50%;top:44%;transform:translate(-50%,-50%);width:min(260px,70vw);font:900 clamp(30px,8vw,48px) Impact,'Arial Black',sans-serif;letter-spacing:.3em;text-align:center;text-transform:uppercase;color:#ffd23f;background:rgba(0,0,0,.75);border:3px solid #ffd23f;border-radius:12px;padding:6px 0 6px .3em;outline:none;z-index:6}
 </style>
 </head>
 <body>
@@ -33,7 +34,10 @@
   <button id="tp" data-a="KeyJ">POING</button><button id="tk" data-a="KeyK">PIED</button><button id="ts" data-a="KeyL">SPÉCIAL</button>
   <button id="tpause" data-a="KeyP">II</button>
 </div>
+<input id="codeIn" type="text" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Code du salon">
 <script src="js/data.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/online.js"></script>
 <script src="js/game.js"></script>
 </body>
 </html>

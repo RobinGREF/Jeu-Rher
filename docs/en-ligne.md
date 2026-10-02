@@ -77,3 +77,20 @@ La bonne réponse n'est publiée qu'une fois la question jouée. L'hôte fait to
 La configuration Firebase vient de `solo/.env` (mêmes valeurs publiques que `app/.env`). Pour essayer sans Firebase, deux onglets d'un même navigateur : construire avec `EXPO_PUBLIC_ONLINE_BACKEND=local`.
 
 Limites : si l'hôte recharge la page ou la ferme, la partie s'arrête (pas de reprise comme dans 50 Missions) ; un joueur qui part en cours de route bloque son tour tant qu'il n'est pas revenu.
+
+
+## Famille Fight en ligne (jeu de combat)
+
+Famille Fight (dossier `combat/`) utilise le même projet Firebase, dans son propre nœud `combat/rooms/<code>` (les salons des autres jeux ne sont pas touchés). Page : **EN LIGNE** dans le menu → *Créer un salon* (on choisit son combattant puis le décor, et on reçoit un code à 4 lettres) ou *Rejoindre un salon* (on tape le code, puis on choisit son combattant). L'hôte lance le combat quand l'adversaire est là ; ensuite revanche (ENTRÉE) ou retour au salon (ÉCHAP). Deux joueurs par salon.
+
+**Principe : les deux appareils calculent le même combat.** Ils n'échangent que leurs touches, image par image, avec un petit retard d'entrée (5 à 16 images, calculé d'après la latence mesurée dans le salon) pour laisser le temps au réseau. Aucun joueur n'est « l'hôte du calcul » : personne n'a l'avantage. Si les touches de l'adversaire n'arrivent pas, le jeu attend (« Connexion lente… ») ; après 10 secondes sans nouvelles, le combat s'arrête.
+
+Données écrites : `meta` (créateur, personnage, décor), `guest` (l'adversaire et son personnage), `start` (lancement du combat), `net/ping` et `net/pong` (mesure de latence), `in/h` et `in/g` (les dernières touches de chaque joueur, une petite chaîne qui se remplace). Le salon est supprimé quand l'hôte part.
+
+⚠️ **Il faut republier les règles** : Firebase → Realtime Database → Règles → coller le contenu de `app/firebase.rules.json` → Publier. Sans cela, créer ou rejoindre un salon de Famille Fight échoue (accès refusé).
+
+La configuration Firebase vient de `combat/js/firebase-config.js` (mêmes valeurs publiques que `app/.env`). Le SDK Firebase est chargé à la demande, seulement quand on choisit EN LIGNE.
+
+Pour essayer sans Firebase : ouvrir le jeu avec `?online=local` à la fin de l'adresse dans **deux onglets** du même navigateur (l'un crée, l'autre rejoint avec le code).
+
+Limites : 2 joueurs ; le code (4 lettres) n'est pas un secret fort (il donne accès au salon) ; les deux joueurs doivent avoir le même navigateur « moteur » pour que les calculs soient identiques (Chrome, Safari et Firefox récents conviennent) ; pas de reprise si quelqu'un recharge la page en plein combat.

@@ -88,7 +88,7 @@ const keys = {};
 let savedDiff = 1;
 try { savedDiff = parseInt(localStorage.getItem('rf_diff'), 10); } catch (e) {}
 const G = {
-  scene: 'title', menuIdx: 0, showControls: false, mode: 1, difficulty: (savedDiff >= 0 && savedDiff < CFG.difficulties.length) ? savedDiff : 1,
+  scene: 'title', menuIdx: 0, showControls: false, mode: 1, online: false, onlineIdx: 0, net: null, netMsg: '', difficulty: (savedDiff >= 0 && savedDiff < CFG.difficulties.length) ? savedDiff : 1,
   sel: { cursor: 0, step: 0 }, picks: [0, 1], stageCursor: 0, stageIdx: 0,
   match: null, clickables: [], hover: null, t: 0, mouse: { x: -1, y: -1 }
 };
@@ -361,6 +361,216 @@ function aiThink(f, o) {
   }
 }
 
+
+/* ---------------------------------------------------------------- en ligne (synchronisation image par image)
+ * Les deux appareils calculent exactement le même combat ; ils n'échangent que leurs touches.
+ * Chaque touche est appliquée avec un petit retard (D images) pour laisser le temps au réseau.
+ * Si les touches de l'adversaire manquent, le jeu attend (« Connexion lente… »). */
+const BTN = { KeyJ: 16, KeyF: 16, KeyK: 32, KeyG: 32, KeyL: 64, KeyH: 64 };
+let pendingBtn = 0;
+function noteBtn(code) { if (BTN[code]) pendingBtn |= BTN[code]; }
+const hex2 = n => (n < 16 ? '0' : '') + n.toString(16);
+const median = a => { const b = a.slice().sort((x, y) => x - y); return b.length ? b[Math.floor(b.length / 2)] : 0; };
+const netErr = e => { G.netMsg = (e && e.message) || String(e); };
+
+function sampleLocalBits() {
+  const i = humanInput(0), K = keys;
+  let b = (i.left ? 1 : 0) | (i.right ? 2 : 0) | (i.up ? 4 : 0) | (i.down ? 8 : 0);
+  if (K.KeyJ || K.KeyF) b |= 16;
+  if (K.KeyK || K.KeyG) b |= 32;
+  if (K.KeyL || K.KeyH) b |= 64;
+  b |= pendingBtn; pendingBtn = 0;
+  return b;
+}
+function netSend(m) {
+  const n = m.net, hi = n.sampled, lo = Math.max(0, hi - 23);
+  let str = '';
+  for (let i = lo; i <= hi; i++) str += hex2(n.local[i] || 0);
+  G.net.be.set(G.net.base + '/in/' + 'hg'[n.side], { id: n.id, f: hi, s: str }).catch(() => {});
+}
+function netIngest(n, v) {
+  if (!v || v.id !== n.id || typeof v.s !== 'string') return;
+  n.lastRecv = performance.now();
+  const len = v.s.length >> 1;
+  for (let k = 0; k < len; k++) {
+    const fr = v.f - len + 1 + k;
+    if (fr >= 0 && n.remote[fr] === undefined) n.remote[fr] = parseInt(v.s.substr(2 * k, 2), 16) || 0;
+  }
+}
+function netPrepare(m) {
+  const n = m.net, bits = sampleLocalBits();
+  n.local[n.F + n.D] = bits; n.sampled = n.F + n.D;
+  if (n.F % 2 === 0 || bits !== n.lastBits) netSend(m);
+  n.lastBits = bits;
+  const per = [0, 0];
+  per[n.side] = n.local[n.F] || 0; per[1 - n.side] = n.remote[n.F] || 0;
+  for (let i = 0; i < 2; i++) {
+    const f = m.f[i], b = per[i];
+    f.inp = { left: !!(b & 1), right: !!(b & 2), up: !!(b & 4), down: !!(b & 8) };
+    if ((b & 16) && !(n.prev[i] & 16)) f.buf.punch = 6;
+    if ((b & 32) && !(n.prev[i] & 32)) f.buf.kick = 6;
+    if ((b & 64) && !(n.prev[i] & 64)) f.buf.special = 6;
+    n.prev[i] = b;
+  }
+}
+function updateFight() {
+  const m = G.match, n = m.net;
+  if (!n) { simFrame(); return; }
+  if (n.remote[n.F] === undefined) {
+    n.stall++;
+    if (n.stall % 8 === 1) netSend(m);
+    if (performance.now() - n.lastRecv > 10000) netPeerLost();
+    return;
+  }
+  n.stall = 0;
+  netPrepare(m);
+  simFrame();
+  n.F++;
+}
+
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+const randCode = () => Array.from({ length: 4 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
+
+function stopMatchNet() {
+  if (G.net && G.net.matchUnsub) { G.net.matchUnsub(); G.net.matchUnsub = null; }
+  G.match = null;
+}
+function leaveOnline(toScene) {
+  const net = G.net;
+  if (net) {
+    net.unsubs.forEach(u => u()); net.timers.forEach(clearInterval);
+    if (net.matchUnsub) net.matchUnsub();
+    // chaque joueur ne peut effacer que ce qui lui appartient (règles Firebase)
+    const mine = net.isHost ? ['meta', 'guest', 'start', 'net/ping', 'in/h'] : ['guest', 'net/pong', 'in/g'];
+    mine.forEach(k => { try { net.be.remove(net.base + '/' + k).catch(() => {}); } catch (e) { /* ignoré */ } });
+  }
+  G.net = null; G.online = false; G.match = null; showCodeInput(false);
+  G.scene = toScene || 'title';
+}
+function hostBackToLobby(msg) {
+  stopMatchNet();
+  if (G.net) { G.net.be.remove(G.net.base + '/start').catch(() => {}); }
+  if (msg) G.netMsg = msg;
+  G.scene = 'lobby';
+}
+function netPeerLost() {
+  if (G.net && G.net.isHost) hostBackToLobby('Connexion perdue avec ton adversaire.');
+  else { netErr(new Error('Connexion perdue avec l\'hôte.')); leaveOnline('online'); }
+}
+
+async function netConnect() {
+  const be = await Online.makeBackend();
+  return { be, uid: await be.uid() };
+}
+async function onlineCreate() {
+  G.netMsg = 'Connexion…'; G.net = null; G.scene = 'lobby';
+  try {
+    const { be, uid } = await netConnect();
+    let code = randCode();
+    for (let t = 0; t < 10 && (await be.get(`combat/rooms/${code}/meta`)); t++) code = randCode();
+    const base = `combat/rooms/${code}`;
+    await be.set(base + '/meta', { hostUid: uid, char: G.picks[0], stage: G.stageIdx, at: Date.now() });
+    const net = G.net = { be, uid, code, base, side: 0, isHost: true, guest: null, rtts: [], sent: {}, pingN: 0, unsubs: [], timers: [] };
+    be.removeOnDisconnect(base + '/meta');
+    net.unsubs.push(be.onValue(base + '/guest', v => {
+      const had = !!net.guest; net.guest = v;
+      if (v && !had) { be.remove(base + '/start').catch(() => {}); sfx('ok'); }
+      if (had && !v) { if (G.scene === 'fight') hostBackToLobby('Ton adversaire est parti.'); else G.netMsg = 'Ton adversaire est parti.'; }
+    }, netErr));
+    net.unsubs.push(be.onValue(base + '/net/pong', v => {
+      if (v && net.sent[v.n]) { net.rtts.push(performance.now() - net.sent[v.n]); if (net.rtts.length > 6) net.rtts.shift(); }
+    }));
+    net.timers.push(setInterval(() => {
+      const k = ++net.pingN; net.sent[k] = performance.now(); be.set(base + '/net/ping', { n: k }).catch(() => {});
+    }, 900));
+    G.netMsg = '';
+  } catch (e) { netErr(e); leaveOnline('online'); }
+}
+async function onlineJoin(code) {
+  G.netMsg = 'Connexion…';
+  try {
+    const { be, uid } = await netConnect();
+    const base = `combat/rooms/${code}`;
+    const meta = await be.get(base + '/meta');
+    if (!meta) throw new Error('Salon introuvable : vérifie le code.');
+    const g = await be.get(base + '/guest');
+    if (g && g.uid !== uid) throw new Error('Ce salon est déjà complet.');
+    G.net = { be, uid, code, base, side: 1, isHost: false, meta, unsubs: [], timers: [], lastStartId: null };
+    G.netMsg = ''; G.online = true; G.mode = 1;
+    G.sel = { cursor: G.picks[0], step: 0 }; G.scene = 'select';
+  } catch (e) { netErr(e); G.scene = 'online'; }
+}
+async function guestReady() {
+  const net = G.net, { be, base, uid } = net;
+  try {
+    await be.set(base + '/guest', { uid, char: G.picks[0] });
+    be.removeOnDisconnect(base + '/guest');
+    net.unsubs.push(be.onValue(base + '/meta', v => {
+      if (!v) { netErr(new Error('L\'hôte a quitté le salon.')); if (G.net === net) leaveOnline('online'); } else net.meta = v;
+    }, netErr));
+    net.unsubs.push(be.onValue(base + '/start', v => {
+      if (G.net !== net) return;
+      if (v && v.id !== net.lastStartId) { net.lastStartId = v.id; startOnlineMatch(v); }
+      else if (!v && G.match && G.match.net) { stopMatchNet(); G.scene = 'lobby'; G.netMsg = 'L\'hôte a quitté le combat.'; }
+    }, netErr));
+    net.unsubs.push(be.onValue(base + '/net/ping', v => { if (v) be.set(base + '/net/pong', { n: v.n }).catch(() => {}); }));
+    G.netMsg = ''; G.scene = 'lobby';
+  } catch (e) { netErr(e); leaveOnline('online'); }
+}
+async function hostLaunch() {
+  const net = G.net;
+  if (!net || !net.isHost || !net.guest || G.scene === 'fight' && G.match && G.match.phase !== 'match') return;
+  const rtt = median(net.rtts);
+  const d = net.rtts.length ? clamp(Math.ceil((rtt / 2 + 25) / (1000 / 60)) + 2, 5, 16) : 8;
+  const st = { id: Date.now(), hostChar: G.picks[0], guestChar: net.guest.char, stage: G.stageIdx, d };
+  try { await net.be.set(net.base + '/start', st); } catch (e) { netErr(e); return; }
+  startOnlineMatch(st);
+}
+function startOnlineMatch(st) {
+  const net = G.net, chars = CFG.characters;
+  if (net.matchUnsub) net.matchUnsub();
+  const ch0 = chars[st.hostChar] || chars[0], ch1 = chars[st.guestChar] || chars[0];
+  const f = [makeFighter(0, ch0, false), makeFighter(1, ch1, false)];
+  const stageIdx = CFG.stages[st.stage] ? st.stage : 0;
+  const n = { id: st.id, D: st.d, F: 0, side: net.side, local: [], remote: [], sampled: st.d - 1, prev: [0, 0], stall: 0, lastRecv: performance.now(), lastBits: 0, quitAt: 0 };
+  for (let i = 0; i < n.D; i++) { n.local[i] = 0; n.remote[i] = 0; }
+  G.stageIdx = stageIdx;
+  G.match = { f, round: 1, proj: [], sparks: [], texts: [], paused: false, winner: -1, stage: CFG.stages[stageIdx], roundMsg: '', net: n };
+  net.matchUnsub = net.be.onValue(net.base + '/in/' + 'hg'[1 - net.side], v => netIngest(n, v));
+  resetRound();
+  G.scene = 'fight'; G.netMsg = '';
+  sfx('start');
+}
+function netQuitPress() {
+  const n = G.match.net, now = performance.now();
+  if (now - n.quitAt < 2000) { if (G.net.isHost) hostBackToLobby(); else leaveOnline('online'); }
+  else n.quitAt = now;
+}
+
+/* code du salon (champ de texte HTML, pour le clavier du téléphone) */
+const codeIn = document.getElementById('codeIn');
+function showCodeInput(show) {
+  if (!codeIn) return;
+  codeIn.style.display = show ? 'block' : 'none';
+  if (show) { codeIn.value = ''; setTimeout(() => codeIn.focus(), 50); } else codeIn.blur();
+}
+function submitCode() {
+  const code = codeIn.value.toUpperCase().replace(/[^A-Z]/g, '');
+  if (code.length !== 4) { G.netMsg = 'Le code a 4 lettres.'; return; }
+  showCodeInput(false); G.scene = 'online'; onlineJoin(code);
+}
+if (codeIn) {
+  codeIn.addEventListener('input', () => {
+    codeIn.value = codeIn.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
+    if (codeIn.value.length === 4) submitCode();
+  });
+  codeIn.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Enter') submitCode();
+    if (e.key === 'Escape') { showCodeInput(false); G.scene = 'online'; }
+  });
+}
+
 /* ---------------------------------------------------------------- boucle de match */
 function endRound() {
   const m = G.match, [a, b] = m.f;
@@ -374,7 +584,7 @@ function endRound() {
   if (a.hp <= 0 || b.hp <= 0) { m.slow = 70; sfx('ko'); }
 }
 
-function updateFight() {
+function simFrame() {
   const m = G.match;
   if (m.paused) return;
   const [a, b] = m.f;
@@ -394,7 +604,7 @@ function updateFight() {
     const f = m.f[i], o = m.f[1 - i];
     if (m.phase !== 'play') { f.inp = { left: false, right: false, up: false, down: false }; f.buf = { punch: 0, kick: 0, special: 0 }; }
     else if (f.cpu) aiThink(f, o);
-    else f.inp = humanInput(i);
+    else if (!m.net) f.inp = humanInput(i);
   }
   updateFighter(a, b); updateFighter(b, a);
   separate(a, b);
@@ -786,7 +996,7 @@ function drawHUD() {
     hg.addColorStop(0, low ? '#ff8a8a' : '#8dff7a'); hg.addColorStop(1, low ? '#c81818' : '#1fa83a');
     ctx.fillStyle = hg; ctx.fillRect(px(w2), by, w2, 22);
     ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(px(w2), by, w2, 6);
-    text(f.ch.name + (f.cpu ? ' (CPU ' + curDiff().name + ')' : ''), left ? bx : bx + bw, by + 42, 20, '#fff', left ? 'left' : 'right');
+    text(f.ch.name + (f.cpu ? ' (CPU ' + curDiff().name + ')' : '') + (m.net && f.side === m.net.side ? ' (TOI)' : ''), left ? bx : bx + bw, by + 42, 20, '#fff', left ? 'left' : 'right');
     // manches gagnées
     for (let i = 0; i < need; i++) {
       const cx = left ? bx + bw - 10 - i * 22 : bx + 10 + i * 22, cy = by + 42;
@@ -816,6 +1026,11 @@ function drawHUD() {
   }
 }
 
+function whoLabel(i) {
+  const m = G.match;
+  if (m.net) return m.f[i].ch.name;
+  return i === 0 ? 'JOUEUR 1' : (m.f[1].cpu ? 'CPU' : 'JOUEUR 2');
+}
 function banner(str, size, color, y) { text(str, W / 2, y || H / 2 - 30, size, color || '#fff'); }
 
 function drawFight() {
@@ -836,17 +1051,22 @@ function drawFight() {
     else { const s = 1 + Math.max(0, 1 - (m.phaseT - 60) / 6) * 0.6; ctx.save(); ctx.translate(W / 2, H / 2 - 30); ctx.scale(s, s); text('COMBATTEZ !', 0, 0, 72, '#ffd23f'); ctx.restore(); }
   } else if (m.phase === 'end') {
     banner(m.banner, 84, m.banner === 'K.O.' ? '#ff4d4d' : '#fff');
-    if (m.phaseT > 50 && m.roundWin >= 0) text((m.roundWin === 0 ? 'JOUEUR 1' : (m.f[1].cpu ? 'CPU' : 'JOUEUR 2')) + ' REMPORTE LE ROUND', W / 2, H / 2 + 40, 26, '#fff');
+    if (m.phaseT > 50 && m.roundWin >= 0) text(whoLabel(m.roundWin) + ' REMPORTE LE ROUND', W / 2, H / 2 + 40, 26, '#fff');
   } else if (m.phase === 'match') {
     ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 0, W, H);
     if (m.winner < 0) banner('MATCH NUL', 80, '#fff', 180);
     else {
       const w = m.f[m.winner];
-      banner((m.winner === 0 ? 'JOUEUR 1' : (w.cpu ? 'CPU' : 'JOUEUR 2')) + ' GAGNE !', 62, '#ffd23f', 130);
+      banner(whoLabel(m.winner) + ' GAGNE !', 62, '#ffd23f', 130);
       text(w.ch.name + ' — ' + w.ch.title, W / 2, 190, 26, '#fff');
       drawFighter(w, W / 2, 420, 1.6);
     }
-    text(isTouch ? 'Touche en bas : rejouer  —  en haut : menu' : 'ENTRÉE : rejouer   —   ÉCHAP : menu', W / 2, H - 40, 22, '#fff');
+    if (m.net) text(G.net.isHost ? (isTouch ? 'Touche en bas : revanche — en haut : salon' : 'ENTRÉE : revanche   —   ÉCHAP : retour au salon') : (isTouch ? 'En attente de l\'hôte — touche en haut : quitter' : 'En attente de la revanche de l\'hôte — ÉCHAP : quitter'), W / 2, H - 40, 20, '#fff');
+    else text(isTouch ? 'Touche en bas : rejouer  —  en haut : menu' : 'ENTRÉE : rejouer   —   ÉCHAP : menu', W / 2, H - 40, 22, '#fff');
+  }
+  if (m.net) {
+    if (m.net.stall > 20) { ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, H / 2 - 40, W, 60); text('Connexion lente…', W / 2, H / 2 - 10, 30, '#ffd23f'); }
+    if (performance.now() - m.net.quitAt < 2000) text(isTouch ? 'Touche II encore pour quitter' : 'Échap encore pour quitter', W / 2, H - 70, 22, '#ff9a9a');
   }
   if (m.paused) {
     ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, W, H);
@@ -869,13 +1089,13 @@ function drawTitle() {
   text('RUMBLE', W / 2, 105 + bob, 104, '#ffd23f');
   text('FIGHTER', W / 2, 190 + bob, 84, '#ff4d4d');
   if (G.showControls) return drawControls();
-  const items = ['1 JOUEUR  (contre l\'ordinateur)', '2 JOUEURS  (même clavier)', '◀ DIFFICULTÉ : ' + curDiff().name + ' ▶', 'COMMANDES'];
+  const items = ['1 JOUEUR  (contre l\'ordinateur)', '2 JOUEURS  (même clavier)', 'EN LIGNE  (salon à code)', '◀ DIFFICULTÉ : ' + curDiff().name + ' ▶', 'COMMANDES'];
   items.forEach((it, i) => {
-    const y = 272 + i * 56, sel = G.menuIdx === i;
-    if (sel) { ctx.fillStyle = 'rgba(255,210,63,0.18)'; rrect(W / 2 - 300, y - 26, 600, 52, 10); ctx.fill(); }
-    text((sel ? '▶ ' : '') + it, W / 2, y, sel ? 32 : 28, sel ? '#ffd23f' : '#fff');
-    clickable(W / 2 - 300, y - 26, 600, 52, () => { G.menuIdx = i; menuConfirm(); });
-    if (i === 2) { clickable(W / 2 - 300, y - 26, 150, 52, () => { G.menuIdx = 2; cycleDiff(-1); }); clickable(W / 2 + 150, y - 26, 150, 52, () => { G.menuIdx = 2; cycleDiff(1); }); }
+    const y = 258 + i * 50, sel = G.menuIdx === i;
+    if (sel) { ctx.fillStyle = 'rgba(255,210,63,0.18)'; rrect(W / 2 - 300, y - 23, 600, 46, 10); ctx.fill(); }
+    text((sel ? '▶ ' : '') + it, W / 2, y, sel ? 30 : 26, sel ? '#ffd23f' : '#fff');
+    clickable(W / 2 - 300, y - 23, 600, 46, () => { G.menuIdx = i; menuConfirm(); });
+    if (i === 3) { clickable(W / 2 - 300, y - 23, 150, 46, () => { G.menuIdx = 3; cycleDiff(-1); }); clickable(W / 2 + 150, y - 23, 150, 46, () => { G.menuIdx = 3; cycleDiff(1); }); }
   });
   plainText('↑ ↓ pour choisir · ENTRÉE pour valider', W / 2, H - 30, 16, 'rgba(255,255,255,0.7)', 'center');
 }
@@ -905,7 +1125,7 @@ function drawSelect() {
   drawBackdrop();
   const chars = CFG.characters, step = G.sel.step;
   text('CHOISIS TON COMBATTANT', W / 2, 44, 42, '#fff');
-  const who = step === 0 ? 'JOUEUR 1' : (G.mode === 1 ? 'ADVERSAIRE (CPU)' : 'JOUEUR 2');
+  const who = G.online ? 'EN LIGNE : TON COMBATTANT' : step === 0 ? 'JOUEUR 1' : (G.mode === 1 ? 'ADVERSAIRE (CPU)' : 'JOUEUR 2');
   text(who, W / 2, 86, 26, step === 0 ? '#ff6b6b' : '#7ad0ff');
   const n = chars.length, cols = Math.min(6, n), rows = Math.ceil(n / cols), cw = 138, gap = 12;
   const big = rows === 1, ch = big ? 220 : 108, fs = big ? 1 : 0.62, y00 = big ? 112 : 100;
@@ -949,6 +1169,71 @@ function badge(x, y, str, col) {
   plainText(str, x + 18, y + 12, 13, '#fff', 'center', 'bold');
 }
 
+function dummyOf(c, face, i) {
+  return { ch: c, state: 'idle', face, anim: G.t + i * 20, y: 0, flash: 0, gauge: 0, stun: 0, atk: null, walkPh: 0, stateT: 0, launched: false, blockCrouch: false };
+}
+function drawOnline() {
+  drawBackdrop();
+  text('JOUER EN LIGNE', W / 2, 80, 56, '#ffd23f');
+  plainText('Chacun joue sur son appareil. Le créateur du salon donne son code de 4 lettres.', W / 2, 135, 17, 'rgba(255,255,255,0.8)', 'center');
+  const items = ['CRÉER UN SALON', 'REJOINDRE UN SALON', 'RETOUR'];
+  items.forEach((it, i) => {
+    const y = 230 + i * 70, sel = G.onlineIdx === i;
+    if (sel) { ctx.fillStyle = 'rgba(255,210,63,0.18)'; rrect(W / 2 - 280, y - 28, 560, 56, 10); ctx.fill(); }
+    text((sel ? '▶ ' : '') + it, W / 2, y, sel ? 34 : 30, sel ? '#ffd23f' : '#fff');
+    clickable(W / 2 - 280, y - 28, 560, 56, () => { G.onlineIdx = i; onlineChoose(); });
+  });
+  if (G.netMsg) text(G.netMsg, W / 2, 460, 22, '#ff9a6b');
+}
+function onlineChoose() {
+  sfx('ok');
+  if (G.onlineIdx === 2) { G.scene = 'title'; return; }
+  G.netMsg = ''; G.mode = 1;
+  if (G.onlineIdx === 0) { G.online = true; G.sel = { cursor: G.picks[0], step: 0 }; G.scene = 'select'; }
+  else { G.scene = 'join'; showCodeInput(true); }
+}
+function drawJoin() {
+  drawBackdrop();
+  text('REJOINDRE UN SALON', W / 2, 90, 52, '#ffd23f');
+  text('Tape le code à 4 lettres', W / 2, 150, 28, '#fff');
+  if (G.netMsg) text(G.netMsg, W / 2, 400, 22, '#ff9a6b');
+  text('‹ RETOUR', 70, 40, 24, '#fff', 'left');
+  clickable(20, 10, 160, 60, () => { showCodeInput(false); G.scene = 'online'; });
+}
+function drawLobby() {
+  drawBackdrop();
+  const net = G.net, chars = CFG.characters;
+  text('SALON EN LIGNE', W / 2, 50, 40);
+  if (!net) { text(G.netMsg || 'Connexion…', W / 2, H / 2, 30, '#ffd23f'); return; }
+  if (net.isHost) {
+    text('CODE', W / 2, 105, 22, '#ddd');
+    text(net.code, W / 2, 168, 90, '#ffd23f');
+    plainText('Donne ce code à ton adversaire (il choisit « Rejoindre un salon »).', W / 2, 224, 16, 'rgba(255,255,255,0.8)', 'center');
+  } else {
+    text('SALON ' + net.code, W / 2, 130, 40, '#ffd23f');
+  }
+  const hostCh = chars[net.isHost ? G.picks[0] : (net.meta && net.meta.char)] || chars[0];
+  const guestIdx = net.isHost ? (net.guest ? net.guest.char : null) : G.picks[0];
+  drawFighter(dummyOf(hostCh, 1, 0), 270, 440, 1.2);
+  text(hostCh.name + (net.isHost ? ' (TOI)' : ''), 270, 470, 22);
+  if (guestIdx !== null && chars[guestIdx]) {
+    drawFighter(dummyOf(chars[guestIdx], -1, 1), 690, 440, 1.2);
+    text(chars[guestIdx].name + (net.isHost ? '' : ' (TOI)'), 690, 470, 22);
+  } else {
+    text('?', 690, 340, 120, 'rgba(255,255,255,0.35)');
+    text('En attente d\'un adversaire…', 690, 470, 20, '#ffd23f');
+  }
+  text('VS', W / 2, 380, 60, '#ff4d4d');
+  if (net.isHost && net.rtts.length) plainText('Latence ≈ ' + Math.round(median(net.rtts)) + ' ms', W / 2, 262, 15, 'rgba(255,255,255,0.7)', 'center');
+  if (net.isHost && net.guest) {
+    text(isTouch ? 'TOUCHE ICI POUR LANCER' : 'ENTRÉE : LANCER LE COMBAT', W / 2, 505, 28, '#7dff9a');
+    clickable(W / 2 - 280, 480, 560, 50, hostLaunch);
+  } else if (!net.isHost) text('En attente du lancement par l\'hôte…', W / 2, 505, 24, '#ffd23f');
+  if (G.netMsg) text(G.netMsg, W / 2, 292, 20, '#ff9a6b');
+  text('‹ QUITTER', 70, 40, 24, '#fff', 'left');
+  clickable(20, 10, 180, 60, () => { leaveOnline('online'); });
+}
+
 function drawStageSelect() {
   drawBackdrop();
   const stages = CFG.stages, n = stages.length + 1;
@@ -979,13 +1264,20 @@ function cycleDiff(d) {
 }
 function menuConfirm() {
   sfx('ok');
-  if (G.menuIdx === 2) { cycleDiff(1); return; }
-  if (G.menuIdx === 3) { G.showControls = true; return; }
+  if (G.menuIdx === 3) { cycleDiff(1); return; }
+  if (G.menuIdx === 4) { G.showControls = true; return; }
+  if (G.menuIdx === 2) { G.onlineIdx = 0; G.netMsg = ''; G.scene = 'online'; return; }
+  G.online = false;
   G.mode = G.menuIdx === 0 ? 1 : 2;
   G.sel = { cursor: G.picks[0], step: 0 }; G.scene = 'select';
 }
 function selectConfirm() {
   sfx('ok');
+  if (G.online) {
+    G.picks[0] = G.sel.cursor;
+    if (G.net && !G.net.isHost) guestReady(); else G.scene = 'stage';
+    return;
+  }
   if (G.sel.step === 0) { G.picks[0] = G.sel.cursor; G.sel.step = 1; G.sel.cursor = G.picks[1]; }
   else { G.picks[1] = G.sel.cursor; G.scene = 'stage'; }
 }
@@ -993,6 +1285,7 @@ function stageConfirm() {
   sfx('ok');
   const n = CFG.stages.length;
   G.stageIdx = G.stageCursor < n ? G.stageCursor : Math.floor(Math.random() * n);
+  if (G.online) { onlineCreate(); return; }
   startMatch();
 }
 function nav(c) {
@@ -1007,11 +1300,21 @@ function onPress(code) {
   const k = nav(code);
   if (G.scene === 'title') {
     if (G.showControls) { if (k.back || k.ok) G.showControls = false; return; }
-    if (k.U) { G.menuIdx = (G.menuIdx + 3) % 4; sfx('menu'); }
-    if (k.D) { G.menuIdx = (G.menuIdx + 1) % 4; sfx('menu'); }
-    if (G.menuIdx === 2 && k.L) cycleDiff(-1);
-    if (G.menuIdx === 2 && k.R) cycleDiff(1);
+    if (k.U) { G.menuIdx = (G.menuIdx + 4) % 5; sfx('menu'); }
+    if (k.D) { G.menuIdx = (G.menuIdx + 1) % 5; sfx('menu'); }
+    if (G.menuIdx === 3 && k.L) cycleDiff(-1);
+    if (G.menuIdx === 3 && k.R) cycleDiff(1);
     if (k.ok) menuConfirm();
+  } else if (G.scene === 'online') {
+    if (k.U) { G.onlineIdx = (G.onlineIdx + 2) % 3; sfx('menu'); }
+    if (k.D) { G.onlineIdx = (G.onlineIdx + 1) % 3; sfx('menu'); }
+    if (k.ok) onlineChoose();
+    if (k.back) { G.scene = 'title'; sfx('menu'); }
+  } else if (G.scene === 'join') {
+    if (k.back) { showCodeInput(false); G.scene = 'online'; }
+  } else if (G.scene === 'lobby') {
+    if (k.ok && G.net && G.net.isHost) hostLaunch();
+    if (k.back) { leaveOnline('online'); sfx('menu'); }
   } else if (G.scene === 'select') {
     const n = CFG.characters.length;
     if (k.L) { G.sel.cursor = (G.sel.cursor + n - 1) % n; sfx('menu'); }
@@ -1019,6 +1322,7 @@ function onPress(code) {
     if (k.D && G.sel.cursor + 6 < n) { G.sel.cursor += 6; sfx('menu'); }
     if (k.U && G.sel.cursor - 6 >= 0) { G.sel.cursor -= 6; sfx('menu'); }
     if (k.ok) selectConfirm();
+    if (k.back && G.online) { leaveOnline('online'); sfx('menu'); return; }
     if (k.back) { if (G.sel.step === 1) { G.sel.step = 0; G.sel.cursor = G.picks[0]; } else G.scene = 'title'; sfx('menu'); }
   } else if (G.scene === 'stage') {
     const n = CFG.stages.length + 1;
@@ -1027,9 +1331,17 @@ function onPress(code) {
     if (k.D && G.stageCursor + 4 < n) { G.stageCursor += 4; sfx('menu'); }
     if (k.U && G.stageCursor - 4 >= 0) { G.stageCursor -= 4; sfx('menu'); }
     if (k.ok) stageConfirm();
-    if (k.back) { G.scene = 'select'; G.sel = { cursor: G.picks[1], step: 1 }; sfx('menu'); }
+    if (k.back && G.online) { G.scene = 'select'; G.sel = { cursor: G.picks[0], step: 0 }; sfx('menu'); }
+    else if (k.back) { G.scene = 'select'; G.sel = { cursor: G.picks[1], step: 1 }; sfx('menu'); }
   } else if (G.scene === 'fight') {
     const m = G.match;
+    if (m.net) {
+      if (m.phase === 'match') {
+        if (code === 'Enter' && G.net.isHost) hostLaunch();
+        else if (code === 'Escape') { if (G.net.isHost) hostBackToLobby(); else leaveOnline('online'); }
+      } else if (code === 'Escape' || code === 'KeyP') netQuitPress();
+      return;
+    }
     if (m.paused) {
       if (code === 'KeyP' || code === 'Enter') m.paused = false;
       else if (code === 'Escape') { G.scene = 'title'; }
@@ -1050,10 +1362,12 @@ function onPress(code) {
 }
 
 window.addEventListener('keydown', e => {
+  if (e.target && e.target.tagName === 'INPUT') return;
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Backspace'].includes(e.code)) e.preventDefault();
   ensureAudio();
   if (e.repeat) return;
   keys[e.code] = true;
+  noteBtn(e.code);
   onPress(e.code);
 });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
@@ -1073,6 +1387,10 @@ cv.addEventListener('pointerdown', e => {
   if (G.scene === 'title' && G.showControls) { G.showControls = false; return; }
   if (G.scene === 'fight') {
     const m = G.match;
+    if (m.net) {
+      if (m.phase === 'match') { if (p.y > H - 80 && G.net.isHost) hostLaunch(); else if (p.y < 60) { if (G.net.isHost) hostBackToLobby(); else leaveOnline('online'); } }
+      return;
+    }
     if (m.phase === 'match') { if (p.y > H - 80) startMatch(); else if (p.y < 60) G.scene = 'title'; return; }
     if (m.paused) { if (p.y > H / 2) G.scene = 'title'; else m.paused = false; return; }
     return;
@@ -1088,9 +1406,9 @@ document.querySelectorAll('#touch button').forEach(b => {
   const down = e => {
     e.preventDefault(); ensureAudio(); b.classList.add('on');
     if (hold) keys[hold] = true;
-    else if (G.scene === 'fight') onPress(tap);
+    else { keys[tap] = true; noteBtn(tap); if (G.scene === 'fight') onPress(tap); }
   };
-  const up = e => { e.preventDefault(); b.classList.remove('on'); if (hold) keys[hold] = false; };
+  const up = e => { e.preventDefault(); b.classList.remove('on'); if (hold) keys[hold] = false; else keys[tap] = false; };
   b.addEventListener('pointerdown', down);
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => b.addEventListener(t, up));
   b.addEventListener('contextmenu', e => e.preventDefault());
@@ -1105,6 +1423,9 @@ function render() {
     case 'select': drawSelect(); break;
     case 'stage': drawStageSelect(); break;
     case 'fight': drawFight(); break;
+    case 'online': drawOnline(); break;
+    case 'join': drawJoin(); break;
+    case 'lobby': drawLobby(); break;
   }
 }
 let last = performance.now(), acc = 0;
@@ -1121,5 +1442,5 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // accès pour le débogage / les tests
-window.__game = { G, startMatch, onPress, keys };
+window.__game = { G, startMatch, onPress, keys, hostLaunch };
 })();

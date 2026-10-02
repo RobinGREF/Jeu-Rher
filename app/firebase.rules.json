@@ -98,6 +98,44 @@
           }
         }
       }
+    },
+    "combat": {
+      "rooms": {
+        "$code": {
+          "meta": {
+            ".read": "auth != null",
+            ".write": "auth != null && ((!data.exists() && newData.child('hostUid').val() === auth.uid) || data.child('hostUid').val() === auth.uid)"
+          },
+          "guest": {
+            ".read": "auth != null",
+            ".write": "auth != null && ((!data.exists() && newData.child('uid').val() === auth.uid) || data.child('uid').val() === auth.uid || root.child('combat').child('rooms').child($code).child('meta').child('hostUid').val() === auth.uid)"
+          },
+          "start": {
+            ".read": "auth != null",
+            ".write": "auth != null && root.child('combat').child('rooms').child($code).child('meta').child('hostUid').val() === auth.uid"
+          },
+          "net": {
+            ".read": "auth != null",
+            "ping": {
+              ".write": "auth != null && root.child('combat').child('rooms').child($code).child('meta').child('hostUid').val() === auth.uid"
+            },
+            "pong": {
+              ".write": "auth != null && root.child('combat').child('rooms').child($code).child('guest').child('uid').val() === auth.uid"
+            }
+          },
+          "in": {
+            ".read": "auth != null",
+            "h": {
+              ".write": "auth != null && root.child('combat').child('rooms').child($code).child('meta').child('hostUid').val() === auth.uid",
+              ".validate": "newData.hasChildren(['id', 'f', 's']) && newData.child('s').isString() && newData.child('s').val().length <= 60"
+            },
+            "g": {
+              ".write": "auth != null && root.child('combat').child('rooms').child($code).child('guest').child('uid').val() === auth.uid",
+              ".validate": "newData.hasChildren(['id', 'f', 's']) && newData.child('s').isString() && newData.child('s').val().length <= 60"
+            }
+          }
+        }
+      }
     }
   }
 }

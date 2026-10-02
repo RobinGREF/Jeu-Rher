@@ -19,5 +19,8 @@ Sur mobile, des boutons tactiles (croix, POING, PIED, SPÉCIAL, pause) apparaiss
 
 Reculer = parer (accroupi pour les coups bas). `P`/Échap = pause. En mode 1 joueur, les deux jeux de touches marchent.
 
+## En ligne
+Menu **EN LIGNE** : un joueur crée un salon et donne son code à 4 lettres, l'autre le rejoint. Chacun joue sur son appareil. Voir `docs/en-ligne.md` (règles Firebase à republier ; test sans Firebase avec `?online=local` dans deux onglets).
+
 ## Personnaliser
 Tout est dans `js/data.js` : ajouter/modifier des personnages (stats, couleurs, coiffure, type de spécial : `fireball`, `dash`, `uppercut`) et des décors (couleurs, plans, ambiance, ou une image `image: 'img/x.png'`).

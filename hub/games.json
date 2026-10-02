@@ -10,7 +10,7 @@
     },
     {
       "titre": "Famille Fight",
-      "description": "Jeu de combat 2D à deux (ou contre l'ordinateur) : poing, pied, spécial, avec les visages de la famille.",
+      "description": "Jeu de combat 2D : poing, pied, spécial, avec les visages de la famille. Contre l'ordinateur, à deux, ou en ligne avec un code de salon.",
       "emoji": "🥊",
       "couleur": "#dc2626",
       "url": "famille-fight/"
