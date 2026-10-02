@@ -23,6 +23,8 @@ export type GameState = {
   canDo: Announce[];
   /** Joueurs qui ont dit « je ne peux pas » pour ce tour (effacé à chaque carte posée). */
   passed: number[];
+  /** Missions réussies par le dernier coup, dans l'ordre (y compris celle piochée puis réussie aussitôt). */
+  justDone?: { def: MissionDef; idx: number }[];
   signals: Signal[];
   completed: number;
   medal: Medal | null;
@@ -88,6 +90,7 @@ function resolveMissions(s: GameState, rng: Rng) {
     const t = tops(s);
     const idx = s.missions.findIndex((m) => m.check(t));
     if (idx === -1) return;
+    (s.justDone ??= []).push({ def: s.missions[idx], idx });
     s.completed++;
     const next = drawMission(s, rng);
     if (next) s.missions[idx] = next;
@@ -130,6 +133,7 @@ export function play(prev: GameState, cardId: number, pile: number, rng: Rng = M
     symbolDeck: [...prev.symbolDeck],
     missions: [...prev.missions],
     missionDeck: [...prev.missionDeck],
+    justDone: [],
     canDo: prev.canDo, // revu plus bas : une annonce que ce coup n'a pas touchée reste en place
     passed: [],
     signals: [...prev.signals],
@@ -359,6 +363,10 @@ export function nextMedal(s: GameState): { medal: Medal; missionsNeeded: number 
 
 /** Missions réussies entre deux états (avec leur place dans la rangée) et nombre total gagné, chaînes comprises. */
 export function completedBetween(before: GameState, after: GameState): { done: { def: MissionDef; idx: number }[]; gained: number } {
+  // Le coup sait lui-même ce qu'il a réussi (deux missions d'affilée : la 2e vient d'être piochée, elle n'était pas dans `before`).
+  if (after.justDone?.length && after.justDone.length === after.completed - before.completed) {
+    return { gained: after.justDone.length, done: after.justDone };
+  }
   return {
     gained: after.completed - before.completed,
     done: before.missions.flatMap((def, idx) => (after.missions.some((m) => m.id === def.id) ? [] : [{ def, idx }])),

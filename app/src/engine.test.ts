@@ -376,11 +376,11 @@ test('missions réussies entre deux états : cohérent avec le compteur, présen
       const { done, gained } = completedBetween(s, r.state);
       coups++;
       assert.ok(gained >= 0);
-      assert.ok(done.length <= gained, 'plus de jetons envolés que de missions gagnées');
-      if (gained > 0) { avecMission++; assert.ok(done.length >= 1); if (done.length < gained) chaines++; }
+      assert.equal(done.length, gained, 'chaque mission réussie est listée, y compris celle piochée puis réussie aussitôt');
+      if (gained > 0) { avecMission++; assert.ok(done.length >= 1); if (done.some((d) => !s.missions.some((m) => m.id === d.def.id))) chaines++; }
       for (const d of done) {
-        assert.ok(s.missions[d.idx].id === d.def.id, 'place dans la rangée');
-        assert.ok(!r.state.missions.some((m) => m.id === d.def.id));
+        assert.ok(d.idx >= 0 && d.idx < 4, 'place dans la rangée');
+        assert.ok(!r.state.missions.some((m) => m.id === d.def.id), 'une mission réussie a quitté le tapis');
       }
       s = r.state;
     }
@@ -499,4 +499,27 @@ test('machines : la nouvelle machine réussit nettement plus de missions que l\'
   };
   const greedy = run(botMoveGreedy), smart = run(botMove);
   assert.ok(smart > greedy * 1.3, `nouvelle ${smart.toFixed(1)} contre ancienne ${greedy.toFixed(1)}`);
+});
+
+test('plusieurs missions réussies d\'affilée par un seul coup : toutes sont listées (dont la mission piochée puis réussie aussitôt)', () => {
+  let multi = 0, chained = 0;
+  for (let seed = 1; seed <= 300; seed++) {
+    const rng = seeded(seed * 31);
+    let s = newGame(3, seeded(seed));
+    let guard = 0;
+    while (!s.over && guard++ < 3000) {
+      const mv = botMove(s, s.current, rng); if (!mv) break;
+      const r = play(s, mv.cardId, mv.pile, rng); if (!r.ok) break;
+      const { done, gained } = completedBetween(s, r.state);
+      assert.equal(done.length, gained, `seed ${seed} : ${gained} missions réussies mais ${done.length} listées`);
+      if (gained >= 2) {
+        multi++;
+        // une mission listée qui n'était pas sur le tapis avant le coup = piochée puis réussie aussitôt
+        if (done.some((d) => !s.missions.some((m) => m.id === d.def.id))) chained++;
+      }
+      s = r.state;
+    }
+  }
+  assert.ok(multi > 0, 'aucun coup à plusieurs missions rencontré');
+  console.log(`   (coups à 2+ missions : ${multi}, dont enchaînés : ${chained})`);
 });

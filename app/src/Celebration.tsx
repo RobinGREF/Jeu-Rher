@@ -111,21 +111,6 @@ function Plus({ n, x, y }: { n: number; x: number; y: number }) {
   );
 }
 
-function Banner({ text, y, small }: { text: string; y: number; small?: boolean }) {
-  const v = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.sequence([
-      Animated.timing(v, { toValue: 1, duration: 300, delay: CONFETTI_AT, easing: Easing.out(Easing.back(2)), useNativeDriver: false }),
-      Animated.timing(v, { toValue: 0, duration: 400, delay: 1500, useNativeDriver: false }),
-    ]).start();
-  }, []);
-  return (
-    <Animated.View style={[s.banner, small && { maxWidth: '88%', paddingVertical: 6, paddingHorizontal: 12 }, { top: y, opacity: v, transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }] }]}>
-      <Text style={small ? s.bannerSmall : s.bannerTxt}>{text}</Text>
-    </Animated.View>
-  );
-}
-
 /** Un écran par mission (puis un pour la médaille) ; chaque écran attend un toucher. */
 function Spotlight({ defs, medal, width, height, onDone }: { defs: MissionDef[]; medal: string | null; width: number; height: number; onDone: () => void }) {
   const slides = defs.length + (medal ? 1 : 0);
@@ -173,7 +158,6 @@ export function Celebration({ c, width, height, tokenSize, rowY, target, onEnd }
     const id = setTimeout(onEnd, TOTAL);
     return () => clearTimeout(id);
   }, [spotDone]); // eslint-disable-line react-hooks/exhaustive-deps
-  const text = c.medal ? `🏅 Médaille ${c.medal} !` : c.gained > 1 ? `🎉 ${c.gained} missions réussies !` : '🎉 Mission réussie !';
   if (!spotDone) {
     return (
       <View style={s.layer}>
@@ -188,9 +172,6 @@ export function Celebration({ c, width, height, tokenSize, rowY, target, onEnd }
         <FlyingToken key={`${c.key}-${def.id}`} def={def} size={tokenSize} tx={target.x} ty={target.y}
           x={16 + idx * (tokenSize + gap) + tokenSize / 2} y={rowY + tokenSize / 2} />
       ))}
-      <Banner key={`b${c.key}`} text={text} y={rowY + tokenSize + 34} />
-      {/* Ce qui a été validé, en toutes lettres : pour pouvoir vérifier. */}
-      <Banner key={`l${c.key}`} small text={c.done.map(({ def }) => def.label).join('\n')} y={rowY + tokenSize + 90} />
       <Plus key={`p${c.key}`} n={c.gained} x={target.x} y={target.y + 6} />
     </View>
   );
@@ -206,7 +187,4 @@ const s = StyleSheet.create({
   spotLabel: { color: '#fff', fontSize: 20, fontWeight: '800', textAlign: 'center', paddingHorizontal: 8 },
   glow: { borderRadius: 999, shadowColor: '#fde047', shadowOpacity: 1, shadowRadius: 16, shadowOffset: { width: 0, height: 0 }, elevation: 12 },
   plus: { position: 'absolute', width: 48, textAlign: 'center', color: '#fde047', fontSize: 22, fontWeight: '900', textShadowColor: '#000', textShadowRadius: 4 },
-  banner: { position: 'absolute', alignSelf: 'center', backgroundColor: '#f59e0b', borderRadius: 16, paddingVertical: 10, paddingHorizontal: 20, borderWidth: 3, borderColor: '#fef3c7' },
-  bannerSmall: { color: '#111827', fontSize: 13, fontWeight: '800', textAlign: 'center' },
-  bannerTxt: { color: '#111827', fontSize: 20, fontWeight: '900' },
 });
