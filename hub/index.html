@@ -43,6 +43,7 @@
         : `<li><div class="app soon" style="--c:${c}">${inner}<span class="btn">Bientôt</span></div></li>`;
     }).join('');
   }).catch(() => { document.getElementById('liste').innerHTML = '<li class="d" style="text-align:center">Liste indisponible.</li>'; });
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
 </body>
 </html>
