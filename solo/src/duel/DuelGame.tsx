@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { SafeAreaView, ScrollView, Pressable, Text, TextInput, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { reloadFresh } from '../reload';
+import { clearRoomParam, roomFromUrl } from '../share';
+import { ShareRoom } from '../ShareRoom';
 import { loadJson, removeKey, saveJson } from '../storage';
 import { Board } from './Board';
 import { CatPicker } from './CatPicker';
@@ -79,7 +81,8 @@ function Shell({ onHome, onRules, children }: { onHome: () => void; onRules: () 
 
 export function DuelGame({ onHome }: { onHome: () => void }) {
   const saved = useMemo(() => loadJson<{ game: Game } | null>(KEY_SAVE, null), []);
-  const [screen, setScreen] = useState<Screen>('menu');
+  const invite = useMemo(() => roomFromUrl(), []); // lien d'invitation (?salle=CODE) : on arrive directement sur le salon
+  const [screen, setScreen] = useState<Screen>(invite ? 'online' : 'menu');
   const [flow, setFlow] = useState<Flow | null>(null);
   const [count, setCount] = useState(2);
   const [names, setNames] = useState<string[]>(() => {
@@ -136,7 +139,7 @@ export function DuelGame({ onHome }: { onHome: () => void }) {
   }
 
   if (screen === 'online') {
-    return shell(<Online onl={onl} onBack={() => { onl.leave(); setScreen('menu'); }} onHome={onHome} />);
+    return shell(<Online invite={invite} onl={onl} onBack={() => { onl.leave(); setScreen('menu'); }} onHome={onHome} />);
   }
 
   return shell(
@@ -168,9 +171,15 @@ export function DuelGame({ onHome }: { onHome: () => void }) {
 }
 
 /** Partie en ligne : créer ou rejoindre un salon, attendre les joueurs, jouer. */
-function Online({ onl, onBack, onHome }: { onl: ReturnType<typeof useDuelOnline>; onBack: () => void; onHome: () => void }) {
+function Online({ invite, onl, onBack, onHome }: { invite: string | null; onl: ReturnType<typeof useDuelOnline>; onBack: () => void; onHome: () => void }) {
   const [name, setName] = useState(() => loadJson<string>(KEY_NAME, ''));
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(invite ?? '');
+  const [pending, setPending] = useState(invite); // invitation pas encore utilisée
+  // Invitation : avec un prénom déjà enregistré, on rejoint tout de suite ; sinon on le demande (le code est pré-rempli).
+  useEffect(() => {
+    if (!pending || !onl.kind || !name.trim()) return;
+    setPending(null); clearRoomParam(); onl.join(pending, name);
+  }, [pending, onl.kind]); // eslint-disable-line react-hooks/exhaustive-deps
   const [pick, setPick] = useState(false); // l'hôte choisit les catégories
   const snap = onl.snap;
   const rec = useRecord(snap?.view?.flow ?? null);
@@ -192,13 +201,14 @@ function Online({ onl, onBack, onHome }: { onl: ReturnType<typeof useDuelOnline>
     return (
       <>
         <Text style={s.title}>🌐 En ligne</Text>
+        {!!pending && <Text style={s.text}>👋 Invitation au salon {pending} : saisis ton prénom puis touche « Rejoindre ».</Text>}
         <Text style={s.label}>Ton prénom</Text>
         <TextInput value={name} onChangeText={remember} placeholder="Robin" placeholderTextColor="#8b93a7" maxLength={14} style={s.input} accessibilityLabel="Ton prénom" />
         <Btn label="Créer une partie" disabled={onl.busy} onPress={() => onl.create(name)} />
         <View style={s.row}>
           <TextInput value={code} onChangeText={(v) => setCode(normalizeCode(v))} placeholder="CODE" placeholderTextColor="#8b93a7" autoCapitalize="characters"
             maxLength={4} style={[s.input, s.codeInput]} accessibilityLabel="Code du salon" />
-          <Btn kind="ghost" label="Rejoindre" disabled={onl.busy || code.length !== 4} onPress={() => onl.join(code, name)} />
+          <Btn kind="ghost" label="Rejoindre" disabled={onl.busy || code.length !== 4} onPress={() => { setPending(null); clearRoomParam(); onl.join(code, name); }} />
         </View>
         {!!onl.error && <Text style={s.err}>{onl.error}</Text>}
         {onl.kind === 'local' && <Text style={s.muted}>Test local : les autres joueurs sont les autres onglets de ce navigateur.</Text>}
@@ -240,7 +250,8 @@ function Online({ onl, onBack, onHome }: { onl: ReturnType<typeof useDuelOnline>
     <>
       <Text style={s.label}>Code du salon</Text>
       <Text style={s.code} accessibilityLabel={`Code du salon ${snap.code}`}>{snap.code}</Text>
-      <Text style={s.muted}>Donne ce code aux autres : ils le tapent dans « Rejoindre ».</Text>
+      <Text style={s.muted}>Envoie l'invitation : le lien ouvre le jeu directement sur ce salon.</Text>
+      <ShareRoom game="Duel de savoir" code={snap.code} />
       <View style={s.card}>
         {snap.players.map((p, i) => <Text key={p.uid} style={s.text}>{i === 0 ? '👑 ' : '• '}{p.name}{p.uid === snap.uid ? ' (toi)' : ''}</Text>)}
       </View>

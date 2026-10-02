@@ -22,6 +22,7 @@ import { alertPlayer, joinedNames } from './src/alerts';
 import { setMusic } from './src/music';
 import { BOT_NAMES, shortName } from './src/names';
 import { TvScreen } from './src/TvScreen';
+import { clearRoomParam, roomFromUrl } from './src/share';
 import { clearLocal, clearRoom, loadLocal, loadRoom, saveLocal, saveRoom } from './src/resume';
 import { reloadFresh } from './src/reload';
 
@@ -83,6 +84,7 @@ export default function App() {
     try { return localStorage.getItem('50m-name') ?? ''; } catch { return ''; }
   });
   const [codeInput, setCodeInput] = useState('');
+  const [invited, setInvited] = useState<string | null>(() => roomFromUrl()); // arrivé par un lien d'invitation (?salle=CODE)
   const onl = useOnline();
   const online = mode === 'online';
   const osnap = online ? onl.snap : null;
@@ -237,6 +239,16 @@ export default function App() {
     }
     seenPlayers.current = osnap.players.map((p) => p.uid);
   }, [online, osnap?.players, osnap?.phase]);
+  // Lien d'invitation : on rejoint directement le salon ; sans prénom enregistré, le code est pré-rempli et on demande le prénom.
+  const inviteDone = useRef(false);
+  useEffect(() => {
+    if (!invited || inviteDone.current) return;
+    setCodeInput(invited);
+    if (onl.kind && myName.trim()) {
+      inviteDone.current = true;
+      setMode('online'); setTv(false); onl.join(invited, myName); setInvited(null); clearRoomParam();
+    }
+  }, [invited, onl.kind]);
   const seenReq = useRef(0);
   useEffect(() => {
     const n = online && osnap?.isHost ? osnap.requests.length : 0;
@@ -408,7 +420,7 @@ export default function App() {
     const resLocal = loadLocal()?.mode === 'solo' ? loadLocal() : null; // l'ancien mode « un téléphone » n'existe plus
     const resRoom = onl.kind ? loadRoom() : null;
     const createOnline = () => { setMode('online'); setTv(false); onl.create(myName); };
-    const joinOnline = () => { setMode('online'); setTv(false); onl.join(codeInput, myName); };
+    const joinOnline = () => { setMode('online'); setTv(false); onl.join(codeInput, myName); if (invited) { setInvited(null); clearRoomParam(); } };
     return (
       <SafeAreaView style={s.root}>
         <StatusBar style="light" />
@@ -416,6 +428,9 @@ export default function App() {
           <Text style={s.title}>50 Missions</Text>
           <Text style={s.sub}>Jeu de cartes coopératif, en ligne avec tes amis</Text>
 
+          {!!invited && (
+            <View style={s.resume}><Text style={s.resumeTitle}>👋 Invitation au salon {invited}</Text><Text style={s.resumeSub}>Saisis ton prénom puis touche « Rejoindre ».</Text></View>
+          )}
           {resRoom && (
             <View style={s.resume}>
               <Pressable style={s.resumeBtn} disabled={onl.busy} onPress={() => resumeOnline(resRoom.code)} accessibilityLabel="Reprendre la partie en ligne">

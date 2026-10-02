@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { ShareRoom } from './ShareRoom';
 import { MAX_PLAYERS, type OnlineSession, type Snapshot } from './online/session';
 
 /** Salon d'attente : le code à partager, les joueurs présents, et pour l'hôte les réglages et le départ. */
@@ -27,6 +28,7 @@ export function Lobby({ snap, session, onLeave, local }: { snap: Snapshot; sessi
         <Text style={s.label}>Code du salon</Text>
         <Text style={s.code} accessibilityLabel={`Code ${snap.code.split('').join(' ')}`}>{snap.code}</Text>
         <Text style={s.sub}>Les autres joueurs saisissent ce code pour te rejoindre.{local ? '\n(Test local : ouvre un autre onglet de ce navigateur.)' : ''}</Text>
+        <ShareRoom game="50 Missions" code={snap.code} />
 
         <Text style={s.label}>Joueurs ({humans}/{MAX_PLAYERS})</Text>
         <View style={s.list}>

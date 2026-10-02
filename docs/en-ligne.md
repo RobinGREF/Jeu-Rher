@@ -94,3 +94,6 @@ La configuration Firebase vient de `combat/js/firebase-config.js` (mêmes valeur
 Pour essayer sans Firebase : ouvrir le jeu avec `?online=local` à la fin de l'adresse dans **deux onglets** du même navigateur (l'un crée, l'autre rejoint avec le code).
 
 Limites : 2 joueurs ; le code (4 lettres) n'est pas un secret fort (il donne accès au salon) ; les deux joueurs doivent avoir le même navigateur « moteur » pour que les calculs soient identiques (Chrome, Safari et Firefox récents conviennent) ; pas de reprise si quelqu'un recharge la page en plein combat.
+
+## Inviter par lien (WhatsApp, SMS…)
+Dans le salon d'attente de chaque jeu en ligne (50 Missions, Duel de savoir), les boutons **📤 Partager / 💬 WhatsApp / ✉️ SMS** envoient une invitation : « Rejoins ma partie de <jeu> ! Code du salon : ABCD » avec un lien du type `https://robingref.github.io/Jeu-Rher/50-missions/?salle=ABCD`. Le lien ouvre **le bon jeu** directement sur le salon : si le prénom est déjà enregistré sur l'appareil, l'invité rejoint tout de suite ; sinon le code est pré-rempli et il tape son prénom puis « Rejoindre ». Un nouveau jeu en ligne reprend `src/share.ts` et `src/ShareRoom.tsx` (copies identiques dans `app/src` et `solo/src`).
