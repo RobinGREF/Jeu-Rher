@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { catInfo, CATEGORY_TARGET, diffInfo, DIFFICULTIES, isCatDone, progressOf, stepGain, TURN_COLORS, wonCount } from './engine';
 import type { Action, Flow } from './flow';
 import { Btn, Pill, s } from './ui';
@@ -9,22 +9,43 @@ import { Wheel } from './Wheel';
  * Le jeu lui-même : affiche l'état du tour et envoie les actions du joueur.
  * `canAct` est faux pour qui regarde jouer un autre (en ligne) : mêmes écrans, sans les boutons.
  */
-/** Une rosace par joueur, avec son nom, son score et ses catégories gagnées : le joueur courant est entouré à sa couleur. */
+/**
+ * Une rosace par joueur, avec son nom, son score et ses catégories gagnées : le joueur courant est entouré à sa couleur.
+ * À partir de trois joueurs, deux cartes restent visibles côte à côte et les autres défilent sur le côté
+ * (la liste se cale d'elle-même sur le joueur dont c'est le tour).
+ */
 function Scores({ game }: { game: Flow['game'] }) {
-  const many = game.players.length > 1;
+  const n = game.players.length;
+  const scrolls = n > 2;
+  const gap = 8;
+  const [width, setWidth] = useState(0);
+  const ref = useRef<ScrollView>(null);
+  const cardW = width > 0 ? (width - gap) / 2 : 150;
+  useEffect(() => {
+    if (scrolls && width > 0) ref.current?.scrollTo({ x: game.current * (cardW + gap), animated: true });
+  }, [scrolls, game.current, width, cardW]);
+
+  const card = (i: number) => {
+    const p = game.players[i];
+    const color = TURN_COLORS[i % TURN_COLORS.length];
+    const now = i === game.current;
+    return (
+      <View key={i} style={[s.pcard, n === 2 && s.pcardHalf, scrolls && { width: cardW }, now && { borderColor: color }]}
+        accessibilityLabel={`${p.name} : ${p.score} points, ${wonCount(game, p)} catégories sur ${game.categories.length}`}>
+        <Text style={[s.pname, { color }]} numberOfLines={1}>{now ? '▶ ' : ''}{p.name}</Text>
+        <Wheel game={game} player={i} size={n > 1 ? 120 : 150} />
+        <Text style={s.pscore}>{p.score} pts · {wonCount(game, p)}/{game.categories.length}</Text>
+      </View>
+    );
+  };
+
+  if (!scrolls) return <View style={s.players}>{game.players.map((_, i) => card(i))}</View>;
   return (
-    <View style={s.players}>
-      {game.players.map((p, i) => {
-        const color = TURN_COLORS[i % TURN_COLORS.length];
-        const now = i === game.current;
-        return (
-          <View key={i} style={[s.pcard, many && s.pcardHalf, now && { borderColor: color }]} accessibilityLabel={`${p.name} : ${p.score} points, ${wonCount(game, p)} catégories sur ${game.categories.length}`}>
-            <Text style={[s.pname, { color }]} numberOfLines={1}>{now ? '▶ ' : ''}{p.name}</Text>
-            <Wheel game={game} player={i} size={many ? 120 : 150} />
-            <Text style={s.pscore}>{p.score} pts · {wonCount(game, p)}/{game.categories.length}</Text>
-          </View>
-        );
-      })}
+    <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+      <ScrollView ref={ref} horizontal showsHorizontalScrollIndicator snapToInterval={cardW + gap} decelerationRate="fast" contentContainerStyle={{ gap }}>
+        {game.players.map((_, i) => card(i))}
+      </ScrollView>
+      <Text style={[s.muted, { marginTop: 6 }]}>◀ {n} joueurs : fais glisser pour voir les autres ▶</Text>
     </View>
   );
 }
