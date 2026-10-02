@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "50 Missions",
-    "slug": "50-missions",
+    "name": "Jeux solo",
+    "slug": "jeux-solo",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -20,8 +20,8 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "name": "50 Missions",
-      "shortName": "50 Missions"
+      "name": "Jeux solo",
+      "shortName": "Jeux solo"
     }
   }
 }

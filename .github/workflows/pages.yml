@@ -1,0 +1,80 @@
+name: Publier sur GitHub Pages
+
+on:
+  push:
+    branches: [ccr-6c52d89d-ni35lw, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Une seule publication à la fois ; une plus récente remplace une plus ancienne.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            app/package-lock.json
+            solo/package-lock.json
+      - run: npm ci
+      - name: Vérifications (types et tests)
+        run: |
+          npm run typecheck
+          npm test
+      - name: Construire le site
+        run: npx expo export --platform web
+        env:
+          CI: '1'
+          EXPO_NO_TELEMETRY: '1'
+          # Le hub « Jeu des vacances » est à la racine https://<compte>.github.io/<dépôt>/ ; 50 Missions est dans /50-missions/
+          EXPO_BASE_URL: /${{ github.event.repository.name }}/50-missions
+          # La configuration Firebase (publique) est lue dans app/.env.
+      - name: Assembler le site (hub à la racine, jeux dans des sous-dossiers)
+        working-directory: .
+        run: |
+          mkdir -p site/50-missions
+          cp -r hub/. site/
+          cp -r app/dist/. site/50-missions/
+          # Famille Fight (Rumble Fighter) : site statique du dossier combat/
+          mkdir -p site/famille-fight
+          cp -r combat/. site/famille-fight/
+      - name: Petits jeux solo (Duel de savoir, Mémo des paires)
+        working-directory: solo
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+          for g in duel:duel-de-savoir memo:memo; do
+            id=${g%%:*}; dir=${g##*:}
+            EXPO_PUBLIC_GAME=$id EXPO_BASE_URL=/${{ github.event.repository.name }}/$dir CI=1 EXPO_NO_TELEMETRY=1 npx expo export --platform web --output-dir dist-$id
+            mkdir -p ../site/$dir
+            cp -r dist-$id/. ../site/$dir/
+          done
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

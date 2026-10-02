@@ -24,9 +24,26 @@
 
 ## Communication
 - On peut parler, mais jamais des valeurs ni des symboles/couleurs de sa propre main.
-- On ne parle que des Symboles exposés et des Missions. Ex. : « Ne jouez pas sur cette carte ! », « J'ai une bonne carte à jouer ici. », « Je peux aider pour cette Mission. »
+- **Règle retenue pour l'appli (exemplaire du joueur)** : on peut annoncer « je peux réussir » sur une ou plusieurs missions, à tout moment, hors de son tour compris. Ni « bonne carte ici », ni « je peux aider » (sauf option).
+  - Le bouton d'annonce **n'apparaît que si le joueur peut réellement réussir au moins une mission** d'un seul coup : c'est le seul indice, il ne dit ni quelle carte ni sur quel tas jouer.
+  - Le joueur touche ensuite la ou les missions concernées, puis valide. Les autres voient sur quelles missions il se positionne.
+  - L'annonce disparaît dès qu'une carte est posée. Les machines annoncent toutes les missions à leur portée et, pour laisser le temps de le repérer, jouent un peu plus tard après une annonce.
+- (Le PDF en ligne cite ces phrases en exemples : « Ne jouez pas sur cette carte ! », « J'ai une bonne carte à jouer ici. », « Je peux aider pour cette Mission. » L'appli suit la règle de l'exemplaire, plus stricte.)
+- **Machines stratèges** : elles réussissent ce qu’elles peuvent, évitent de bloquer le joueur suivant, laissent un tapis où les autres ont une chance de réussir (en comptant davantage les missions rares dans le contexte de la partie, d’après les cartes encore inconnues) et ne défont pas une mission annoncée.
+- **Esprit coopératif** : une machine ne joue pas un coup qui défait une mission annoncée par un autre joueur (humain ou machine), tant qu’un autre coup l’évite.
+- **Option « Phrases du livret »** : ajoute « Je peux aider pour cette mission » (sur une mission), « J'ai une bonne carte ici » et « Ne jouez pas ici » (sur un tas), en plus de « je peux réussir une mission ».
 - Débutants : permis de regarder sous les 4 cartes exposées (cartes déjà jouées).
 - Super-pros : aucune communication.
+
+## Indice « je peux » (réglable, activé par défaut)
+- Activé : le bouton « Oui, je peux » n’apparaît que si le joueur peut réellement réussir une mission d’un seul coup. Désactivé : le bouton est toujours là, à chacun de juger ; une annonce fausse est refusée (« Tu ne peux réussir aucune mission d’un seul coup »).
+
+## Tour de table (réglable, activé par défaut)
+- Avant chaque coup, chaque joueur sauf celui dont c’est le tour dit « oui, je peux réussir une mission » (en choisissant lesquelles) ou « non, je ne peux pas ». Personne, machine comprise, ne joue tant que tout le monde n’a pas répondu. Les machines répondent toutes seules et jouent seules (plus de « Laisser jouer ») dès que tout le monde a répondu. À chaque carte posée, les « non » sont effacés ; une annonce « je peux » reste positionnée si le coup ne l’a pas touchée (mission toujours là et toujours réalisable), sinon elle tombe et le joueur se reprononce.
+
+## Quitter et reprendre
+- Contre des machines : la partie est sauvegardée sur l’appareil à chaque coup ; l’accueil propose « Reprendre la partie en cours » (ou « Abandonner »). Oubliée après 3 jours ou à la fin de la partie.
+- En ligne : l’accueil propose « Reprendre la partie en ligne » (code du salon). Si l’hôte quitte, la partie est reprise à son retour ; les autres peuvent le remplacer par une machine.
 
 ## Variante « 50 Missions de folie »
 - Temps limité de 5 minutes, sans ordre de jeu (chacun joue quand il veut).
@@ -47,3 +64,8 @@ Symboles : Jumelles (vert), Boussoles (jaune), Briquets (bleu), Couteaux (rouge)
 - Bronze : « Félicitations pour cette médaille de bronze, posez-la près de vous… »
 - Argent : « …et en avant pour la médaille d'or ».
 - Or : « Reformez une pioche avec les cartes Symbole présentes sous les 4 piles et essayez de réaliser les 50 missions ».
+
+## Modes de jeu
+- En ligne (un téléphone par joueur) et contre des machines. Le mode « on se passe un téléphone » a été retiré : trop d’échanges à prévoir. Un mode télé (📺 Écran télé) permet de suivre le tapis ensemble sur un grand écran, sans jouer.
+- Les machines ont des prénoms (Jack, Anne, Morgan…) ; sur les missions, une pastille donne « Toi » ou le début du prénom.
+- L’indice « je peux » est un réglage personnel (également dans le menu ☰) : désactivé, on peut se positionner sur une mission même si aucune n’est faisable.

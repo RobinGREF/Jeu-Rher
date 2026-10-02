@@ -1,0 +1,33 @@
+{
+  "_aide": "Pour ajouter un jeu : copier un bloc, remplir titre, description, emoji, couleur et url (laisser url vide = « bientôt »). Il apparaît en bas de la liste.",
+  "games": [
+    {
+      "titre": "50 Missions",
+      "description": "Jeu de cartes coopératif : 4 tas, 50 missions, jusqu'à 4 joueurs en ligne ou contre des machines.",
+      "emoji": "🧭",
+      "couleur": "#d97706",
+      "url": "50-missions/"
+    },
+    {
+      "titre": "Famille Fight",
+      "description": "Jeu de combat 2D à deux (ou contre l'ordinateur) : poing, pied, spécial, avec les visages de la famille.",
+      "emoji": "🥊",
+      "couleur": "#dc2626",
+      "url": "famille-fight/"
+    },
+    {
+      "titre": "Mémo des paires",
+      "description": "Retrouve toutes les paires en un minimum de coups, solo, 3 niveaux.",
+      "emoji": "🎴",
+      "couleur": "#0ea5e9",
+      "url": "memo/"
+    },
+    {
+      "titre": "Duel de savoir",
+      "description": "Quiz façon Trivial Pursuit : 20 catégories, 1176 questions, 1 à 6 joueurs sur un appareil.",
+      "emoji": "🧠",
+      "couleur": "#2563eb",
+      "url": "duel-de-savoir/"
+    }
+  ]
+}
