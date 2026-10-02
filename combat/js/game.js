@@ -1436,11 +1436,22 @@ function frame(now) {
     if (G.scene === 'fight') updateFight();
   }
   document.body.dataset.scene = G.scene;
+  document.body.dataset.host = (G.net && G.net.isHost) ? '1' : '';
   render();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
+/* lien d'invitation (?salle=CODE) : on rejoint directement le salon, puis le choix du combattant */
+(function inviteJoin() {
+  const c = (new URLSearchParams(location.search).get('salle') || '').toUpperCase().replace(/[^A-Z]/g, '');
+  if (c.length !== 4) return;
+  const u = new URL(location.href); u.searchParams.delete('salle');
+  history.replaceState(null, '', u.pathname + u.search + u.hash);
+  G.scene = 'online'; G.online = true; G.mode = 1; G.netMsg = 'Connexion…';
+  onlineJoin(c);
+})();
+
 // accès pour le débogage / les tests
-window.__game = { G, startMatch, onPress, keys, hostLaunch };
+window.__game = { G, startMatch, onPress, keys, hostLaunch, onlineCreate, onlineJoin };
 })();
