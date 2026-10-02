@@ -7,7 +7,7 @@
 <style>
   html,body{margin:0;height:100%;background:#0b0b12;overflow:hidden}
   body{display:flex;align-items:center;justify-content:center}
-  canvas{background:#000;max-width:100vw;max-height:100vh;aspect-ratio:16/9;width:min(100vw,177.78vh);height:auto;image-rendering:auto;touch-action:none}
+  canvas{background:#000;max-width:100vw;max-height:100vh;max-height:100dvh;aspect-ratio:16/9;width:min(100vw,177.78vh);width:min(100vw,177.78dvh);height:auto;image-rendering:auto;touch-action:none}
   #touch{display:none;position:fixed;left:0;right:0;bottom:0;height:0;pointer-events:none;z-index:5;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
   body.touch[data-scene=fight] #touch{display:block}
   #touch{--s:min(66px,16vw,20vh);--g:6px;--b:14px}

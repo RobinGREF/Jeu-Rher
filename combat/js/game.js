@@ -1214,21 +1214,21 @@ function drawLobby() {
   }
   const hostCh = chars[net.isHost ? G.picks[0] : (net.meta && net.meta.char)] || chars[0];
   const guestIdx = net.isHost ? (net.guest ? net.guest.char : null) : G.picks[0];
-  drawFighter(dummyOf(hostCh, 1, 0), 270, 440, 1.2);
-  text(hostCh.name + (net.isHost ? ' (TOI)' : ''), 270, 470, 22);
+  drawFighter(dummyOf(hostCh, 1, 0), 270, 412, 1.1);
+  text(hostCh.name + (net.isHost ? ' (TOI)' : ''), 270, 438, 22);
   if (guestIdx !== null && chars[guestIdx]) {
-    drawFighter(dummyOf(chars[guestIdx], -1, 1), 690, 440, 1.2);
-    text(chars[guestIdx].name + (net.isHost ? '' : ' (TOI)'), 690, 470, 22);
+    drawFighter(dummyOf(chars[guestIdx], -1, 1), 690, 412, 1.1);
+    text(chars[guestIdx].name + (net.isHost ? '' : ' (TOI)'), 690, 438, 22);
   } else {
-    text('?', 690, 340, 120, 'rgba(255,255,255,0.35)');
-    text('En attente d\'un adversaire…', 690, 470, 20, '#ffd23f');
+    text('?', 690, 310, 110, 'rgba(255,255,255,0.35)');
+    text('En attente d\'un adversaire…', 690, 438, 20, '#ffd23f');
   }
-  text('VS', W / 2, 380, 60, '#ff4d4d');
+  text('VS', W / 2, 350, 60, '#ff4d4d');
   if (net.isHost && net.rtts.length) plainText('Latence ≈ ' + Math.round(median(net.rtts)) + ' ms', W / 2, 262, 15, 'rgba(255,255,255,0.7)', 'center');
   if (net.isHost && net.guest) {
-    text(isTouch ? 'TOUCHE ICI POUR LANCER' : 'ENTRÉE : LANCER LE COMBAT', W / 2, 505, 28, '#7dff9a');
-    clickable(W / 2 - 280, 480, 560, 50, hostLaunch);
-  } else if (!net.isHost) text('En attente du lancement par l\'hôte…', W / 2, 505, 24, '#ffd23f');
+    text(isTouch ? 'TOUCHE ICI POUR LANCER' : 'ENTRÉE : LANCER LE COMBAT', W / 2, 466, 28, '#7dff9a');
+    clickable(W / 2 - 280, 445, 560, 40, hostLaunch);
+  } else if (!net.isHost) text('En attente du lancement par l\'hôte…', W / 2, 466, 24, '#ffd23f');
   if (G.netMsg) text(G.netMsg, W / 2, 292, 20, '#ff9a6b');
   text('‹ QUITTER', 70, 40, 24, '#fff', 'left');
   clickable(20, 10, 180, 60, () => { leaveOnline('online'); });
