@@ -1,6 +1,6 @@
 # Dépôt Jeu-Rher — organisation (décision du 2026-10-01, à respecter par toutes les sessions)
 
-Ce dépôt contient **tous les jeux de Robin**. Chaque jeu a **son propre dossier** et **sa propre adresse** sur GitHub Pages ; une **page d'accueil « Jeu Robin »** (`hub/`) liste les jeux avec leur lien.
+Ce dépôt contient **tous les jeux de Robin**. Chaque jeu a **son propre dossier** et **sa propre adresse** sur GitHub Pages ; une **page d'accueil « Jeu des vacances »** (`hub/`) liste les jeux avec leur lien.
 
 | Jeu | Dossier | Adresse (après `https://robingref.github.io/Jeu-Rher/`) |
 |---|---|---|
