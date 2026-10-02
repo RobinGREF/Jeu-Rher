@@ -7,7 +7,7 @@ import { ShareRoom } from '../ShareRoom';
 import { loadJson, removeKey, saveJson } from '../storage';
 import { Board } from './Board';
 import { CatPicker } from './CatPicker';
-import { MAX_PLAYERS, newDuel, TURN_COLORS } from './engine';
+import { MAX_PLAYERS, mergeSeen, newDuel, TURN_COLORS } from './engine';
 import { reduce, startFlow, type Action, type Flow } from './flow';
 import { CATEGORIES, QUESTIONS } from './questions';
 import { useDuelOnline } from './online/useDuelOnline';
@@ -148,7 +148,7 @@ export function DuelGame({ onHome }: { onHome: () => void }) {
       <Text style={s.muted}>Quiz à choix multiples, de 1 à 6 joueurs : sur un seul appareil, ou chacun sur son téléphone.</Text>
       {saved && (
         <Btn label={`▶ Reprendre la partie (${saved.game.players.map((p) => p.name).join(', ')})`}
-          onPress={() => { setFlow(startFlow(saved.game)); setCount(saved.game.players.length); setScreen('local'); }} />
+          onPress={() => { setFlow(startFlow({ ...saved.game, seen: mergeSeen(seen(), saved.game.seen) })); setCount(saved.game.players.length); setScreen('local'); }} />
       )}
       {rec.best && <Text style={s.record}>🏆 Record : {rec.best.score} pts ({rec.best.name})</Text>}
       <Btn label="🌐 Jouer en ligne avec des amis" onPress={() => setScreen('online')} />
@@ -183,8 +183,8 @@ function Online({ invite, onl, onBack, onHome }: { invite: string | null; onl: R
   const [pick, setPick] = useState(false); // l'hôte choisit les catégories
   const snap = onl.snap;
   const rec = useRecord(snap?.view?.flow ?? null);
-  const hostSeen = snap?.isHost ? snap.view?.flow.game.seen : undefined;
-  useEffect(() => { if (hostSeen) saveJson(KEY_SEEN, hostSeen); }, [hostSeen]);
+  const viewSeen = snap?.view?.flow.game.seen;
+  useEffect(() => { if (viewSeen) saveJson(KEY_SEEN, mergeSeen(loadJson<Record<string, number[]>>(KEY_SEEN, {}), viewSeen)); }, [viewSeen]);
   const remember = (v: string) => { setName(v); saveJson(KEY_NAME, v); };
 
   if (!onl.kind) {

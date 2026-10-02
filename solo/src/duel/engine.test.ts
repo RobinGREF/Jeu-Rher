@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { CATEGORIES, QUESTIONS } from './questions';
 import {
   applyAnswer, drawQuestion, eliminate, hasWon, isBlindCorrect, matchesOneAnswer, newDuel, randomCategories, stepGain, wonCount,
-  CATEGORY_TARGET, DEFAULT_CATEGORIES,
+  CATEGORY_TARGET, DEFAULT_CATEGORIES, mergeSeen,
 } from './engine';
 
 const seeded = (seed = 1) => () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
@@ -37,8 +37,11 @@ test('le tirage ne répète pas avant épuisement, puis recommence un cycle', ()
     texts.add(d.question.q);
   }
   assert.equal(texts.size, total);
+  // Banque épuisée : on repioche parmi les plus anciennes, sans jamais reprendre celle qui vient de sortir.
+  const lastDrawn = seen['geo|facile'][total - 1];
   const again = drawQuestion('geo', 'facile', seen, rng);
-  assert.equal(again.seen['geo|facile'].length, 1);
+  assert.equal(again.seen['geo|facile'].length, total);
+  assert.notEqual(again.seen['geo|facile'][total - 1], lastDrawn);
 });
 
 test('le tirage mélange les propositions sans perdre la bonne réponse', () => {
@@ -136,4 +139,28 @@ test("réponse à l'aveugle : fautes, accents, articles, chiffres isolés", () =
   const q = { diff: 'facile' as const, q: '', choices: ['Molière', 'a', 'b', 'c'], correct: 0, alt: ['Jean-Baptiste Poquelin'] };
   assert.ok(isBlindCorrect('moliere', q));
   assert.ok(isBlindCorrect('poquelin', q));
+});
+
+test("une question ne revient jamais avant que les deux tiers de la banque soient passés", () => {
+  const rng = seeded(21);
+  const n = QUESTIONS.cuisine.filter((q) => q.diff === 'facile').length;
+  let seen: Record<string, number[]> = {};
+  const last = new Map<string, number>();
+  let minGap = Infinity;
+  for (let draw = 0; draw < n * 6; draw++) {
+    const d = drawQuestion('cuisine', 'facile', seen, rng);
+    seen = d.seen;
+    const prev = last.get(d.question.q);
+    if (prev !== undefined) minGap = Math.min(minGap, draw - prev);
+    last.set(d.question.q, draw);
+  }
+  assert.ok(minGap >= Math.floor((n * 2) / 3), `écart minimal ${minGap} pour ${n} questions`);
+  assert.equal(seen['cuisine|facile'].length, n, 'la mémoire ne grossit pas au-delà de la banque');
+});
+
+test("la mémoire des questions vues se réunit sans doublon et garde l'ordre", () => {
+  const m = mergeSeen({ 'geo|facile': [3, 1], 'a|facile': [0] }, { 'geo|facile': [1, 7, 3, 9], 'b|facile': [2] });
+  assert.deepEqual(m['geo|facile'], [3, 1, 7, 9]);
+  assert.deepEqual(m['a|facile'], [0]);
+  assert.deepEqual(m['b|facile'], [2]);
 });

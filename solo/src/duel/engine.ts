@@ -49,18 +49,39 @@ export const hasWon = (g: DuelGame, p: DuelPlayer) => wonCount(g, p) >= g.catego
 
 export type Drawn = { question: Question; seen: Record<string, number[]> };
 
-/** Tire une question jamais vue (recommence un cycle quand toute la banque a été vue) et mélange ses propositions. */
+/**
+ * Tire une question et mélange ses propositions.
+ * `seen` garde, par catégorie et difficulté, les questions déjà posées de la plus ancienne à la plus récente.
+ * On tire d'abord parmi celles jamais vues ; une fois toute la banque épuisée, parmi le tiers le plus ancien :
+ * une question ne revient donc jamais avant que les deux tiers de la banque soient passés (et jamais juste après l'avoir vue).
+ */
 export function drawQuestion(cat: string, diff: DiffKey, seen: Record<string, number[]>, rng: Rng = Math.random): Drawn {
   const key = `${cat}|${diff}`;
   const all = (QUESTIONS[cat] ?? []).map((q, i) => ({ q, i })).filter((x) => x.q.diff === diff);
   if (all.length === 0) throw new Error(`Aucune question pour ${key}`);
-  let used = seen[key] ?? [];
-  let remaining = all.filter((x) => !used.includes(x.i));
-  if (remaining.length === 0) { used = []; remaining = all; }
-  const pick = remaining[Math.floor(rng() * remaining.length)];
+  const valid = new Set(all.map((x) => x.i));
+  const used = (seen[key] ?? []).filter((i, k, a) => valid.has(i) && a.indexOf(i) === k);
+  const fresh = all.filter((x) => !used.includes(x.i));
+  let pick: { q: Question; i: number };
+  if (fresh.length > 0) pick = fresh[Math.floor(rng() * fresh.length)];
+  else {
+    const oldest = used.slice(0, Math.max(1, Math.ceil(used.length / 3)));
+    const target = oldest[Math.floor(rng() * oldest.length)];
+    pick = all.find((x) => x.i === target)!;
+  }
   const order = shuffle([0, 1, 2, 3], rng);
   const question: Question = { ...pick.q, choices: order.map((i) => pick.q.choices[i]), correct: order.indexOf(pick.q.correct) };
-  return { question, seen: { ...seen, [key]: [...used, pick.i] } };
+  return { question, seen: { ...seen, [key]: [...used.filter((i) => i !== pick.i), pick.i] } };
+}
+
+/** Réunit deux mémoires de questions vues : l'ordre de `base` est gardé, ce que `extra` ajoute vient en dernier (le plus récent). */
+export function mergeSeen(base: Record<string, number[]>, extra: Record<string, number[]>): Record<string, number[]> {
+  const out: Record<string, number[]> = { ...base };
+  for (const [k, list] of Object.entries(extra)) {
+    const have = out[k] ?? [];
+    out[k] = [...have, ...list.filter((i) => !have.includes(i))];
+  }
+  return out;
 }
 
 // ---------- Indices ----------
