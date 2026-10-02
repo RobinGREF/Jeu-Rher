@@ -6,7 +6,7 @@ Ce dépôt contient **tous les jeux de Robin**. Chaque jeu a **son propre dossie
 |---|---|---|
 | Page d'accueil | `hub/` (`hub/games.json` = la liste) | `/` |
 | 50 Missions | `app/` | `/50-missions/` |
-| Famille Fight (Rumble Fighter) | `combat/` | `/famille-fight/` |
+| Familly Fight | `combat/` | `/famille-fight/` |
 | Duel de savoir | `solo/src/duel/` | `/duel-de-savoir/` |
 | Mémo des paires | `solo/src/memo/` | `/memo/` |
 

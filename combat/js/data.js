@@ -1,6 +1,6 @@
 /*
  * ============================================================
- *  RUMBLE FIGHTER — données personnalisables
+ *  FAMILLY FIGHT — données personnalisables
  * ============================================================
  *  Tout ce qui est "contenu" est ici : ajoute / modifie des
  *  personnages et des décors sans toucher au moteur (game.js).

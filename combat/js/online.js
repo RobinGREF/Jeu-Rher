@@ -1,4 +1,4 @@
-/* RUMBLE FIGHTER — accès à la base en temps réel.
+/* FAMILLY FIGHT — accès à la base en temps réel.
  * Deux « serveurs » interchangeables, même interface :
  *   - Firebase (vrai mode en ligne, via le SDK chargé à la demande) ;
  *   - local (deux onglets du même navigateur, pour essayer : ajouter ?online=local à l'adresse).

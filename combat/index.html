@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Rumble Fighter</title>
+<title>Familly Fight</title>
 <style>
   html,body{margin:0;height:100%;background:#0b0b12;overflow:hidden}
   body{display:flex;align-items:center;justify-content:center}
@@ -49,11 +49,11 @@
     function info() {
       var n = window.__game && window.__game.G.net; if (!n) return null;
       var url = location.origin + location.pathname + '?salle=' + n.code;
-      return { url: url, text: 'Rejoins ma partie de Famille Fight ! Code du salon : ' + n.code };
+      return { url: url, text: 'Rejoins ma partie de Familly Fight ! Code du salon : ' + n.code };
     }
     document.getElementById('invShare').addEventListener('click', function () {
       var i = info(); if (!i) return;
-      if (navigator.share) navigator.share({ title: 'Famille Fight', text: i.text, url: i.url }).catch(function () {});
+      if (navigator.share) navigator.share({ title: 'Familly Fight', text: i.text, url: i.url }).catch(function () {});
       else if (navigator.clipboard) navigator.clipboard.writeText(i.text + ' ' + i.url);
     });
     document.getElementById('invWa').addEventListener('click', function () {

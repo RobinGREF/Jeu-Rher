@@ -1,4 +1,4 @@
-# Rumble Fighter
+# Familly Fight
 
 Jeu de combat 2D façon « Street Fighter », en HTML5 canvas (aucune dépendance).
 

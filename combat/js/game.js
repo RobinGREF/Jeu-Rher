@@ -1,4 +1,4 @@
-/* RUMBLE FIGHTER — moteur de jeu (canvas 2D, aucune dépendance).
+/* FAMILLY FIGHT — moteur de jeu (canvas 2D, aucune dépendance).
  * Le contenu (personnages, décors) est dans data.js. */
 (() => {
 'use strict';
@@ -1086,8 +1086,8 @@ function drawBackdrop() {
 function drawTitle() {
   drawBackdrop();
   const bob = Math.sin(G.t * 0.05) * 4;
-  text('RUMBLE', W / 2, 105 + bob, 104, '#ffd23f');
-  text('FIGHTER', W / 2, 190 + bob, 84, '#ff4d4d');
+  text('FAMILLY', W / 2, 105 + bob, 104, '#ffd23f');
+  text('FIGHT', W / 2, 190 + bob, 84, '#ff4d4d');
   if (G.showControls) return drawControls();
   const items = ['1 JOUEUR  (contre l\'ordinateur)', '2 JOUEURS  (même clavier)', 'EN LIGNE  (salon à code)', '◀ DIFFICULTÉ : ' + curDiff().name + ' ▶', 'COMMANDES'];
   items.forEach((it, i) => {

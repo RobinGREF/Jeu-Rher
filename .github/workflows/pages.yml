@@ -49,7 +49,7 @@ jobs:
           mkdir -p site/50-missions
           cp -r hub/. site/
           cp -r app/dist/. site/50-missions/
-          # Famille Fight (Rumble Fighter) : site statique du dossier combat/
+          # Familly Fight : site statique du dossier combat/
           mkdir -p site/famille-fight
           cp -r combat/. site/famille-fight/
       - name: Petits jeux solo (Duel de savoir, Mémo des paires)
