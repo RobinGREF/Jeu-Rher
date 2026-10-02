@@ -30,3 +30,12 @@ test('sans l\'indice, on peut se positionner sur une mission même si aucune n\'
   }
   assert.ok(checked > 0);
 });
+
+import { sumsOf } from './sums';
+test('logo Σ : sommes par famille sur les 4 tas, et total', () => {
+  const c = (symbol: 0 | 1 | 2 | 3, value: number) => ({ id: value, symbol, value });
+  const { per, total } = sumsOf([c(1, 5), c(1, 6), c(2, 3), c(0, 7)]);
+  assert.deepEqual(per, [7, 11, 3, 0]); // Jumelles 7, Boussoles 5+6, Briquets 3, Couteaux 0
+  assert.equal(total, 21);
+  assert.deepEqual(sumsOf([]).per, [0, 0, 0, 0]);
+});
