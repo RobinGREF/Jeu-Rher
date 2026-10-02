@@ -5,10 +5,19 @@ import { SYMBOLS } from './symbols';
 const CREAM = '#fef9c3';
 const INK = '#7c2d12';
 
+/** Mélange d'une couleur avec du blanc (t = part de blanc) : fond clair mais bien teinté. */
+const tint = (hex: string, t: number) => {
+  const n = parseInt(hex.slice(1), 16);
+  const mix = (c: number) => Math.round(c + (255 - c) * t);
+  return `rgb(${mix((n >> 16) & 255)},${mix((n >> 8) & 255)},${mix(n & 255)})`;
+};
+
+/** Le symbole sur un disque blanc cerclé de la couleur de sa famille (vert, jaune, bleu, rouge) : lisible même petit. */
 function SymIcon({ sym, size }: { sym: number; size: number }) {
   const s = SYMBOLS[sym];
+  const ring = Math.max(2, Math.round(size * 0.1));
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: s.color + '33', alignItems: 'center', justifyContent: 'center' }}>
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#fff', borderWidth: ring, borderColor: s.color, alignItems: 'center', justifyContent: 'center' }}>
       <Text style={{ fontSize: size * 0.62 }}>{s.emoji}</Text>
     </View>
   );
@@ -17,8 +26,9 @@ function SymIcon({ sym, size }: { sym: number; size: number }) {
 function MiniCard({ c, w }: { c: VisualCard; w: number }) {
   const h = w * 1.45;
   const stripe = c.sym?.length === 1 ? SYMBOLS[c.sym[0]].color : '#a16207';
+  const bg = c.sym?.length === 1 ? tint(stripe, 0.8) : CREAM; // carte d'une seule famille : fond à sa couleur
   return (
-    <View style={[s.mini, { width: w, height: h, borderRadius: w * 0.14, borderColor: c.blank ? '#d6d3d1' : stripe }]}>
+    <View style={[s.mini, { width: w, height: h, borderRadius: w * 0.14, backgroundColor: bg, borderWidth: Math.max(2, w * 0.08), borderColor: c.blank ? '#d6d3d1' : stripe }]}>
       {c.vals && (
         <View style={[s.vals, { width: w }]}>
           {c.vals.map((v) => (

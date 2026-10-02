@@ -126,7 +126,7 @@ export default function App() {
   const [picked, setPicked] = useState<string[]>([]);
 
   const { width, height } = useWindowDimensions();
-  const tokenSize = loupe ? Math.max(70, Math.min((width - 32 - 12) / 2, (height - 380) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
+  const tokenSize = loupe ? Math.max(70, Math.min((width - 32 - 12) / 2, (height - 450) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
   const scale = loupe ? 0.62 : Math.min(1, Math.max(0.72, (height - 200) / 560));
 
   const solo = mode === 'solo';
@@ -693,7 +693,7 @@ export default function App() {
           : sigMode !== 'play' ? <Text style={s.barTxt} numberOfLines={1}>{sigHint}</Text>
           : pendingAns.length > 0 && picking === null ? <Text style={s.barWait} numberOfLines={1}>{(solo || online) ? (pendingAns.includes(me) ? '🗣️ Peux-tu réussir une mission ?' : `⏳ On attend : ${pendingAns.map(seat).join(', ')}`) : `🗣️ J${pendingAns[0] + 1}, peux-tu réussir une mission ?`}</Text>
           : waitingBot ? <Text style={s.barWait} numberOfLines={1}>🤖 {botName} va jouer{announcers.length ? ' · tu peux annoncer avant' : ''}</Text>
-          : <Text style={s.barTxt} numberOfLines={1}>{hist[0] ?? (game.current === me ? 'À toi de commencer' : `${seat(game.current)} commence`)}</Text>}
+          : <Text style={s.barTxt} numberOfLines={2}>{hist[0] ?? (game.current === me ? 'À toi de commencer' : `${seat(game.current)} commence`)}</Text>}
         <View style={s.barRow}>
           {picking !== null ? (
             <>
@@ -800,10 +800,10 @@ const s = StyleSheet.create({
   askYes: { backgroundColor: '#16a34a', borderRadius: 8, paddingVertical: 6, paddingHorizontal: 10 },
   askNo: { backgroundColor: '#475569', borderRadius: 8, paddingVertical: 6, paddingHorizontal: 10 },
   askBtn: { color: '#fff', fontWeight: '800', fontSize: 13 },
-  barTxt: { color: '#94a3b8', fontSize: 12, textAlign: 'center' },
-  barErr: { color: '#fca5a5', fontSize: 12, textAlign: 'center', fontWeight: '700' },
+  barTxt: { color: '#e2e8f0', fontSize: 14, textAlign: 'center', fontWeight: '600' },
+  barErr: { color: '#fca5a5', fontSize: 14, textAlign: 'center', fontWeight: '700' },
   barRow: { flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' },
-  barWait: { color: '#fde68a', fontSize: 13, textAlign: 'center', fontWeight: '800' },
+  barWait: { color: '#fde68a', fontSize: 15, textAlign: 'center', fontWeight: '800' },
   goBtn: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, backgroundColor: '#22c55e' },
   goTxt: { color: '#052e16', fontWeight: '900', fontSize: 15 },
   barSpacer: { height: 39 },

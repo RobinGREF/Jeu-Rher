@@ -3,6 +3,7 @@ import { Animated, Pressable, StyleSheet, Text, useWindowDimensions, View } from
 import { CardView } from './CardView';
 import type { GameState } from './engine';
 import { SYMBOLS } from './symbols';
+import { sumsOf } from './sums';
 import type { Card } from './types';
 
 /** Dernier coup joué : la carte vient se poser sur celle qu'elle recouvre. */
@@ -26,6 +27,25 @@ function Countdown({ ms }: { ms: number }) {
   return (
     <View style={s.countTrack}>
       <Animated.View style={[s.countBar, { width: w.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} />
+    </View>
+  );
+}
+
+/** Petit logo Σ : les sommes de chaque famille sur les 4 tas, et la somme totale. */
+function SumBadge({ cards, grid }: { cards: Card[]; grid?: boolean }) {
+  const { per, total } = sumsOf(cards);
+  return (
+    <View style={s.sum} accessibilityLabel={`Sommes : ${SYMBOLS.map((sy, i) => `${sy.name} ${per[i]}`).join(', ')}, total ${total}`}>
+      <Text style={s.sumTitle}>Σ</Text>
+      <View style={grid ? s.sumGrid : undefined}>
+        {SYMBOLS.map((sy, i) => (
+          <View key={sy.name} style={[s.sumRow, { opacity: per[i] ? 1 : 0.45 }]}>
+            <View style={[s.sumDot, { borderColor: sy.color }]}><Text style={s.sumEmoji}>{sy.emoji}</Text></View>
+            <Text style={s.sumVal}>{per[i]}</Text>
+          </View>
+        ))}
+      </View>
+      <Text style={s.sumTotal}>={total}</Text>
     </View>
   );
 }
@@ -100,7 +120,9 @@ export function TableScene(p: Props) {
   const leftRel = n === 4 ? [1] : [];
   const rightRel = n === 4 ? [3] : [];
   const inner = width - 32 - 20;
-  const pileW = Math.min(64 * p.scale, (inner - (n === 4 ? 2 * 62 : 0) - 3 * 6) / 4);
+  // À 4 joueurs, le logo Σ se met en haut à droite (les côtés sont pris par les joueurs) ; sinon, à droite des tas.
+  const sumSide = n !== 4;
+  const pileW = Math.min(64 * p.scale, (inner - (n === 4 ? 2 * 62 : 0) - (sumSide ? 44 : 0) - 3 * 6) / 4);
   const handW = Math.min(66 * p.scale, (inner - 52 - 3 * 6) / 4);
   const label = (i: number) => p.labels?.[i]?.name ?? (solo && i === 0 ? 'Toi' : `J${i + 1}`);
   const avatar = (i: number) => p.labels?.[i]?.avatar ?? (solo ? (i === 0 ? '🙂' : '🤖') : '👤');
@@ -123,6 +145,7 @@ export function TableScene(p: Props) {
   return (
     <View style={s.felt}>
       {topRel.length > 0 && <View style={s.topRow}>{topRel.map((r) => seat(r))}</View>}
+      {!sumSide && <View style={s.sumCorner}><SumBadge cards={piles.map((pv) => pv.card)} grid /></View>}
 
       <View style={s.mid}>
         {leftRel.map((r) => seat(r, true))}
@@ -148,6 +171,7 @@ export function TableScene(p: Props) {
             </View>
           ))}
         </View>
+        {sumSide && <SumBadge cards={piles.map((pv) => pv.card)} />}
         {rightRel.map((r) => seat(r, true))}
       </View>
 
@@ -210,6 +234,15 @@ const s = StyleSheet.create({
   countTrack: { height: 3, backgroundColor: '#334155', borderRadius: 2, overflow: 'hidden' },
   countBar: { height: 3, backgroundColor: '#f59e0b' },
   me: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sum: { backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 10, paddingVertical: 4, paddingHorizontal: 4, alignItems: 'center', gap: 2, marginLeft: 4 },
+  sumTitle: { color: '#fde68a', fontSize: 14, fontWeight: '900', lineHeight: 15 },
+  sumGrid: { flexDirection: 'row', flexWrap: 'wrap', width: 74, justifyContent: 'center', gap: 2 },
+  sumRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  sumDot: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  sumEmoji: { fontSize: 10 },
+  sumVal: { color: '#fff', fontSize: 13, fontWeight: '800', minWidth: 14 },
+  sumTotal: { color: '#fde68a', fontSize: 13, fontWeight: '900' },
+  sumCorner: { position: 'absolute', top: 6, right: 6, zIndex: 3 },
   mine: { backgroundColor: '#fef9c3', borderRadius: 16, borderWidth: 3, borderColor: '#ca8a04', paddingHorizontal: 6, paddingTop: 16, paddingBottom: 6, marginTop: 6 },
   mineOn: { backgroundColor: '#fde68a', borderColor: '#f59e0b' },
   mineTag: { position: 'absolute', top: -2, left: 12, color: '#713f12', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
