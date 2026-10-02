@@ -9,6 +9,26 @@ import { Wheel } from './Wheel';
  * Le jeu lui-même : affiche l'état du tour et envoie les actions du joueur.
  * `canAct` est faux pour qui regarde jouer un autre (en ligne) : mêmes écrans, sans les boutons.
  */
+/** Une rosace par joueur, avec son nom, son score et ses catégories gagnées : le joueur courant est entouré à sa couleur. */
+function Scores({ game }: { game: Flow['game'] }) {
+  const many = game.players.length > 1;
+  return (
+    <View style={s.players}>
+      {game.players.map((p, i) => {
+        const color = TURN_COLORS[i % TURN_COLORS.length];
+        const now = i === game.current;
+        return (
+          <View key={i} style={[s.pcard, many && s.pcardHalf, now && { borderColor: color }]} accessibilityLabel={`${p.name} : ${p.score} points, ${wonCount(game, p)} catégories sur ${game.categories.length}`}>
+            <Text style={[s.pname, { color }]} numberOfLines={1}>{now ? '▶ ' : ''}{p.name}</Text>
+            <Wheel game={game} player={i} size={many ? 120 : 150} />
+            <Text style={s.pscore}>{p.score} pts · {wonCount(game, p)}/{game.categories.length}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 function BoardInner({ flow, canAct, act, record, newRecord, onAgain, onHome }: {
   flow: Flow; canAct: boolean; act: (a: Action) => void;
   record?: string | null; newRecord?: boolean; onAgain?: () => void; onHome: () => void;
@@ -46,8 +66,7 @@ function BoardInner({ flow, canAct, act, record, newRecord, onAgain, onHome }: {
     const open = game.categories.filter((k) => !isCatDone(player, k));
     return (
       <>
-        <Text style={s.muted}>{player.score} pts · {wonCount(game, player)}/{game.categories.length} catégories</Text>
-        <View style={s.center}><Wheel game={game} player={game.current} /></View>
+        <Scores game={game} />
         <Text style={s.label}>{canAct ? 'Choisis une catégorie' : 'Catégories à remplir'}</Text>
         <View style={s.grid}>
           {open.map((k) => {
@@ -60,11 +79,6 @@ function BoardInner({ flow, canAct, act, record, newRecord, onAgain, onHome }: {
             );
           })}
         </View>
-        {game.players.length > 1 && (
-          <View style={s.card}>
-            {game.players.map((p, i) => <Text key={i} style={[s.text, i === game.current && s.bold]}>{i === game.current ? '▶ ' : ''}{p.name} — {p.score} pts · {wonCount(game, p)}/{game.categories.length}</Text>)}
-          </View>
-        )}
       </>
     );
   }
@@ -177,7 +191,7 @@ export function Board(props: Parameters<typeof BoardInner>[0]) {
       {step !== 'victory' && (
         <View style={[s.turnBar, { borderColor: color }]} accessibilityLiveRegion="polite">
           <View style={[s.turnDot, { backgroundColor: color }]} />
-          <Text style={[s.turnBarTxt, { color }]} numberOfLines={1}>
+          <Text style={[s.turnBarTxt, { color }]}>
             {canAct ? `${player.name}, c'est à toi de jouer` : `👀 ${player.name} joue…`}
           </Text>
         </View>
