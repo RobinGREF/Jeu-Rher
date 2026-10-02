@@ -6,7 +6,7 @@ import {
   syncBotAnnouncements, setPass, unanswered, syncBotSignals, toggleSignal, tops,
   type GameState, type SignalKind,
 } from './src/engine';
-import { Celebration, celebrationMs, type Celebrate } from './src/Celebration';
+import { Celebration, type Celebrate } from './src/Celebration';
 import { InfoPanel } from './src/InfoPanel';
 import { ScoreBoard, type SharedScores } from './src/ScoreBoard';
 import { addScore, cleanName, clearScores, loadScores, saveScores, type ScoreEntry } from './src/scores';
@@ -202,11 +202,6 @@ export default function App() {
     setScores(list); setLastRank(rank); setLastScoreId(entry.id); setLastCode(online ? osnap?.code ?? null : null);
   }, [game?.over]);
 
-  useEffect(() => {
-    if (!party) return;
-    const id = setTimeout(() => setParty((cur) => (cur && cur.key === party.key ? null : cur)), celebrationMs(party));
-    return () => clearTimeout(id);
-  }, [party]);
 
   // La carte posée reste mise en évidence le temps choisi, puis la vue se remet à plat.
   useEffect(() => {
@@ -753,7 +748,7 @@ export default function App() {
       )}
 
       {party && (
-        <Celebration c={party} width={width} height={height} tokenSize={tokenSize} rowY={rowY} target={{ x: width - 126, y: 16 }} />
+        <Celebration key={party.key} c={party} onEnd={() => setParty((cur) => (cur && cur.key === party.key ? null : cur))} width={width} height={height} tokenSize={tokenSize} rowY={rowY} target={{ x: width - 126, y: 16 }} />
       )}
 
       {info && (

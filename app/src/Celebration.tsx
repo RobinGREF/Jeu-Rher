@@ -15,9 +15,8 @@ const COLORS = ['#f59e0b', '#22c55e', '#3b82f6', '#ef4444', '#eab308', '#a855f7'
 const CONFETTI_AT = 700; // après l'arrivée de la carte sur le tas
 const FLY_AT = 1500;
 const TOTAL = 3700;
-/** Plusieurs missions d'un coup : chacune est fêtée à son tour en plein écran (touche pour passer à la suivante). */
+/** Chaque mission réussie est fêtée en plein écran, l'une après l'autre ; on avance au toucher (rien ne défile tout seul). */
 const SPOT_START = 600;
-const SPOT_MS = 2100;
 
 function Confetti({ width, height }: { width: number; height: number }) {
   const parts = useMemo(
@@ -127,34 +126,34 @@ function Banner({ text, y, small }: { text: string; y: number; small?: boolean }
   );
 }
 
-/** Durée totale de la fête : plusieurs missions à la suite ajoutent un plein écran chacune. */
-export const celebrationMs = (c: { done: unknown[] }) => (c.done.length > 1 ? SPOT_START + c.done.length * SPOT_MS + TOTAL : TOTAL);
-
-/** Une mission en plein écran, avec ses confettis ; la suivante prend le relais (ou un toucher la fait passer). */
-function Spotlight({ defs, width, height, onDone }: { defs: MissionDef[]; width: number; height: number; onDone: () => void }) {
+/** Un écran par mission (puis un pour la médaille) ; chaque écran attend un toucher. */
+function Spotlight({ defs, medal, width, height, onDone }: { defs: MissionDef[]; medal: string | null; width: number; height: number; onDone: () => void }) {
+  const slides = defs.length + (medal ? 1 : 0);
   const [i, setI] = useState(-1);
   useEffect(() => {
     if (i === -1) { const id = setTimeout(() => setI(0), SPOT_START); return () => clearTimeout(id); }
-    if (i >= defs.length) { onDone(); return; }
-    const id = setTimeout(() => setI(i + 1), SPOT_MS);
-    return () => clearTimeout(id);
+    if (i >= slides) onDone();
   }, [i]); // eslint-disable-line react-hooks/exhaustive-deps
   const pop = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     pop.setValue(0);
     if (i >= 0) Animated.spring(pop, { toValue: 1, friction: 5, tension: 70, useNativeDriver: false }).start();
   }, [i]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (i < 0 || i >= defs.length) return null;
+  if (i < 0 || i >= slides) return null;
   const size = Math.min(width - 56, height * 0.4, 340);
+  const isMedal = i >= defs.length;
   return (
     <Pressable onPress={() => setI(i + 1)} style={s.spot} accessibilityLabel="Mission réussie, toucher pour continuer">
       <Confetti key={`sc${i}`} width={width} height={height} />
-      <Text style={s.spotTitle}>🎉 Mission réussie !</Text>
-      <Text style={s.spotCount}>{i + 1} sur {defs.length}</Text>
+      <Text style={s.spotTitle}>{isMedal ? `🏅 Médaille ${medal} !` : '🎉 Mission réussie !'}</Text>
+      {defs.length > 1 && !isMedal && <Text style={s.spotCount}>{i + 1} sur {defs.length}</Text>}
       <Animated.View style={{ transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }], opacity: pop }}>
-        <View style={s.glow}><MissionToken def={defs[i]} size={size} showText={false} onPress={() => {}} /></View>
+        {isMedal
+          ? <Text style={{ fontSize: size * 0.7 }}>{medal === "d'or" ? '🥇' : medal === "d'argent" ? '🥈' : '🥉'}</Text>
+          : <View style={s.glow} pointerEvents="none"><MissionToken def={defs[i]} size={size} showText={false} onPress={() => {}} /></View>}
       </Animated.View>
-      <Text style={s.spotLabel}>{defs[i].label}</Text>
+      {!isMedal && <Text style={s.spotLabel}>{defs[i].label}</Text>}
+      <Text style={s.spotHint}>👆 Touche pour continuer</Text>
     </Pressable>
   );
 }
@@ -163,17 +162,22 @@ function Spotlight({ defs, width, height, onDone }: { defs: MissionDef[]; width:
  * Fête d'une mission réussie : confettis, bandeau, puis le jeton de la mission s'envole
  * vers le compteur de missions réussies avec « +N ».
  */
-export function Celebration({ c, width, height, tokenSize, rowY, target }: {
-  c: Celebrate; width: number; height: number; tokenSize: number; rowY: number; target: { x: number; y: number };
+export function Celebration({ c, width, height, tokenSize, rowY, target, onEnd }: {
+  c: Celebrate; width: number; height: number; tokenSize: number; rowY: number; target: { x: number; y: number }; onEnd: () => void;
 }) {
   const gap = 6;
-  const multi = c.done.length > 1;
-  const [spotDone, setSpotDone] = useState(!multi); // plusieurs missions : d'abord chacune en plein écran
+  const [spotDone, setSpotDone] = useState(false); // d'abord chaque mission en plein écran, au toucher
+  // Après le plein écran : le vol des jetons vers le compteur, puis la fête se termine.
+  useEffect(() => {
+    if (!spotDone) return;
+    const id = setTimeout(onEnd, TOTAL);
+    return () => clearTimeout(id);
+  }, [spotDone]); // eslint-disable-line react-hooks/exhaustive-deps
   const text = c.medal ? `🏅 Médaille ${c.medal} !` : c.gained > 1 ? `🎉 ${c.gained} missions réussies !` : '🎉 Mission réussie !';
   if (!spotDone) {
     return (
       <View style={s.layer}>
-        <Spotlight defs={c.done.map((d) => d.def)} width={width} height={height} onDone={() => setSpotDone(true)} />
+        <Spotlight defs={c.done.map((d) => d.def)} medal={c.medal} width={width} height={height} onDone={() => setSpotDone(true)} />
       </View>
     );
   }
@@ -198,6 +202,7 @@ const s = StyleSheet.create({
   spot: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(2,6,23,0.9)', alignItems: 'center', justifyContent: 'center', gap: 14, padding: 20 },
   spotTitle: { color: '#fde047', fontSize: 30, fontWeight: '900', textAlign: 'center' },
   spotCount: { color: '#e2e8f0', fontSize: 18, fontWeight: '800' },
+  spotHint: { color: '#fde68a', fontSize: 16, fontWeight: '800', marginTop: 6 },
   spotLabel: { color: '#fff', fontSize: 20, fontWeight: '800', textAlign: 'center', paddingHorizontal: 8 },
   glow: { borderRadius: 999, shadowColor: '#fde047', shadowOpacity: 1, shadowRadius: 16, shadowOffset: { width: 0, height: 0 }, elevation: 12 },
   plus: { position: 'absolute', width: 48, textAlign: 'center', color: '#fde047', fontSize: 22, fontWeight: '900', textShadowColor: '#000', textShadowRadius: 4 },
