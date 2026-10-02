@@ -9,7 +9,27 @@ import { Wheel } from './Wheel';
  * Le jeu lui-même : affiche l'état du tour et envoie les actions du joueur.
  * `canAct` est faux pour qui regarde jouer un autre (en ligne) : mêmes écrans, sans les boutons.
  */
-export function Board({ flow, canAct, act, record, newRecord, onAgain, onHome }: {
+/** Une rosace par joueur, avec son nom, son score et ses catégories gagnées : le joueur courant est entouré à sa couleur. */
+function Scores({ game }: { game: Flow['game'] }) {
+  const many = game.players.length > 1;
+  return (
+    <View style={s.players}>
+      {game.players.map((p, i) => {
+        const color = TURN_COLORS[i % TURN_COLORS.length];
+        const now = i === game.current;
+        return (
+          <View key={i} style={[s.pcard, many && s.pcardHalf, now && { borderColor: color }]} accessibilityLabel={`${p.name} : ${p.score} points, ${wonCount(game, p)} catégories sur ${game.categories.length}`}>
+            <Text style={[s.pname, { color }]} numberOfLines={1}>{now ? '▶ ' : ''}{p.name}</Text>
+            <Wheel game={game} player={i} size={many ? 120 : 150} />
+            <Text style={s.pscore}>{p.score} pts · {wonCount(game, p)}/{game.categories.length}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function BoardInner({ flow, canAct, act, record, newRecord, onAgain, onHome }: {
   flow: Flow; canAct: boolean; act: (a: Action) => void;
   record?: string | null; newRecord?: boolean; onAgain?: () => void; onHome: () => void;
 }) {
@@ -26,10 +46,6 @@ export function Board({ flow, canAct, act, record, newRecord, onAgain, onHome }:
     act({ t: 'blind' });
     setInput('');
   };
-  const banner = !canAct && step !== 'victory' && (
-    <View style={s.watch}><Text style={s.watchTxt}>👀 {player.name} joue…</Text></View>
-  );
-
   if (step === 'victory') {
     const solo = game.players.length === 1;
     return (
@@ -50,10 +66,7 @@ export function Board({ flow, canAct, act, record, newRecord, onAgain, onHome }:
     const open = game.categories.filter((k) => !isCatDone(player, k));
     return (
       <>
-        <Text style={[s.turn, { color: TURN_COLORS[game.current % TURN_COLORS.length] }]}>Au tour de {player.name}</Text>
-        <Text style={s.muted}>{player.score} pts · {wonCount(game, player)}/{game.categories.length} catégories</Text>
-        {banner}
-        <View style={s.center}><Wheel game={game} player={game.current} /></View>
+        <Scores game={game} />
         <Text style={s.label}>{canAct ? 'Choisis une catégorie' : 'Catégories à remplir'}</Text>
         <View style={s.grid}>
           {open.map((k) => {
@@ -66,11 +79,6 @@ export function Board({ flow, canAct, act, record, newRecord, onAgain, onHome }:
             );
           })}
         </View>
-        {game.players.length > 1 && (
-          <View style={s.card}>
-            {game.players.map((p, i) => <Text key={i} style={[s.text, i === game.current && s.bold]}>{p.name} — {p.score} pts · {wonCount(game, p)}/{game.categories.length}</Text>)}
-          </View>
-        )}
       </>
     );
   }
@@ -79,7 +87,6 @@ export function Board({ flow, canAct, act, record, newRecord, onAgain, onHome }:
     const c = catInfo(turn.cat);
     return (
       <>
-        {banner}
         <Text style={[s.pill, { backgroundColor: c.color, alignSelf: 'center' }]}>{c.emoji} {c.label}</Text>
         <Text style={s.label}>Quelle difficulté ?</Text>
         {DIFFICULTIES.map((d) => (
@@ -100,7 +107,7 @@ export function Board({ flow, canAct, act, record, newRecord, onAgain, onHome }:
   if (step === 'preq') {
     return (
       <View style={s.card}>
-        {banner}{head}
+        {head}
         {canAct && <>
           <Btn label="⚡ Répondre à l'aveugle — juste = points doublés (+ tu rejoues) !" onPress={() => act({ t: 'blindMode' })} />
           <Btn kind="ghost" label="👁️ Voir les 4 propositions" onPress={() => act({ t: 'reveal' })} />
@@ -112,7 +119,7 @@ export function Board({ flow, canAct, act, record, newRecord, onAgain, onHome }:
   if (step === 'blind') {
     return (
       <View style={s.card}>
-        {banner}{head}
+        {head}
         {canAct && <>
           <Text style={s.label}>Ta réponse</Text>
           <TextInput value={input} onChangeText={setInput} placeholder="Tape ta réponse…" placeholderTextColor="#8b93a7" style={s.input}
@@ -130,7 +137,7 @@ export function Board({ flow, canAct, act, record, newRecord, onAgain, onHome }:
   const bar = turn.blind ? d.step : stepGain(turn.diff!, turn.hint);
   return (
     <View style={s.card}>
-      {banner}{head}
+      {head}
       {turn.blind ? (
         result && <Text style={s.muted}>Réponse tapée : {turn.input}</Text>
       ) : (
@@ -167,5 +174,29 @@ export function Board({ flow, canAct, act, record, newRecord, onAgain, onHome }:
         </>
       )}
     </View>
+  );
+}
+
+/**
+ * Dit toujours à qui c'est de jouer : bandeau collé en haut de l'écran (même en faisant défiler), à la couleur du joueur.
+ * Celui qui doit jouer le lit à la deuxième personne ; les autres voient qui joue.
+ */
+export function Board(props: Parameters<typeof BoardInner>[0]) {
+  const { flow, canAct } = props;
+  const { game, step } = flow;
+  const player = game.players[game.current];
+  const color = TURN_COLORS[game.current % TURN_COLORS.length];
+  return (
+    <>
+      {step !== 'victory' && (
+        <View style={[s.turnBar, { borderColor: color }]} accessibilityLiveRegion="polite">
+          <View style={[s.turnDot, { backgroundColor: color }]} />
+          <Text style={[s.turnBarTxt, { color }]}>
+            {canAct ? `${player.name}, c'est à toi de jouer` : `👀 ${player.name} joue…`}
+          </Text>
+        </View>
+      )}
+      <BoardInner {...props} />
+    </>
   );
 }
