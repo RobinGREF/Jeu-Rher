@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { SafeAreaView, ScrollView, Pressable, Text, TextInput, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { reloadFresh } from '../reload';
 import { loadJson, removeKey, saveJson } from '../storage';
 import { Board } from './Board';
 import { CatPicker } from './CatPicker';
@@ -66,7 +67,10 @@ function Shell({ onHome, onRules, children }: { onHome: () => void; onRules: () 
       <View style={s.top}>
         <Pressable onPress={onHome} style={s.topBtn} accessibilityLabel="Retour à la liste des jeux"><Text style={s.topTxt}>← Jeux</Text></Pressable>
         <Text style={s.topTitle}>Duel de Savoir</Text>
-        <Pressable onPress={onRules} style={s.topBtn} accessibilityLabel="Règles"><Text style={[s.topTxt, { textAlign: 'right' }]}>📖</Text></Pressable>
+        <View style={s.topRight}>
+          <Pressable onPress={reloadFresh} style={s.topIcon} accessibilityLabel="Recharger la dernière version du jeu"><Text style={s.topTxt}>↻</Text></Pressable>
+          <Pressable onPress={onRules} style={s.topIcon} accessibilityLabel="Règles"><Text style={s.topTxt}>📖</Text></Pressable>
+        </View>
       </View>
       <ScrollView contentContainerStyle={s.body}>{children}</ScrollView>
     </SafeAreaView>

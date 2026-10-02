@@ -26,6 +26,8 @@ export const s = StyleSheet.create({
   body: { padding: 16, gap: 12, maxWidth: 560, width: '100%', alignSelf: 'center' },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 8 },
   topBtn: { padding: 8, minWidth: 64 },
+  topRight: { flexDirection: 'row', minWidth: 64, justifyContent: 'flex-end' },
+  topIcon: { padding: 8 },
   topTxt: { color: '#d4af37', fontWeight: '800', fontSize: 15 },
   topTitle: { color: '#ece7db', fontWeight: '800', fontSize: 16 },
   title: { color: '#d4af37', fontSize: 28, fontWeight: '900', textAlign: 'center' },
