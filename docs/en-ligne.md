@@ -64,3 +64,16 @@ Quelqu'un qui tape le code d'une partie déjà lancée rejoint **en spectateur**
 
 ## Mode télé
 Sur une télé (ou n'importe quel grand écran), ouvrir le jeu → **📺 Écran télé** → taper le code du salon → **Afficher la table**. La télé suit la partie sans jouer et sans prendre de place : missions en grand avec leur texte, les 4 tas, les joueurs (prénoms, qui joue, qui se positionne sur quelle mission), le dernier coup et les missions réussies. Les mains restent cachées jusqu'à la fin de la partie, où elles sont dévoilées avec la raison de l'arrêt. On peut la lancer avant le début de la partie : elle attend. Aucune règle Firebase à changer.
+
+
+## Duel de savoir en ligne
+
+Duel de savoir (dossier `solo/`) utilise le même projet Firebase, dans son propre nœud `duel/rooms/<code>` (les salons de 50 Missions ne sont pas touchés).
+Un joueur crée un salon et donne son code à 4 lettres ; chacun joue à son tour sur son téléphone, les autres voient la question et la rosace en direct.
+La bonne réponse n'est publiée qu'une fois la question jouée. L'hôte fait tourner la partie ; il choisit les catégories et lance quand tout le monde est là ; on peut arriver après le début en spectateur.
+
+⚠️ **Il faut republier les règles** : Firebase → Realtime Database → Règles → coller le contenu de `app/firebase.rules.json` → Publier. Sans cela, créer ou rejoindre un salon de Duel échoue (accès refusé).
+
+La configuration Firebase vient de `solo/.env` (mêmes valeurs publiques que `app/.env`). Pour essayer sans Firebase, deux onglets d'un même navigateur : construire avec `EXPO_PUBLIC_ONLINE_BACKEND=local`.
+
+Limites : si l'hôte recharge la page ou la ferme, la partie s'arrête (pas de reprise comme dans 50 Missions) ; un joueur qui part en cours de route bloque son tour tant qu'il n'est pas revenu.

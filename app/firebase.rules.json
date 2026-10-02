@@ -72,6 +72,32 @@
           ".validate": false
         }
       }
+    },
+    "duel": {
+      "rooms": {
+        "$code": {
+          "meta": {
+            ".read": "auth != null",
+            ".write": "auth != null && ((!data.exists() && newData.child('hostUid').val() === auth.uid) || data.child('hostUid').val() === auth.uid)"
+          },
+          "players": {
+            ".read": "auth != null",
+            "$uid": {
+              ".write": "auth != null && auth.uid === $uid"
+            }
+          },
+          "state": {
+            ".read": "auth != null",
+            ".write": "auth != null && root.child('duel').child('rooms').child($code).child('meta').child('hostUid').val() === auth.uid"
+          },
+          "intents": {
+            ".read": "auth != null && root.child('duel').child('rooms').child($code).child('meta').child('hostUid').val() === auth.uid",
+            "$id": {
+              ".write": "auth != null && (newData.child('uid').val() === auth.uid || (!newData.exists() && root.child('duel').child('rooms').child($code).child('meta').child('hostUid').val() === auth.uid))"
+            }
+          }
+        }
+      }
     }
   }
 }
