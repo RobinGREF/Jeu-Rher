@@ -64,13 +64,6 @@ jobs:
             mkdir -p ../site/$dir
             cp -r dist-$id/. ../site/$dir/
           done
-      - name: Rendre chaque jeu installable (icône + manifeste)
-        working-directory: .
-        run: |
-          sh hub/pwa.sh site/50-missions 50-missions "50 Missions" "#d97706"
-          sh hub/pwa.sh site/famille-fight famille-fight "Famille Fight" "#dc2626"
-          sh hub/pwa.sh site/duel-de-savoir duel-de-savoir "Duel de savoir" "#2563eb"
-          sh hub/pwa.sh site/memo memo "Mémo des paires" "#0ea5e9"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

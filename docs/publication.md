@@ -35,5 +35,5 @@ Tous les jeux vivent dans ce dépôt : `app/` (50 Missions, → `/50-missions/`)
 
 Les petits jeux solo (Duel de savoir, Mémo des paires) vivent dans `solo/` : un seul projet Expo, construit une fois par jeu (`EXPO_PUBLIC_GAME=duel|memo`) et servi sous `/duel-de-savoir/` et `/memo/`. Pour un nouveau jeu solo : ajouter son dossier dans `solo/src/`, un cas dans `solo/App.tsx`, une entrée dans la boucle du workflow, et une ligne dans `hub/games.json`.
 
-## Jeux installables
-Chaque jeu est installable (« Ajouter à l'écran d'accueil ») avec son icône : `hub/pwa.sh <dossier> <id> <nom> <couleur>` ajoute le manifeste et les icônes (`hub/icons/<id>-192.png` / `-512.png`) et les liens dans le `index.html` du jeu ; le workflow l'appelle pour chaque jeu. Nouveau jeu : ses deux icônes dans `hub/icons/`, une ligne dans le workflow. La page d'accueil affiche les jeux en grille de logos carrés (2 par ligne).
+## Installation (raccourci)
+Seule la **page d'accueil « Jeu des vacances »** est installable (« Ajouter à l'écran d'accueil » / « Installer l'application »), avec son manifeste `hub/manifest.webmanifest` et ses icônes `hub/icons/hub-*.png`. Son périmètre (`scope`) couvre tout le site : les jeux s'ouvrent dans la même fenêtre d'application, et le bouton « ← Jeux » de chaque jeu ramène à l'accueil. Les jeux n'ont pas de manifeste propre : on n'installe qu'un seul raccourci. La page d'accueil affiche les jeux en grille de logos carrés (2 par ligne).
