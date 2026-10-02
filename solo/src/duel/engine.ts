@@ -101,6 +101,10 @@ export function levenshtein(a: string, b: string): number {
 const typoBudget = (len: number) => (len <= 1 ? 0 : len <= 5 ? 1 : len <= 10 ? 2 : 3);
 
 export function matchesOneAnswer(input: string, answer: string): boolean {
+  // Réponse d'un seul signe ou d'une seule lettre (« @ », « C », « Q ») : la normalisation l'effacerait, on compare telle quelle.
+  const raw = input.trim().toLowerCase();
+  const bare = answer.trim().toLowerCase();
+  if (raw && (raw === bare || raw === bare.replace(/^(le|la|les|l'|un|une) /, ''))) return true;
   const ni = normalizeAnswer(input);
   const nc = normalizeAnswer(answer);
   if (ni.length < 1) return false;

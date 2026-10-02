@@ -127,6 +127,12 @@ test("réponse à l'aveugle : fautes, accents, articles, chiffres isolés", () =
   assert.ok(!matchesOneAnswer('7', '5'));
   assert.ok(!matchesOneAnswer('x', 'Paris'));
   assert.ok(!matchesOneAnswer('', 'Paris'));
+  // réponses d'un seul signe ou d'une seule lettre
+  assert.ok(matchesOneAnswer('@', '@'));
+  assert.ok(matchesOneAnswer('c', 'Le C'));
+  assert.ok(matchesOneAnswer('Q', 'Q'));
+  assert.ok(!matchesOneAnswer('#', '@'));
+  assert.ok(!matchesOneAnswer('d', 'Le C'));
   const q = { diff: 'facile' as const, q: '', choices: ['Molière', 'a', 'b', 'c'], correct: 0, alt: ['Jean-Baptiste Poquelin'] };
   assert.ok(isBlindCorrect('moliere', q));
   assert.ok(isBlindCorrect('poquelin', q));
