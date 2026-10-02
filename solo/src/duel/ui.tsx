@@ -63,6 +63,10 @@ export const s = StyleSheet.create({
   catTxt: { color: '#ece7db', fontWeight: '700', fontSize: 14, textAlign: 'center' },
   catSub: { color: '#8b93a7', fontSize: 12, fontWeight: '700', textAlign: 'center' },
   turn: { fontSize: 22, fontWeight: '900', textAlign: 'center' },
+  // bandeau « à qui de jouer » : collé en haut (sur le web) pour rester visible quand on fait défiler
+  turnBar: { position: 'sticky' as never, top: 0, zIndex: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#1a1e2a', borderWidth: 2, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14 },
+  turnDot: { width: 14, height: 14, borderRadius: 7 },
+  turnBarTxt: { fontSize: 18, fontWeight: '900', flexShrink: 1 },
   watch: { backgroundColor: '#21273a', borderRadius: 10, padding: 10 },
   watchTxt: { color: '#d4af37', fontWeight: '800', textAlign: 'center' },
   center: { alignItems: 'center', gap: 8 },
