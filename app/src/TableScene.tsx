@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { CardView } from './CardView';
 import type { GameState } from './engine';
@@ -34,9 +34,23 @@ function Countdown({ ms }: { ms: number }) {
 /** Petit logo Σ : les sommes de chaque famille sur les 4 tas, et la somme totale. */
 function SumBadge({ cards, grid }: { cards: Card[]; grid?: boolean }) {
   const { per, total } = sumsOf(cards);
+  // Repliable : on touche le Σ pour déplier / replier (choix retenu sur l'appareil).
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem('50m-sum-open') !== '0'; } catch { return true; } });
+  const toggle = () => { const v = !open; setOpen(v); try { localStorage.setItem('50m-sum-open', v ? '1' : '0'); } catch { /* sans stockage */ } };
+  if (!open) {
+    return (
+      <Pressable onPress={toggle} style={[s.sum, s.sumClosed]} accessibilityLabel={`Sommes repliées, total ${total}. Toucher pour déplier`}>
+        <Text style={s.sumTitle}>Σ {total}</Text>
+        <Text style={s.sumChevron}>▾</Text>
+      </Pressable>
+    );
+  }
   return (
     <View style={s.sum} accessibilityLabel={`Sommes : ${SYMBOLS.map((sy, i) => `${sy.name} ${per[i]}`).join(', ')}, total ${total}`}>
-      <Text style={s.sumTitle}>Σ</Text>
+      <Pressable onPress={toggle} accessibilityLabel="Replier les sommes" style={s.sumHead}>
+        <Text style={s.sumTitle}>Σ</Text>
+        <Text style={s.sumChevron}>▴</Text>
+      </Pressable>
       <View style={grid ? s.sumGrid : undefined}>
         {SYMBOLS.map((sy, i) => (
           <View key={sy.name} style={[s.sumRow, { opacity: per[i] ? 1 : 0.45 }]}>
@@ -235,6 +249,9 @@ const s = StyleSheet.create({
   countBar: { height: 3, backgroundColor: '#f59e0b' },
   me: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   sum: { backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 10, paddingVertical: 4, paddingHorizontal: 4, alignItems: 'center', gap: 2, marginLeft: 4 },
+  sumHead: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  sumClosed: { flexDirection: 'row', paddingHorizontal: 8, paddingVertical: 6, gap: 4 },
+  sumChevron: { color: '#fde68a', fontSize: 11, fontWeight: '900' },
   sumTitle: { color: '#fde68a', fontSize: 14, fontWeight: '900', lineHeight: 15 },
   sumGrid: { flexDirection: 'row', flexWrap: 'wrap', width: 74, justifyContent: 'center', gap: 2 },
   sumRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
