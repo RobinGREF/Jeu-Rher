@@ -126,8 +126,10 @@ export default function App() {
   const [picked, setPicked] = useState<string[]>([]);
 
   const { width, height } = useWindowDimensions();
-  const tokenSize = loupe ? Math.max(70, Math.min((width - 32 - 12) / 2, (height - 450) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
-  const scale = loupe ? 0.62 : Math.min(1, Math.max(0.72, (height - 200) / 560));
+  // La barre du bas est plus haute en fin de partie (explication) ou en spectateur : les missions en loupe lui laissent la place.
+  const tallBar = (!!game && game.over && game.completed < 50 && !resultSeen) || (online && !!osnap?.spectator);
+  const tokenSize = loupe ? Math.max(64, Math.min((width - 32 - 12) / 2, (height - 450 - (tallBar ? 120 : 0)) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
+  const scale = loupe ? 0.62 : Math.min(1, Math.max(0.66, (height - 200 - (tallBar ? 90 : 0)) / 560));
 
   const solo = mode === 'solo';
   const botSeats = (n: number) => (solo ? Array.from({ length: n - 1 }, (_, i) => i + 1) : []);
@@ -614,7 +616,7 @@ export default function App() {
   const missionText = game.missions.find((m) => m.id === textFor)?.label;
   const sigHint = { play: '', help: 'Touche la mission pour laquelle tu peux aider', good: 'Touche le tas où tu as une bonne carte', stop: 'Touche le tas où il ne faut pas jouer' }[sigMode];
   const toggleSig = (k: SignalKind) => setSigMode(sigMode === k ? 'play' : k);
-  const turnTitle = review ? '🛑 Fin de partie' : spectator ? `👀 ${seat(game.current)} joue…` : solo || online ? (game.current === me ? 'À toi de jouer' : waitingBot ? `${botName} va jouer` : `${seat(game.current)} joue…`) : `Joueur ${game.current + 1} joue`;
+  const turnTitle = review ? '🛑 Fin' : spectator ? `👀 ${seat(game.current)} joue…` : solo || online ? (game.current === me ? 'À toi de jouer' : waitingBot ? `${botName} va jouer` : `${seat(game.current)} joue…`) : `Joueur ${game.current + 1} joue`;
   const stuck = game.current;
   const stuckYou = (online || solo) && stuck === me;
   const stuckName = seat(stuck).replace(' (machine)', '');
@@ -683,7 +685,7 @@ export default function App() {
         <View style={s.bar}>
           <Text style={s.whyTitle}>La partie s'arrête : {game.completed}/50 missions</Text>
           <Text style={s.whyTxt}>{why}</Text>
-          <Text style={s.barTxt}>Quand un joueur ne peut pas jouer, c'est fini. Les mains sont dévoilées.</Text>
+          <Text style={[s.barTxt, { fontSize: 12 }]} numberOfLines={2}>Quand un joueur ne peut pas jouer, c'est fini. Les mains sont dévoilées.</Text>
           <Pressable onPress={() => setResultSeen(true)} style={[s.goBtn, s.grow]} accessibilityLabel="Voir le résultat"><Text style={s.goTxt}>Voir le résultat</Text></Pressable>
         </View>
       ) : (
@@ -794,7 +796,7 @@ const s = StyleSheet.create({
   tipTxt: { color: '#111827', fontWeight: '800', fontSize: 13, textAlign: 'center' },
   bar: { gap: 4 },
   whyTitle: { color: '#fca5a5', fontWeight: '900', fontSize: 15, textAlign: 'center' },
-  whyTxt: { color: '#f8fafc', fontWeight: '700', fontSize: 14, textAlign: 'center' },
+  whyTxt: { color: '#f8fafc', fontWeight: '700', fontSize: 13, textAlign: 'center' },
   askRow: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#1e3a8a', borderRadius: 12, paddingVertical: 6, paddingHorizontal: 10, marginBottom: 6 },
   askTxt: { flex: 1, color: '#e0e7ff', fontWeight: '700', fontSize: 13 },
   askYes: { backgroundColor: '#16a34a', borderRadius: 8, paddingVertical: 6, paddingHorizontal: 10 },
