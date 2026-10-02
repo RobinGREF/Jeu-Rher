@@ -85,7 +85,7 @@ Familly Fight (dossier `combat/`) utilise le même projet Firebase, dans son pro
 
 **Principe : les deux appareils calculent le même combat.** Ils n'échangent que leurs touches, image par image, avec un petit retard d'entrée (5 à 16 images, calculé d'après la latence mesurée dans le salon) pour laisser le temps au réseau. Aucun joueur n'est « l'hôte du calcul » : personne n'a l'avantage. Si les touches de l'adversaire n'arrivent pas, le jeu attend (« Connexion lente… ») ; après 10 secondes sans nouvelles, le combat s'arrête.
 
-Données écrites : `meta` (créateur, personnage, décor), `guest` (l'adversaire et son personnage), `start` (lancement du combat), `net/ping` et `net/pong` (mesure de latence), `in/h` et `in/g` (les dernières touches de chaque joueur, une petite chaîne qui se remplace). Le salon est supprimé quand l'hôte part.
+Données écrites : `meta` (créateur, personnage, décor), `guest` (l'adversaire et son personnage), `start` (lancement du combat), `net/ping` et `net/pong` (mesure de latence), `in/h` et `in/g` (les dernières touches de chaque joueur, une petite chaîne qui se remplace). Le salon reste même si l'hôte change d'appli un instant (pour envoyer le code par WhatsApp) ; il est supprimé quand l'hôte quitte par le menu.
 
 ⚠️ **Il faut republier les règles** : Firebase → Realtime Database → Règles → coller le contenu de `app/firebase.rules.json` → Publier. Sans cela, créer ou rejoindre un salon de Familly Fight échoue (accès refusé).
 

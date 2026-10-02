@@ -471,7 +471,6 @@ async function onlineCreate() {
     const base = `combat/rooms/${code}`;
     await be.set(base + '/meta', { hostUid: uid, char: G.picks[0], stage: G.stageIdx, at: Date.now() });
     const net = G.net = { be, uid, code, base, side: 0, isHost: true, guest: null, rtts: [], sent: {}, pingN: 0, unsubs: [], timers: [] };
-    be.removeOnDisconnect(base + '/meta');
     net.unsubs.push(be.onValue(base + '/guest', v => {
       const had = !!net.guest; net.guest = v;
       if (v && !had) { be.remove(base + '/start').catch(() => {}); sfx('ok'); }
@@ -495,16 +494,22 @@ async function onlineJoin(code) {
     if (!meta) throw new Error('Salon introuvable : vérifie le code.');
     const g = await be.get(base + '/guest');
     if (g && g.uid !== uid) throw new Error('Ce salon est déjà complet.');
-    G.net = { be, uid, code, base, side: 1, isHost: false, meta, unsubs: [], timers: [], lastStartId: null };
+    G.net = { be, uid, code, base, side: 1, isHost: false, meta, unsubs: [], timers: [], lastStartId: null, t0: performance.now() };
     G.netMsg = ''; G.online = true; G.mode = 1;
     G.sel = { cursor: G.picks[0], step: 0 }; G.scene = 'select';
-  } catch (e) { netErr(e); G.scene = 'online'; }
+  } catch (e) { netErr(/introuvable|complet/.test(e.message || '') ? e : new Error('Impossible de rejoindre : ' + ((e && e.message) || e))); G.scene = 'online'; }
 }
 async function guestReady() {
   const net = G.net, { be, base, uid } = net;
   try {
     await be.set(base + '/guest', { uid, char: G.picks[0] });
     be.removeOnDisconnect(base + '/guest');
+    // si la connexion saute un instant (appli en arrière-plan), on se réinscrit au retour
+    net.unsubs.push(be.onValue('.info/connected', v => {
+      if (v !== true || !net.joined || G.net !== net) return;
+      be.set(base + '/guest', { uid, char: G.picks[0] }).then(() => be.removeOnDisconnect(base + '/guest')).catch(() => {});
+    }));
+    net.joined = true;
     net.unsubs.push(be.onValue(base + '/meta', v => {
       if (!v) { netErr(new Error('L\'hôte a quitté le salon.')); if (G.net === net) leaveOnline('online'); } else net.meta = v;
     }, netErr));
@@ -513,7 +518,7 @@ async function guestReady() {
       if (v && v.id !== net.lastStartId) { net.lastStartId = v.id; startOnlineMatch(v); }
       else if (!v && G.match && G.match.net) { stopMatchNet(); G.scene = 'lobby'; G.netMsg = 'L\'hôte a quitté le combat.'; }
     }, netErr));
-    net.unsubs.push(be.onValue(base + '/net/ping', v => { if (v) be.set(base + '/net/pong', { n: v.n }).catch(() => {}); }));
+    net.unsubs.push(be.onValue(base + '/net/ping', v => { if (v) { net.lastPing = performance.now(); be.set(base + '/net/pong', { n: v.n }).catch(() => {}); } }));
     G.netMsg = ''; G.scene = 'lobby';
   } catch (e) { netErr(e); leaveOnline('online'); }
 }
@@ -1228,7 +1233,10 @@ function drawLobby() {
   if (net.isHost && net.guest) {
     text(isTouch ? 'TOUCHE ICI POUR LANCER' : 'ENTRÉE : LANCER LE COMBAT', W / 2, 466, 28, '#7dff9a');
     clickable(W / 2 - 280, 445, 560, 40, hostLaunch);
-  } else if (!net.isHost) text('En attente du lancement par l\'hôte…', W / 2, 466, 24, '#ffd23f');
+  } else if (!net.isHost) {
+    const silent = performance.now() - (net.lastPing || net.t0) > 8000;
+    text(silent ? 'L\'hôte ne répond plus… (il a peut-être quitté)' : 'En attente du lancement par l\'hôte…', W / 2, 466, silent ? 20 : 24, silent ? '#ff9a6b' : '#ffd23f');
+  }
   if (G.netMsg) text(G.netMsg, W / 2, 292, 20, '#ff9a6b');
   text('‹ QUITTER', 70, 40, 24, '#fff', 'left');
   clickable(20, 10, 180, 60, () => { leaveOnline('online'); });
