@@ -4,6 +4,7 @@
 'use strict';
 
 const CFG = window.GAME_CONFIG;
+const BUILD = 'v5';  // affiché dans le salon : permet de vérifier que les deux téléphones ont la même version
 const W = 960, H = 540, GROUND = 470, STAGE_L = 50, STAGE_R = 910, GRAV = 0.8;
 const cv = document.getElementById('game');
 const ctx = cv.getContext('2d');
@@ -472,7 +473,7 @@ async function onlineCreate() {
     const meta = { hostUid: uid, char: G.picks[0], stage: G.stageIdx, at: Date.now() };
     await be.set(base + '/meta', meta);
     if (!(await be.get(base + '/meta'))) throw new Error('Le salon n\'a pas pu être enregistré.');
-    const net = G.net = { be, uid, code, base, side: 0, isHost: true, guest: null, rtts: [], sent: {}, pingN: 0, unsubs: [], timers: [] };
+    const net = G.net = { be, uid, code, base, side: 0, isHost: true, guest: null, rtts: [], sent: {}, pingN: 0, unsubs: [], timers: [], roomOk: true };
     net.unsubs.push(be.onValue(base + '/guest', v => {
       const had = !!net.guest; net.guest = v;
       if (v && !had) { be.remove(base + '/start').catch(() => {}); sfx('ok'); }
@@ -484,7 +485,7 @@ async function onlineCreate() {
     net.timers.push(setInterval(() => {
       const k = ++net.pingN; net.sent[k] = performance.now(); be.set(base + '/net/ping', { n: k }).catch(() => {});
       // le salon doit rester là tant que l'hôte est dans le jeu : on le recrée s'il a disparu
-      if (k % 5 === 0) be.get(base + '/meta').then(m => { if (!m && G.net === net) be.set(base + '/meta', meta); }).catch(() => {});
+      if (k % 5 === 0) be.get(base + '/meta').then(m => { net.roomOk = !!m; if (!m && G.net === net) be.set(base + '/meta', meta); }).catch(() => { net.roomOk = false; });
     }, 900));
     G.netMsg = '';
   } catch (e) { netErr(e); leaveOnline('online'); }
@@ -496,7 +497,7 @@ async function onlineJoin(code) {
     const base = `combat/rooms/${code}`;
     let meta = await be.get(base + '/meta');
     for (let t = 0; !meta && t < 3; t++) { await new Promise(r => setTimeout(r, 900)); meta = await be.get(base + '/meta'); }
-    if (!meta) throw new Error('Salon ' + code + ' introuvable : vérifie le code, et que l\'hôte est bien dans son salon.');
+    if (!meta) throw new Error('Salon ' + code + ' introuvable (' + BUILD + ') : vérifie le code, et que l\'hôte est bien dans son salon.');
     const g = await be.get(base + '/guest');
     if (g && g.uid !== uid) throw new Error('Ce salon est déjà complet.');
     G.net = { be, uid, code, base, side: 1, isHost: false, meta, unsubs: [], timers: [], lastStartId: null, t0: performance.now() };
@@ -1108,6 +1109,7 @@ function drawTitle() {
     if (i === 3) { clickable(W / 2 - 300, y - 23, 150, 46, () => { G.menuIdx = 3; cycleDiff(-1); }); clickable(W / 2 + 150, y - 23, 150, 46, () => { G.menuIdx = 3; cycleDiff(1); }); }
   });
   plainText('↑ ↓ pour choisir · ENTRÉE pour valider', W / 2, H - 30, 16, 'rgba(255,255,255,0.7)', 'center');
+  plainText(BUILD, W - 10, H - 12, 11, 'rgba(255,255,255,0.4)', 'right');
 }
 
 function drawControls() {
@@ -1219,6 +1221,7 @@ function drawLobby() {
     text('CODE', W / 2, 105, 22, '#ddd');
     text(net.code, W / 2, 168, 90, '#ffd23f');
     plainText('Donne ce code à ton adversaire (il choisit « Rejoindre un salon »).', W / 2, 224, 16, 'rgba(255,255,255,0.8)', 'center');
+    plainText(net.roomOk ? '✓ Salon visible sur le serveur' : '⚠ Salon introuvable sur le serveur (recréation…)', W / 2, 244, 14, net.roomOk ? '#7dff9a' : '#ff9a6b', 'center', 'bold');
   } else {
     text('SALON ' + net.code, W / 2, 130, 40, '#ffd23f');
   }
@@ -1244,6 +1247,7 @@ function drawLobby() {
   }
   if (G.netMsg) text(G.netMsg, W / 2, 292, 20, '#ff9a6b');
   text('‹ QUITTER', 70, 40, 24, '#fff', 'left');
+  plainText('Familly Fight ' + BUILD, 12, H - 14, 12, 'rgba(255,255,255,0.5)', 'left');
   clickable(20, 10, 180, 60, () => { leaveOnline('online'); });
 }
 
