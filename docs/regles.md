@@ -70,6 +70,6 @@ Symboles : Jumelles (vert), Boussoles (jaune), Briquets (bleu), Couteaux (rouge)
 - Les machines ont des prénoms (Jack, Anne, Morgan…) ; sur les missions, une pastille donne « Toi » ou le début du prénom.
 - L’indice « je peux » est un réglage personnel (également dans le menu ☰) : désactivé, on peut se positionner sur une mission même si aucune n’est faisable.
 
-## Alerte blocage (réglable, activée par défaut)
-- La partie s'arrête dès qu'un joueur n'a plus de carte jouable. Le jeu le détecte à l'avance : à chaque tour, il essaie les coups possibles du joueur courant et prévient **tout le monde** si certains laisseraient le joueur suivant sans coup (« ⚠️ Prudence : 2 coups sur 5 laisseraient Anne sans carte jouable au tour suivant », ou « 💥 Quoi que tu joues, … ne pourra plus jouer » si c'est inévitable).
-- Il ne dit ni quelles cartes ni lesquelles du suivant, seulement le nombre de coups concernés. En ligne, c'est l'hôte (qui connaît toutes les mains) qui le calcule. Réglage personnel « ⚠️ Alerte blocage » dans les paramètres.
+## Joueurs bloqués en l'état (réglable, activé par défaut)
+- La partie s'arrête dès qu'un joueur n'a plus de carte jouable à son tour. Après chaque coup, le jeu constate et affiche pour tous (« 🚫 Anne ne peut pas jouer en l'état ») les joueurs dont aucune carte ne va sur les 4 tas tels qu'ils sont maintenant : ils ne jouent que si les coups d'avant leur tour changent un tas, sinon c'est la fin.
+- Constat sur le tapis actuel uniquement (pas de prévision) ; les cartes ne sont pas montrées. En ligne, l'hôte le calcule (il connaît toutes les mains). Réglage personnel « 🚫 Joueurs bloqués » dans les paramètres.
