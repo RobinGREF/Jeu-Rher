@@ -20,6 +20,7 @@ import { TableScene, type LastPlay, type PileView } from './src/TableScene';
 import { SYMBOLS } from './src/symbols';
 import { alertPlayer, joinedNames } from './src/alerts';
 import { setMusic } from './src/music';
+import { DEFAULT_TRACK_50M, TRACKS_50M } from './src/tracks';
 import { BOT_NAMES, shortName } from './src/names';
 import { TvScreen } from './src/TvScreen';
 import { clearRoomParam, roomFromUrl } from './src/share';
@@ -29,7 +30,7 @@ import { reloadFresh } from './src/reload';
 type Mode = 'solo' | 'together' | 'online';
 type Screen = 'home' | 'together' | 'settings' | 'tv' | 'machines';
 
-const DEFAULTS = { bots: 2, pauseMs: 5000, manual: true, phrasesOn: false, openHands: false, alertsOn: true, ask: true, musicOn: true, hint: true, loupe: false };
+const DEFAULTS = { bots: 2, pauseMs: 5000, manual: true, phrasesOn: false, openHands: false, alertsOn: true, ask: true, musicOn: true, musicTrack: DEFAULT_TRACK_50M, hint: true, loupe: false };
 /** Réglages gardés d'une visite à l'autre (facultatif : sans stockage, on repart des valeurs par défaut). */
 function loadSettings(): typeof DEFAULTS {
   try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem('50m-settings') ?? '{}') }; } catch { return DEFAULTS; }
@@ -74,6 +75,7 @@ export default function App() {
   const [phrasesOn, setPhrasesOn] = useState(saved.phrasesOn);
   const [manual, setManual] = useState(saved.manual); // les machines attendent mon clic
   const [musicOn, setMusicOn] = useState(saved.musicOn); // musique de fond
+  const [musicTrack, setMusicTrack] = useState<string>(TRACKS_50M.some((t) => t.id === saved.musicTrack) ? saved.musicTrack : DEFAULT_TRACK_50M); // morceau choisi dans les réglages
   const [loupe, setLoupe] = useState(saved.loupe); // mode loupe : missions en grand (2 colonnes), le reste réduit
   const [hint, setHint] = useState(saved.hint); // le jeu m'indique si je peux réussir une mission (bouton « je peux » seulement si c'est vrai)
   const [ask, setAsk] = useState(saved.ask); // tour de table : chacun dit s'il peut ou non avant que le joueur ne joue
@@ -222,9 +224,9 @@ export default function App() {
   }, [pub?.v]);
 
   useEffect(() => {
-    try { localStorage.setItem('50m-settings', JSON.stringify({ bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask, musicOn, hint, loupe })); } catch { /* sans stockage */ }
-  }, [bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask, musicOn, hint, loupe]);
-  useEffect(() => { setMusic(musicOn); }, [musicOn]);
+    try { localStorage.setItem('50m-settings', JSON.stringify({ bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask, musicOn, musicTrack, hint, loupe })); } catch { /* sans stockage */ }
+  }, [bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask, musicOn, musicTrack, hint, loupe]);
+  useEffect(() => { setMusic(musicOn ? musicTrack : null); }, [musicOn, musicTrack]);
 
   // Alertes en ligne : un joueur rejoint le salon, la partie démarre, c'est ton tour.
   const seenPlayers = useRef<string[] | null>(null);
@@ -395,7 +397,16 @@ export default function App() {
             {!ask && (
               <Toggle on={manual} onPress={() => setManual(!manual)} title="👆 Machines : attendre mon clic" sub="Avant chaque machine, un message te prévient et elle ne joue que quand tu touches « Laisser jouer »." />
             )}
-            <Toggle on={musicOn} onPress={() => setMusicOn(!musicOn)} title="🎵 Musique de fond" sub="Une mélodie de marin, composée pour le jeu. Se coupe aussi avec le bouton 🎵 en haut de la table." />
+            <Toggle on={musicOn} onPress={() => setMusicOn(!musicOn)} title="🎵 Musique de fond" sub="Morceaux composés pour le jeu, synthétisés par le navigateur. Se coupe aussi avec le bouton 🎵 en haut de la table." />
+            {musicOn && (
+              <View style={s.tracks}>
+                {TRACKS_50M.map((tr) => (
+                  <Pressable key={tr.id} onPress={() => setMusicTrack(tr.id)} accessibilityLabel={`Musique : ${tr.name}`} style={[s.trackChip, musicTrack === tr.id && s.trackChipOn]}>
+                    <Text style={[s.trackTxt, musicTrack === tr.id && s.trackTxtOn]}>{tr.emoji} {tr.name}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
             <Toggle on={alertsOn} onPress={() => setAlertsOn(!alertsOn)} title="🔔 Alertes (son, vibration, titre)" sub="En ligne : un bip et une vibration quand un joueur rejoint le salon ou quand c'est ton tour ; le titre de l'onglet clignote si la page est cachée." />
             <Text style={s.label}>Pause entre les coups</Text>
             <View style={s.row}>
@@ -768,6 +779,7 @@ export default function App() {
               <Text style={s.quitTxt}>Remplacer {sd.name} par une machine</Text>
             </Pressable>
           ) : null))}
+          <Pressable onPress={() => { const i = TRACKS_50M.findIndex((x) => x.id === musicTrack); setMusicTrack(TRACKS_50M[(i + 1) % TRACKS_50M.length].id); setMusicOn(true); }} style={s.quit} accessibilityLabel="Changer de musique"><Text style={s.quitTxt}>🎵 Musique : {(TRACKS_50M.find((x) => x.id === musicTrack) ?? TRACKS_50M[0]).name} ▸</Text></Pressable>
           <Pressable onPress={() => setLoupe(!loupe)} style={s.quit}><Text style={s.quitTxt}>{loupe ? '🔍 Mode loupe : activé' : '🔍 Mode loupe : désactivé'}</Text></Pressable>
           <Pressable onPress={() => setHint(!hint)} style={s.quit}><Text style={s.quitTxt}>{hint ? '💡 Indice « je peux » : activé' : '💡 Indice « je peux » : désactivé'}</Text></Pressable>
           <Pressable onPress={quit} style={s.quit}><Text style={s.quitTxt}>Quitter (tu pourras reprendre)</Text></Pressable>
@@ -871,6 +883,11 @@ const s = StyleSheet.create({
   err: { color: '#fca5a5', textAlign: 'center' },
   input: { backgroundColor: '#1e293b', color: '#f8fafc', borderRadius: 12, padding: 14, fontSize: 18, fontWeight: '700', textAlign: 'center' },
   codeInput: { width: 130, letterSpacing: 6 },
+  tracks: { gap: 6, marginBottom: 6 },
+  trackChip: { backgroundColor: '#1e293b', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 14, borderWidth: 2, borderColor: 'transparent' },
+  trackChipOn: { borderColor: '#f59e0b', backgroundColor: '#3b2a0d' },
+  trackTxt: { color: '#e2e8f0', fontSize: 15, fontWeight: '700' },
+  trackTxtOn: { color: '#fde68a' },
   resume: { gap: 2, alignItems: 'center' },
   resumeBtn: { alignSelf: 'stretch', backgroundColor: '#16a34a', borderRadius: 14, padding: 14, alignItems: 'center', gap: 2 },
   resumeTitle: { color: '#fff', fontSize: 18, fontWeight: '900' },
