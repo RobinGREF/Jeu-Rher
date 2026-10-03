@@ -23,6 +23,8 @@
   #ts{right:calc(2vw + var(--s)*0.5 + var(--g)/2);bottom:calc(var(--b) + var(--s)*2 + var(--g)*2);background:rgba(230,160,20,.55)!important}
   #refresh{position:fixed;left:8px;top:8px;z-index:6;width:36px;height:36px;border-radius:50%;border:2px solid rgba(255,255,255,.4);background:rgba(20,20,30,.45);color:#fff;font:bold 18px Arial,sans-serif;padding:0;opacity:.7;-webkit-tap-highlight-color:transparent}
   #tpause{right:8px;top:8px;width:40px!important;height:40px!important;font-size:14px!important}
+  #home{position:fixed;right:8px;top:8px;z-index:8;height:36px;padding:0 12px;border-radius:18px;border:2px solid rgba(255,255,255,.45);background:rgba(20,20,30,.55);color:#fff;font:bold 14px Arial,sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  body[data-scene=fight] #home{display:none}
   #inv{display:none;position:fixed;left:50%;bottom:3px;right:auto;transform:translate(-50%,0);z-index:7;gap:6px;justify-content:center;width:auto}
   body[data-scene=lobby][data-host="1"] #inv{display:flex}
   #inv button{font:bold 13px Arial,sans-serif;color:#fff;background:#334155;border:2px solid rgba(255,255,255,.35);border-radius:12px;padding:6px 10px;cursor:pointer}
@@ -41,6 +43,7 @@
 </div>
 <input id="codeIn" type="text" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Code du salon">
 <div id="inv"><button type="button" id="invShare">📤 Partager</button><button type="button" class="wa" id="invWa">💬 WhatsApp</button><button type="button" id="invSms">✉️ SMS</button></div>
+<button id="home" type="button" aria-label="Retour à l'accueil des jeux">⌂ Accueil</button>
 <button id="refresh" type="button" tabindex="-1" aria-label="Recharger la dernière version du jeu" title="Recharger la dernière version">↻</button>
 <script>
   // Recharge en forçant la dernière version publiée (adresse différente à chaque fois : le navigateur ne réutilise pas sa copie).
@@ -63,6 +66,11 @@
       var i = info(); if (i) location.href = 'sms:?&body=' + encodeURIComponent(i.text + ' ' + i.url);
     });
   })();
+  // Retour à l'accueil des jeux (on quitte proprement un éventuel salon en ligne avant de partir).
+  document.getElementById('home').addEventListener('click', function () {
+    try { window.__game.leaveOnline('title'); } catch (e) {}
+    setTimeout(function () { window.location.href = '../'; }, 150);
+  });
   document.getElementById('refresh').addEventListener('click', function () {
     var u = new URL(location.href); u.searchParams.set('v', Date.now()); location.replace(u.toString());
   });

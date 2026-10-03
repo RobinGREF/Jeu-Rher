@@ -1317,6 +1317,7 @@ function onPress(code) {
   const k = nav(code);
   if (G.scene === 'title') {
     if (G.showControls) { if (k.back || k.ok) G.showControls = false; return; }
+    if (k.back) { window.location.href = '../'; return; }
     if (k.U) { G.menuIdx = (G.menuIdx + 4) % 5; sfx('menu'); }
     if (k.D) { G.menuIdx = (G.menuIdx + 1) % 5; sfx('menu'); }
     if (G.menuIdx === 3 && k.L) cycleDiff(-1);
@@ -1470,5 +1471,5 @@ requestAnimationFrame(frame);
 })();
 
 // accès pour le débogage / les tests
-window.__game = { G, startMatch, onPress, keys, hostLaunch, onlineCreate, onlineJoin };
+window.__game = { G, startMatch, onPress, keys, hostLaunch, onlineCreate, onlineJoin, leaveOnline };
 })();
