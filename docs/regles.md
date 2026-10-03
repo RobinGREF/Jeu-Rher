@@ -69,3 +69,7 @@ Symboles : Jumelles (vert), Boussoles (jaune), Briquets (bleu), Couteaux (rouge)
 - En ligne (un téléphone par joueur) et contre des machines. Le mode « on se passe un téléphone » a été retiré : trop d’échanges à prévoir. Un mode télé (📺 Écran télé) permet de suivre le tapis ensemble sur un grand écran, sans jouer.
 - Les machines ont des prénoms (Jack, Anne, Morgan…) ; sur les missions, une pastille donne « Toi » ou le début du prénom.
 - L’indice « je peux » est un réglage personnel (également dans le menu ☰) : désactivé, on peut se positionner sur une mission même si aucune n’est faisable.
+
+## Alerte blocage (réglable, activée par défaut)
+- La partie s'arrête dès qu'un joueur n'a plus de carte jouable. Le jeu le détecte à l'avance : à chaque tour, il essaie les coups possibles du joueur courant et prévient **tout le monde** si certains laisseraient le joueur suivant sans coup (« ⚠️ Prudence : 2 coups sur 5 laisseraient Anne sans carte jouable au tour suivant », ou « 💥 Quoi que tu joues, … ne pourra plus jouer » si c'est inévitable).
+- Il ne dit ni quelles cartes ni lesquelles du suivant, seulement le nombre de coups concernés. En ligne, c'est l'hôte (qui connaît toutes les mains) qui le calcule. Réglage personnel « ⚠️ Alerte blocage » dans les paramètres.

@@ -1,5 +1,5 @@
 import { buildMissionDefs, type MissionDef } from '../missions';
-import type { Announce, GameState, Signal, MissionDeckItem } from '../engine';
+import type { Announce, BlockRisk, GameState, Signal, MissionDeckItem } from '../engine';
 import type { Card, Medal } from '../types';
 
 let defsById: Map<string, MissionDef> | null = null;
@@ -55,6 +55,8 @@ export type PublicState = {
   /** Fin de partie seulement : les mains de tous, pour voir pourquoi on a perdu. */
   finalHands?: Card[][];
   canDo: Announce[]; signals: Signal[]; passed?: number[];
+  /** Alerte de blocage calculée par l'hôte (il connaît toutes les mains) : coups qui empêcheraient le joueur suivant de jouer. */
+  risk?: BlockRisk | null;
   nextMedal: { medal: Medal; needed: number } | null;
   /** Siège de la machine qui attend le feu vert d'un joueur, sinon null. */
   awaitingGo: number | null;

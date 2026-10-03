@@ -1,5 +1,5 @@
 import {
-  botDelayMs, botMove, completedBetween, newGame, nextMedal, play, syncBotAnnouncements, syncBotSignals,
+  blockRisk, botDelayMs, botMove, completedBetween, newGame, nextMedal, play, syncBotAnnouncements, syncBotSignals,
   setCanDo, setPass, toggleSignal, unanswered, type GameState, type SignalKind,
 } from '../engine';
 import { SYMBOLS } from '../symbols';
@@ -204,7 +204,7 @@ export class Host {
       missions: g.missions.map((m) => m.id),
       piles: g.piles.map((p) => ({ top: p[p.length - 1], depth: p.length - 1 })),
       deckCount: g.symbolDeck.length, handCounts: g.hands.map((h) => h.length), ...(g.over ? { finalHands: g.hands } : {}),
-      canDo: g.canDo, passed: g.passed, signals: g.signals,
+      canDo: g.canDo, passed: g.passed, signals: g.signals, risk: blockRisk(g),
       nextMedal: nm ? { medal: nm.medal, needed: nm.missionsNeeded } : null,
       awaitingGo: this.waiting(), refused: [...this.refused],
       last: this.last, history: this.history.slice(0, 30), options: this.options,

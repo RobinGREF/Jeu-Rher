@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
-  botDelayMs, botMove, canAnnounce, completedBetween, missionsLeft, newGame, play, playablePiles, setCanDo,
+  blockRisk, botDelayMs, botMove, canAnnounce, completedBetween, missionsLeft, newGame, play, playablePiles, setCanDo,
   syncBotAnnouncements, setPass, unanswered, syncBotSignals, toggleSignal, tops,
   type GameState, type SignalKind,
 } from './src/engine';
@@ -30,7 +30,7 @@ import { reloadFresh } from './src/reload';
 type Mode = 'solo' | 'together' | 'online';
 type Screen = 'home' | 'together' | 'settings' | 'tv' | 'machines';
 
-const DEFAULTS = { bots: 2, pauseMs: 5000, manual: true, phrasesOn: false, openHands: false, alertsOn: true, ask: true, musicOn: true, musicTrack: DEFAULT_TRACK_50M, hint: true, loupe: false };
+const DEFAULTS = { bots: 2, pauseMs: 5000, manual: true, phrasesOn: false, openHands: false, alertsOn: true, ask: true, musicOn: true, musicTrack: DEFAULT_TRACK_50M, hint: true, risk: true, loupe: false };
 /** Réglages gardés d'une visite à l'autre (facultatif : sans stockage, on repart des valeurs par défaut). */
 function loadSettings(): typeof DEFAULTS {
   try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem('50m-settings') ?? '{}') }; } catch { return DEFAULTS; }
@@ -77,6 +77,7 @@ export default function App() {
   const [musicOn, setMusicOn] = useState(saved.musicOn); // musique de fond
   const [musicTrack, setMusicTrack] = useState<string>(TRACKS_50M.some((t) => t.id === saved.musicTrack) ? saved.musicTrack : DEFAULT_TRACK_50M); // morceau choisi dans les réglages
   const [loupe, setLoupe] = useState(saved.loupe); // mode loupe : missions en grand (2 colonnes), le reste réduit
+  const [riskOn, setRiskOn] = useState(saved.risk); // alerte « le joueur suivant ne pourrait plus jouer »
   const [hint, setHint] = useState(saved.hint); // le jeu m'indique si je peux réussir une mission (bouton « je peux » seulement si c'est vrai)
   const [ask, setAsk] = useState(saved.ask); // tour de table : chacun dit s'il peut ou non avant que le joueur ne joue
   const [alertsOn, setAlertsOn] = useState(saved.alertsOn); // son, vibration et titre : un joueur arrive, c'est ton tour
@@ -224,8 +225,8 @@ export default function App() {
   }, [pub?.v]);
 
   useEffect(() => {
-    try { localStorage.setItem('50m-settings', JSON.stringify({ bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask, musicOn, musicTrack, hint, loupe })); } catch { /* sans stockage */ }
-  }, [bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask, musicOn, musicTrack, hint, loupe]);
+    try { localStorage.setItem('50m-settings', JSON.stringify({ bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask, musicOn, musicTrack, hint, risk: riskOn, loupe })); } catch { /* sans stockage */ }
+  }, [bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask, musicOn, musicTrack, hint, riskOn, loupe]);
   useEffect(() => { setMusic(musicOn ? musicTrack : null); }, [musicOn, musicTrack]);
 
   // Alertes en ligne : un joueur rejoint le salon, la partie démarre, c'est ton tour.
@@ -393,6 +394,7 @@ export default function App() {
             <Text style={s.title}>Réglages</Text>
             <Toggle on={loupe} onPress={() => setLoupe(!loupe)} title="🔍 Mode loupe (malvoyant)" sub="Les 4 missions en grand, en carré sur 2 colonnes ; la table et la main sont réduites au nécessaire." />
             <Toggle on={hint} onPress={() => setHint(!hint)} title="💡 Indice « je peux » (pour moi)" sub="Activé : le jeu te propose « Oui, je peux » seulement quand tu peux vraiment réussir une mission. Désactivé : le bouton est toujours là et tu peux te positionner sur une mission même si aucune n'est faisable (à toi de juger). Réglage personnel à chaque joueur." />
+            <Toggle on={riskOn} onPress={() => setRiskOn(!riskOn)} title="⚠️ Alerte blocage (pour moi)" sub="Le jeu te prévient quand un coup risque d'empêcher le joueur suivant de jouer au prochain tour (ce qui termine la partie). Il ne dit ni quelles cartes, ni lesquelles : seulement combien de coups sur combien posent problème." />
             <Toggle on={ask} onPress={() => setAsk(!ask)} title="🗣️ Tour de table" sub="Avant chaque coup, chaque joueur dit s'il peut réussir une mission ou non. Personne ne joue avant." />
             {!ask && (
               <Toggle on={manual} onPress={() => setManual(!manual)} title="👆 Machines : attendre mon clic" sub="Avant chaque machine, un message te prévient et elle ne joue que quand tu touches « Laisser jouer »." />
@@ -549,6 +551,19 @@ export default function App() {
     ...signalTags('help', { mission: id }),
   ];
   // Une machine attend le feu vert (à mon clic) : message et bouton « Laisser jouer ».
+  // Alerte blocage : le joueur suivant risque de ne plus pouvoir jouer (fin de partie). En ligne, c'est l'hôte (qui voit toutes les mains) qui la calcule.
+  const risk = !riskOn || game.over || spectator ? null : online ? pub?.risk ?? null : blockRisk(game);
+  const riskMsg = (() => {
+    if (!risk) return '';
+    const named = online || solo;
+    const nx = named ? seat(risk.next).replace(' (machine)', '') : `J${risk.next + 1}`;
+    const cur = named ? seat(game.current).replace(' (machine)', '') : `J${game.current + 1}`;
+    const nextIsMe = named && risk.next === me, curIsMe = named && game.current === me;
+    const who = curIsMe ? 'Quoi que tu joues' : `Quoi que joue ${cur}`;
+    if (risk.fatal === risk.total) return `💥 ${who}, ${nextIsMe ? 'tu ne pourras' : `${nx} ne pourra`} plus jouer au tour suivant`;
+    const n = risk.fatal;
+    return `⚠️ Prudence : ${n} coup${n > 1 ? 's' : ''} sur ${risk.total} ${nextIsMe ? `te laisserai${n > 1 ? 'ent' : 't'} sans carte jouable` : `laisserai${n > 1 ? 'ent' : 't'} ${nx} sans carte jouable`} au tour suivant`;
+  })();
   const waitingBot = !game.over && (online ? pub?.awaitingGo != null && pub.awaitingGo === game.current : solo && clickMode && game.current !== 0);
   const goBot = () => { if (pendingAns.length) return setError('Chacun doit d\'abord dire s\'il peut réussir une mission'); if (online) session()?.go(); else doBotMove(game); setError(''); };
   const botName = seat(game.current).replace(' (machine)', '');
@@ -696,6 +711,7 @@ export default function App() {
         </View>
       ) : (
       <View style={s.bar}>
+        {!!riskMsg && <Text style={s.riskTxt} numberOfLines={2}>{riskMsg}</Text>}
         {!!error ? <Text style={s.barErr} numberOfLines={1}>{error}</Text>
           : picking !== null ? <Text style={s.barTxt} numberOfLines={1}>Touche la ou les missions que tu peux réussir, puis valide</Text>
           : sigMode !== 'play' ? <Text style={s.barTxt} numberOfLines={1}>{sigHint}</Text>
@@ -863,6 +879,7 @@ const s = StyleSheet.create({
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, justifyContent: 'center', minHeight: 22, maxWidth: 80 },
   badge: { backgroundColor: '#22c55e', color: '#052e16', fontWeight: '800', fontSize: 12, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, overflow: 'hidden' },
   badgeStop: { backgroundColor: '#ef4444', color: '#450a0a' },
+  riskTxt: { color: '#fb923c', fontSize: 13, fontWeight: '800', textAlign: 'center' },
   hintOn: { color: '#facc15', fontSize: 14, fontWeight: '700', textAlign: 'center' },
   hint: { color: '#94a3b8', fontSize: 13, textAlign: 'center' },
   table: { backgroundColor: '#111c33', borderRadius: 12, padding: 12, gap: 8 },

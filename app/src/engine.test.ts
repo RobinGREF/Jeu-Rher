@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSymbolDeck, canPlayOn, newGame, play, playablePiles, setCanDo, canAnnounce, announcedBy, botDelayMs, tops, findMissionMoves, botMove, syncBotAnnouncements, reachableMissions, nextMedal, completedBetween, toggleSignal, syncBotSignals, botMoveGreedy, missionDifficulty, unseenCards } from './engine';
+import { buildSymbolDeck, canPlayOn, newGame, play, playablePiles, setCanDo, canAnnounce, announcedBy, botDelayMs, tops, findMissionMoves, botMove, syncBotAnnouncements, reachableMissions, nextMedal, completedBetween, toggleSignal, syncBotSignals, botMoveGreedy, missionDifficulty, unseenCards, blockRisk } from './engine';
 
 const seeded = (seed: number) => () => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296);
 
@@ -522,4 +522,23 @@ test('plusieurs missions réussies d\'affilée par un seul coup : toutes sont li
   }
   assert.ok(multi > 0, 'aucun coup à plusieurs missions rencontré');
   console.log(`   (coups à 2+ missions : ${multi}, dont enchaînés : ${chained})`);
+});
+
+test('alerte blocage : coups qui laissent le joueur suivant sans carte jouable', () => {
+  const c = (id: number, symbol: number, value: number) => ({ id, symbol, value }) as never;
+  const g = newGame(2, () => 0.3);
+  // tapis : 4 piles ; J0 a deux cartes, J1 n'a qu'une carte (symbole 3, valeur 7)
+  g.piles = [[c(100, 0, 1)], [c(101, 1, 2)], [c(102, 2, 3)], [c(103, 0, 4)]];
+  g.hands = [[c(1, 0, 1), c(2, 1, 6)], [c(3, 3, 7)]];
+  g.symbolDeck = [];
+  g.current = 0; g.over = false; g.completed = 0;
+  const r = blockRisk(g);
+  assert.ok(r, 'risque détecté');
+  assert.equal(r!.next, 1);
+  assert.equal(r!.fatal, r!.total, 'aucun coup ne laisse jouer J1 (carte 3/7 ne va sur rien)');
+  g.piles[0] = [c(100, 3, 1)]; // J1 peut jouer sur la pile 0 tant qu'elle n'est pas recouverte
+  const r2 = blockRisk(g);
+  assert.ok(r2 && r2.fatal > 0 && r2.fatal < r2.total, 'seuls les coups qui recouvrent la pile 0 bloquent');
+  g.hands[1] = [c(3, 3, 7), c(4, 0, 7)];
+  assert.equal(blockRisk(g), null, 'J1 garde un coup quel que soit celui de J0');
 });

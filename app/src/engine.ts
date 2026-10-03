@@ -200,6 +200,27 @@ export function setPass(prev: GameState, player: number): GameState {
 export const unanswered = (s: GameState): number[] =>
   s.over ? [] : Array.from({ length: s.players }, (_, i) => i).filter((i) => i !== s.current && !s.passed.includes(i) && !s.canDo.some((a) => a.player === i));
 
+/**
+ * Alerte de blocage : parmi les coups du joueur dont c'est le tour, combien laisseraient le joueur suivant sans aucune carte
+ * jouable (= fin de partie) ? Ne dit ni quelles cartes, ni lesquelles du suivant : seulement « n coups sur m ».
+ * `null` si aucun coup ne bloque (ou partie finie).
+ */
+export type BlockRisk = { next: number; fatal: number; total: number };
+export function blockRisk(s: GameState): BlockRisk | null {
+  if (s.over || s.players < 2) return null;
+  const next = (s.current + 1) % s.players;
+  let fatal = 0, total = 0;
+  for (const card of s.hands[s.current] ?? []) {
+    for (const pile of playablePiles(s, card)) {
+      const r = play(s, card.id, pile, () => 0.5);
+      if (!r.ok) continue;
+      total++;
+      if (r.state.over && r.state.completed < 50) fatal++;
+    }
+  }
+  return fatal > 0 ? { next, fatal, total } : null;
+}
+
 export type MissionMove = { cardId: number; pile: number; missions: string[] };
 
 /**
