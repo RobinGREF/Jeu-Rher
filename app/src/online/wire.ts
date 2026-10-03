@@ -1,5 +1,5 @@
 import { buildMissionDefs, type MissionDef } from '../missions';
-import type { Announce, GameState, Signal, MissionDeckItem } from '../engine';
+import type { Announce, PlayerStats, GameState, Signal, MissionDeckItem } from '../engine';
 import type { Card, Medal } from '../types';
 
 let defsById: Map<string, MissionDef> | null = null;
@@ -19,7 +19,7 @@ export function toWire(g: GameState): string {
     players: g.players, current: g.current, hands: g.hands, piles: g.piles, symbolDeck: g.symbolDeck,
     missions: g.missions.map((m) => m.id),
     missionDeck: g.missionDeck.map((it): DeckWire => (it.kind === 'mission' ? { m: it.def.id } : { medal: it.medal })),
-    canDo: g.canDo, passed: g.passed, signals: g.signals, completed: g.completed, medal: g.medal, goldReached: g.goldReached, over: g.over,
+    canDo: g.canDo, passed: g.passed, signals: g.signals, stats: g.stats, completed: g.completed, medal: g.medal, goldReached: g.goldReached, over: g.over,
   });
 }
 
@@ -29,7 +29,7 @@ export function fromWire(json: string): GameState {
     players: w.players, current: w.current, hands: w.hands, piles: w.piles, symbolDeck: w.symbolDeck,
     missions: (w.missions as string[]).map(missionById),
     missionDeck: (w.missionDeck as DeckWire[]).map((it): MissionDeckItem => ('m' in it ? { kind: 'mission', def: missionById(it.m) } : { kind: 'medal', medal: it.medal })),
-    canDo: w.canDo, passed: w.passed ?? [], signals: w.signals as Signal[], completed: w.completed, medal: w.medal, goldReached: w.goldReached, over: w.over,
+    canDo: w.canDo, passed: w.passed ?? [], signals: w.signals as Signal[], stats: w.stats, completed: w.completed, medal: w.medal, goldReached: w.goldReached, over: w.over,
   };
 }
 
@@ -57,6 +57,8 @@ export type PublicState = {
   canDo: Announce[]; signals: Signal[]; passed?: number[];
   /** Joueurs sans carte jouable sur le tapis actuel (calculé par l'hôte, qui connaît toutes les mains). */
   blocked?: number[];
+  /** Statistiques de partie par joueur. */
+  stats?: PlayerStats[];
   nextMedal: { medal: Medal; needed: number } | null;
   /** Siège de la machine qui attend le feu vert d'un joueur, sinon null. */
   awaitingGo: number | null;
@@ -85,7 +87,7 @@ export function buildView(pub: PublicState, hand: Card[], mySeat: number): GameS
     hands: pub.handCounts.map((n, i) => (i === mySeat ? hand : pub.over && pub.finalHands?.[i] ? pub.finalHands[i] : filler(n))),
     piles: pub.piles.map((p) => [...filler(p.depth), p.top]),
     symbolDeck: filler(pub.deckCount),
-    missions, missionDeck, canDo: pub.canDo, passed: pub.passed ?? [], signals: pub.signals,
+    missions, missionDeck, canDo: pub.canDo, passed: pub.passed ?? [], signals: pub.signals, stats: pub.stats,
     completed: pub.completed, medal: pub.medal, goldReached: pub.goldReached, over: pub.over,
   };
 }

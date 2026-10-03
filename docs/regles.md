@@ -73,3 +73,7 @@ Symboles : Jumelles (vert), Boussoles (jaune), Briquets (bleu), Couteaux (rouge)
 ## Joueurs bloqués en l'état (réglable, activé par défaut)
 - La partie s'arrête dès qu'un joueur n'a plus de carte jouable à son tour. Après chaque coup, le jeu constate et affiche pour tous (« 🚫 Anne ne peut pas jouer en l'état ») les joueurs dont aucune carte ne va sur les 4 tas tels qu'ils sont maintenant : ils ne jouent que si les coups d'avant leur tour changent un tas, sinon c'est la fin.
 - Constat sur le tapis actuel uniquement (pas de prévision) ; les cartes ne sont pas montrées. En ligne, l'hôte le calcule (il connaît toutes les mains). Réglage personnel « 🚫 Joueurs bloqués » dans les paramètres.
+
+## Statistiques de fin de partie
+- L'écran de fin affiche un tableau par joueur : ✅ missions réussies (par ses coups) · 😬 missions ratées alors qu'il pouvait en réussir une d'un seul coup · 🙋 appels « je peux » faits · 🎯 appels suivis d'une mission réussie à son tour · ❌ appels à tort (rien de réalisable ; possible seulement indice coupé) · 🙈 appels non détectés (« non, je ne peux pas » dit alors qu'une mission était possible).
+- Les missions réussies par le tapis de départ ne sont attribuées à personne. Les stats suivent la partie (sauvegarde locale, hôte en ligne) ; une partie reprise d'une ancienne version démarre ses stats à zéro.

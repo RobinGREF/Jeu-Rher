@@ -8,6 +8,7 @@ import {
 } from './src/engine';
 import { Celebration, type Celebrate } from './src/Celebration';
 import { InfoPanel } from './src/InfoPanel';
+import { StatsTable } from './src/StatsTable';
 import { ScoreBoard, type SharedScores } from './src/ScoreBoard';
 import { addScore, cleanName, clearScores, loadScores, saveScores, type ScoreEntry } from './src/scores';
 import { Lobby } from './src/Lobby';
@@ -508,6 +509,7 @@ export default function App() {
 
   const review = game.over && game.completed < 50 && !resultSeen;
 
+  const endNames = online ? (pub?.seats ?? []).map((x) => x.name) : solo ? [cleanName(myName, 'Moi'), ...Array.from({ length: game.players - 1 }, (_, i) => BOT_NAMES[i] ?? `Machine ${i + 1}`)] : Array.from({ length: game.players }, (_, i) => `Joueur ${i + 1}`);
   if (game.over && !review) {
     return (
       <SafeAreaView style={s.root}>
@@ -517,8 +519,9 @@ export default function App() {
           {status}
           {game.completed < 50 && game.goldReached && <Text style={s.sub}>Il manquait {missionsLeft(game)} missions.</Text>}
           {lastRank !== null && <Text style={s.record}>{lastRank === 1 ? '🏆 Nouveau record !' : `🏅 ${lastRank}ᵉ au classement des meilleurs scores`}</Text>}
-          <Text style={s.sub}>{(online ? (pub?.seats ?? []).map((x) => x.name) : solo ? [cleanName(myName, 'Moi'), ...Array.from({ length: game.players - 1 }, (_, i) => BOT_NAMES[i] ?? `Machine ${i + 1}`)] : Array.from({ length: game.players }, (_, i) => `Joueur ${i + 1}`)).join(' · ')}</Text>
+          <Text style={s.sub}>{endNames.join(' · ')}</Text>
           <Text style={s.sub}>{online ? pub?.last?.n ?? 0 : history.length} coups joués</Text>
+          {!!game.stats && <StatsTable names={endNames} stats={game.stats} />}
           <Pressable style={s.bigBtn} onPress={openScores}><Text style={s.bigTitle}>🏆 Meilleurs scores</Text></Pressable>
           <Pressable style={s.btn} onPress={quit}><Text style={s.btnTxt}>{online ? 'Quitter' : 'Rejouer'}</Text></Pressable>
         </ScrollView>

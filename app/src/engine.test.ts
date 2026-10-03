@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSymbolDeck, canPlayOn, newGame, play, playablePiles, setCanDo, canAnnounce, announcedBy, botDelayMs, tops, findMissionMoves, botMove, syncBotAnnouncements, reachableMissions, nextMedal, completedBetween, toggleSignal, syncBotSignals, botMoveGreedy, missionDifficulty, unseenCards, blockedNow } from './engine';
+import { buildSymbolDeck, canPlayOn, newGame, play, playablePiles, setCanDo, canAnnounce, announcedBy, botDelayMs, tops, findMissionMoves, botMove, syncBotAnnouncements, reachableMissions, nextMedal, completedBetween, toggleSignal, syncBotSignals, botMoveGreedy, missionDifficulty, unseenCards, blockedNow, setPass } from './engine';
 
 const seeded = (seed: number) => () => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296);
 
@@ -535,4 +535,29 @@ test('joueurs bloqués en l\'état : aucune carte jouable sur le tapis actuel', 
   assert.deepEqual(blockedNow(g), [], 'le tapis a changé : J1 peut jouer');
   g.over = true;
   assert.deepEqual(blockedNow(g), []);
+});
+
+test('stats de partie : coups, missions, appels, ratés', () => {
+  const seeded = (n: number) => { let a = n; return () => { a = (a * 1664525 + 1013904223) >>> 0; return a / 4294967296; }; };
+  let g = newGame(2, seeded(7));
+  assert.equal(g.stats!.length, 2);
+  const initial = g.completed; // missions déjà réussies par le tapis de départ : attribuées à personne
+  let guard = 0;
+  while (!g.over && guard++ < 300) {
+    const m = botMove(g, g.current, seeded(guard));
+    if (!m) break;
+    const r = play(g, m.cardId, m.pile, seeded(guard));
+    assert.ok(r.ok); g = r.state;
+  }
+  const total = g.stats!.reduce((a, x) => a + x.done, 0);
+  assert.equal(total, g.completed - initial, 'les missions réussies se répartissent entre les joueurs');
+  assert.equal(g.stats!.reduce((a, x) => a + x.plays, 0) > 0, true);
+});
+
+test('stats : « non » à tort et appel à tort sont comptés', () => {
+  let g = newGame(3, () => 0.4);
+  const p = [1, 2].find((i) => canAnnounce(g, i));
+  if (p !== undefined) { g = setPass(g, p); assert.equal(g.stats![p].wrongNo, 1); g = setPass(g, p); assert.equal(g.stats![p].wrongNo, 1, 'pas compté deux fois'); }
+  const q = [1, 2].find((i) => !canAnnounce(g, i));
+  if (q !== undefined) { g = setCanDo(g, q, [g.missions[0].id], true); assert.equal(g.stats![q].wrongCalls, 1); assert.equal(g.stats![q].calls, 1); }
 });

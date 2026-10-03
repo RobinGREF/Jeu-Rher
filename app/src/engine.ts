@@ -10,6 +10,24 @@ export type Signal = { player: number; kind: SignalKind; mission?: string; pile?
 /** Annonce « je peux réussir… » : qui, et sur quelles missions il se positionne. */
 export type Announce = { player: number; missions: string[] };
 
+/** Statistiques de partie, par joueur (affichées à la fin). */
+export type PlayerStats = {
+  /** Coups joués. */ plays: number;
+  /** Missions réussies par ses coups. */ done: number;
+  /** Tours où il pouvait réussir une mission d'un seul coup et ne l'a pas fait. */ missed: number;
+  /** « Je peux » annoncés. */ calls: number;
+  /** Annonces suivies d'une mission réussie à son tour. */ kept: number;
+  /** Annonces fausses (il ne pouvait rien réussir). */ wrongCalls: number;
+  /** « Non, je ne peux pas » dit alors qu'il pouvait (appel non détecté). */ wrongNo: number;
+};
+export const blankStats = (players: number): PlayerStats[] =>
+  Array.from({ length: players }, () => ({ plays: 0, done: 0, missed: 0, calls: 0, kept: 0, wrongCalls: 0, wrongNo: 0 }));
+const bump = (stats: PlayerStats[] | undefined, players: number, p: number, key: keyof PlayerStats, n = 1): PlayerStats[] => {
+  const out = (stats ?? blankStats(players)).map((x) => ({ ...x }));
+  if (out[p]) out[p][key] += n;
+  return out;
+};
+
 export type GameState = {
   players: number;
   current: number;
@@ -27,6 +45,8 @@ export type GameState = {
   justDone?: { def: MissionDef; idx: number }[];
   signals: Signal[];
   completed: number;
+  /** Statistiques par joueur (absentes des anciennes sauvegardes). */
+  stats?: PlayerStats[];
   medal: Medal | null;
   goldReached: boolean;
   over: boolean;
@@ -113,7 +133,7 @@ export function newGame(players: number, rng: Rng = Math.random): GameState {
   const hands: Card[][] = Array.from({ length: players }, () => []);
   const s: GameState = {
     players, current: 0, hands, piles, symbolDeck, missions, missionDeck: items,
-    canDo: [], passed: [], signals: [], completed: 0, medal: null, goldReached: false, over: false,
+    canDo: [], passed: [], signals: [], stats: blankStats(players), completed: 0, medal: null, goldReached: false, over: false,
   };
   refill(s);
   resolveMissions(s, rng);
@@ -137,7 +157,9 @@ export function play(prev: GameState, cardId: number, pile: number, rng: Rng = M
     canDo: prev.canDo, // revu plus bas : une annonce que ce coup n'a pas touchée reste en place
     passed: [],
     signals: [...prev.signals],
+    stats: (prev.stats ?? blankStats(prev.players)).map((x) => ({ ...x })),
   };
+  const couldDo = findMissionMoves(prev, prev.current).length > 0;
   const hand = s.hands[s.current];
   const ci = hand.findIndex((c) => c.id === cardId);
   if (ci === -1) return { ok: false, error: 'Carte absente de la main' };
@@ -151,6 +173,11 @@ export function play(prev: GameState, cardId: number, pile: number, rng: Rng = M
 
   // Une mission annoncée « réalisable » reste positionnée si ce coup ne l'a pas touchée : elle est toujours sur le tapis
   // et son annonceur peut toujours la réussir d'un seul coup. Sinon, l'annonce tombe et il devra se reprononcer.
+  const gained = s.completed - prev.completed;
+  const st = s.stats![prev.current];
+  st.plays++; st.done += gained;
+  if (gained > 0 && prev.canDo.some((a) => a.player === prev.current)) st.kept++;
+  if (couldDo && gained === 0) st.missed++;
   s.canDo = prev.canDo.flatMap((a) => {
     const reach = reachableMissions(s, a.player);
     const missions = a.missions.filter((id) => s.missions.some((m) => m.id === id) && reach.includes(id));
@@ -186,14 +213,20 @@ export function setCanDo(prev: GameState, player: number, missions: string[], fr
   const ids = [...new Set(missions)].filter((id) => prev.missions.some((m) => m.id === id));
   const rest = prev.canDo.filter((a) => a.player !== player);
   if (!ids.length) return { ...prev, canDo: rest };
-  if (!free && !canAnnounce(prev, player)) return prev; // `free` : sans l'indice, le jeu ne bloque pas une annonce qui ne serait pas réalisable
-  return { ...prev, canDo: [...rest, { player, missions: ids }].sort((x, y) => x.player - y.player), passed: prev.passed.filter((p) => p !== player) };
+  const could = canAnnounce(prev, player);
+  if (!free && !could) return prev; // `free` : sans l'indice, le jeu ne bloque pas une annonce qui ne serait pas réalisable
+  const fresh = !prev.canDo.some((a) => a.player === player);
+  let stats = prev.stats;
+  if (fresh) { stats = bump(stats, prev.players, player, 'calls'); if (!could) stats = bump(stats, prev.players, player, 'wrongCalls'); }
+  return { ...prev, stats, canDo: [...rest, { player, missions: ids }].sort((x, y) => x.player - y.player), passed: prev.passed.filter((p) => p !== player) };
 }
 
 /** « Je ne peux pas réussir de mission » : réponse du joueur pour ce tour (retire son éventuelle annonce). */
 export function setPass(prev: GameState, player: number): GameState {
   if (prev.over || player < 0 || player >= prev.players) return prev;
-  return { ...prev, canDo: prev.canDo.filter((a) => a.player !== player), passed: prev.passed.includes(player) ? prev.passed : [...prev.passed, player].sort((x, y) => x - y) };
+  const again = prev.passed.includes(player);
+  const stats = !again && canAnnounce(prev, player) ? bump(prev.stats, prev.players, player, 'wrongNo') : prev.stats;
+  return { ...prev, stats, canDo: prev.canDo.filter((a) => a.player !== player), passed: prev.passed.includes(player) ? prev.passed : [...prev.passed, player].sort((x, y) => x - y) };
 }
 
 /** Joueurs qui n'ont pas encore dit s'ils peuvent ou non réussir une mission. Celui dont c'est le tour n'a pas à répondre : il joue. */
@@ -327,7 +360,9 @@ export function syncBotAnnouncements(s: GameState, bots: number[]): GameState {
   const said = new Set(mine.map((a) => a.player));
   const no = bots.filter((b) => !said.has(b) && b !== s.current);
   const passed = [...s.passed.filter((p) => !bots.includes(p)), ...no].sort((x, y) => x - y);
-  return { ...s, canDo: [...others, ...mine].sort((x, y) => x.player - y.player), passed };
+  let stats = s.stats;
+  for (const a of mine) if (!s.canDo.some((x) => x.player === a.player)) stats = bump(stats, s.players, a.player, 'calls');
+  return { ...s, stats, canDo: [...others, ...mine].sort((x, y) => x.player - y.player), passed };
 }
 
 /** Missions qu'un joueur pourrait réussir d'un seul coup avec sa main actuelle. */
