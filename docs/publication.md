@@ -37,3 +37,6 @@ Les petits jeux solo (Duel de savoir, Mémo des paires) vivent dans `solo/` : un
 
 ## Installation (raccourci)
 Seule la **page d'accueil « Jeu des vacances »** est installable (« Ajouter à l'écran d'accueil » / « Installer l'application »), avec son manifeste `hub/manifest.webmanifest` et ses icônes `hub/icons/hub-*.png`. Son périmètre (`scope`) couvre tout le site : les jeux s'ouvrent dans la même fenêtre d'application, et le bouton « ← Jeux » de chaque jeu ramène à l'accueil. Les jeux n'ont pas de manifeste propre : on n'installe qu'un seul raccourci. La page d'accueil affiche les jeux en grille de logos carrés (2 par ligne).
+
+## Musique des jeux
+Chaque jeu a sa liste de morceaux synthétisés (aucun fichier audio, aucune œuvre protégée) : `app/src/tracks.ts` (50 Missions), `solo/src/tracks.ts` (Duel, Mémo), `combat/js/music.js` (Familly Fight : un morceau par décor). Le moteur est le même fichier `musicCore.ts` copié dans `app/src/` et `solo/src/` (à garder identique) et compilé pour `combat/js/musiccore.js`. Nouveau morceau = une entrée dans la liste du jeu (tempo, gamme, accords, batterie, graine).

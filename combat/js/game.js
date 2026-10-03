@@ -28,6 +28,7 @@ const overlap = (a, b) => a.x1 < b.x2 && a.x2 > b.x1 && a.y1 < b.y2 && a.y2 > b.
 
 /* ---------------------------------------------------------------- audio */
 let AC = null;
+FFMusic.init(() => (AC && AC.state === 'running') ? AC : null);
 function ensureAudio() {
   if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
   if (AC && AC.state === 'suspended') AC.resume();
@@ -1268,6 +1269,7 @@ function drawStageSelect() {
     ctx.restore();
     ctx.lineWidth = sel ? 5 : 2; ctx.strokeStyle = sel ? '#ffd23f' : 'rgba(255,255,255,0.35)'; rrect(x, y, cw, chh, 10); ctx.stroke();
     text(i < stages.length ? stages[i].name : 'ALÉATOIRE', x + cw / 2, y + chh + 20, 17, sel ? '#ffd23f' : '#fff');
+    if (i < stages.length) plainText('♪ ' + FFMusic.track(stages[i].music).name, x + cw / 2, y + chh + 40, 13, sel ? '#ffd23f' : 'rgba(255,255,255,0.7)', 'center');
     clickable(x, y, cw, chh + 30, () => { if (G.stageCursor === i) stageConfirm(); else { G.stageCursor = i; sfx('menu'); } });
   }
   plainText('← → choisir · ENTRÉE combattre · ÉCHAP retour', W / 2, H - 16, 14, 'rgba(255,255,255,0.7)', 'center');
@@ -1384,6 +1386,7 @@ window.addEventListener('keydown', e => {
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Backspace'].includes(e.code)) e.preventDefault();
   ensureAudio();
   if (e.repeat) return;
+  if (e.code === 'KeyM' && G.scene !== 'fight') { FFMusic.toggle(); return; }
   keys[e.code] = true;
   noteBtn(e.code);
   onPress(e.code);
@@ -1445,6 +1448,24 @@ function render() {
     case 'join': drawJoin(); break;
     case 'lobby': drawLobby(); break;
   }
+  drawMusic();
+}
+function musicId() {
+  if (G.scene === 'fight' && G.match && G.match.stage) return G.match.stage.music || 'menu';
+  if (G.scene === 'stage') { const st = CFG.stages[G.stageCursor]; return st ? (st.music || 'menu') : 'menu'; }
+  return 'menu';
+}
+function drawMusic() {
+  FFMusic.sync(musicId());
+  const id = musicId(), on = FFMusic.on();
+  if (G.scene === 'fight') {
+    const m = G.match;
+    if (on && m && m.phase === 'intro' && m.round === 1) plainText('♪ ' + FFMusic.track(id).name, W - 14, H - 14, 13, 'rgba(255,255,255,0.8)', 'right');
+    return;
+  }
+  const label = on ? '♪ ' + FFMusic.track(id).name + ' (M)' : '♪ musique coupée (M)';
+  plainText(label, W - 14, H - 14, 13, on ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.5)', 'right');
+  clickable(W - 260, H - 30, 260, 28, () => { FFMusic.toggle(); });
 }
 let last = performance.now(), acc = 0;
 function frame(now) {

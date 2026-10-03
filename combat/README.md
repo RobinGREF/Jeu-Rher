@@ -24,3 +24,6 @@ Menu **EN LIGNE** : un joueur crée un salon et donne son code à 4 lettres, l'a
 
 ## Personnaliser
 Tout est dans `js/data.js` : ajouter/modifier des personnages (stats, couleurs, coiffure, type de spécial : `fireball`, `dash`, `uppercut`) et des décors (couleurs, plans, ambiance, ou une image `image: 'img/x.png'`).
+
+## Musique
+Un morceau identifié par décor (champ `music` de chaque décor dans `data.js`, définis dans `js/music.js`) + un thème de menu. Aperçu dès que le curseur passe sur un décor, lecture pendant le combat. Touche **M** ou le bandeau « ♪ » en bas à droite pour couper (mémorisé). Tout est synthétisé par le navigateur : aucune œuvre existante. `js/musiccore.js` est généré depuis `app/src/musicCore.ts` (commande en tête du fichier).

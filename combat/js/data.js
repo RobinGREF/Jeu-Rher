@@ -128,7 +128,7 @@ window.GAME_CONFIG = {
 
   stages: [
     {
-      name: 'Dojo du Crépuscule', seed: 3,
+      name: 'Dojo du Crépuscule', music: 'dojo', seed: 3,
       sky: ['#2b1055', '#d4507a', '#ffb36b'],
       sun: { x: 700, y: 250, r: 70, color: '#fff1c1', glow: 'rgba(255,190,110,0.55)' },
       clouds: true,
@@ -140,7 +140,7 @@ window.GAME_CONFIG = {
       ground: { colors: ['#7a4a2b', '#3c2213'], line: 'rgba(0,0,0,0.28)' }
     },
     {
-      name: 'Néon City', seed: 11,
+      name: 'Néon City', music: 'neon', seed: 11,
       sky: ['#05010f', '#1a0b3d', '#5b1a6e'],
       sun: { x: 250, y: 130, r: 46, color: '#f4f0ff', glow: 'rgba(170,140,255,0.4)' },
       stars: true,
@@ -151,7 +151,7 @@ window.GAME_CONFIG = {
       ground: { colors: ['#2a2a3a', '#0e0e18'], line: 'rgba(37,230,255,0.35)' }
     },
     {
-      name: 'Temple Antique', seed: 7,
+      name: 'Temple Antique', music: 'temple', seed: 7,
       sky: ['#4aa3df', '#a8d8f0', '#f1f7e8'],
       sun: { x: 180, y: 110, r: 48, color: '#fffbe0', glow: 'rgba(255,255,200,0.6)' },
       clouds: true,
@@ -162,7 +162,7 @@ window.GAME_CONFIG = {
       ground: { colors: ['#cfc7b0', '#8f8770'], line: 'rgba(60,50,30,0.3)' }
     },
     {
-      name: 'Volcan', seed: 21,
+      name: 'Volcan', music: 'volcan', seed: 21,
       sky: ['#1a0505', '#5c1408', '#c4410f'],
       sun: { x: 480, y: 210, r: 90, color: '#ffb347', glow: 'rgba(255,90,20,0.5)' },
       embers: true,
@@ -174,7 +174,7 @@ window.GAME_CONFIG = {
     }
     ,
     {
-      name: 'Coucher de Soleil', seed: 5, image: 'img/sunset.jpg',
+      name: 'Coucher de Soleil', music: 'soleil', seed: 5, image: 'img/sunset.jpg',
       sky: ['#f6a94a', '#f7c982'],
       ground: { colors: ['#dcb98d', '#7f6244'], line: 'rgba(90,60,30,0.35)' }
     }
