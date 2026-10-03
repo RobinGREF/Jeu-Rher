@@ -3,12 +3,15 @@ import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, useWindowDimensi
 import { StatusBar } from 'expo-status-bar';
 import { reloadFresh } from '../reload';
 import { loadJson, saveJson } from '../storage';
+import { MusicButton, useMusicChoice } from '../MusicButton';
+import { TRACKS_MEMO } from '../tracks';
 import { flip, hide, isDone, LEVELS, mismatch, newMemo, stars, type Level, type Memo } from './engine';
 
 const KEY_BEST = 'memo-best';
 const HIDE_MS = 900;
 
 export function MemoGame({ onHome }: { onHome: () => void }) {
+  const musicChoice = useMusicChoice('memo', TRACKS_MEMO);
   const [level, setLevel] = useState<Level | null>(null);
   const [memo, setMemo] = useState<Memo | null>(null);
   const [best, setBest] = useState<Record<string, number>>(() => loadJson(KEY_BEST, {}));
@@ -49,12 +52,13 @@ export function MemoGame({ onHome }: { onHome: () => void }) {
       <Pressable onPress={reloadFresh} style={[s.topBtn, { alignItems: 'flex-end' }]} accessibilityLabel="Recharger la dernière version du jeu"><Text style={s.topTxt}>↻</Text></Pressable>
     </View>
   );
+  const music = <MusicButton choice={musicChoice} tracks={TRACKS_MEMO} />;
 
   if (!memo || !level) {
     return (
       <SafeAreaView style={s.root}>
         <StatusBar style="light" />
-        {head}
+        {head}{music}
         <ScrollView contentContainerStyle={s.body}>
           <Text style={s.title}>🧠 Mémo des paires</Text>
           <Text style={s.sub}>Retourne deux cartes à la fois et retrouve toutes les paires, en un minimum de coups.</Text>
@@ -74,7 +78,7 @@ export function MemoGame({ onHome }: { onHome: () => void }) {
   return (
     <SafeAreaView style={s.root}>
       <StatusBar style="light" />
-      {head}
+      {head}{music}
       <ScrollView contentContainerStyle={s.body}>
         <Text style={s.sub}>{memo.moves} coup{memo.moves > 1 ? 's' : ''} · {memo.cards.filter((c) => c.matched).length / 2}/{level.pairs} paires</Text>
         <View style={[s.grid, { width: level.cols * size + (level.cols - 1) * 8 }]}>

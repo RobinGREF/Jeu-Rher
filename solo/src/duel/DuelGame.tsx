@@ -4,6 +4,8 @@ import { StatusBar } from 'expo-status-bar';
 import { reloadFresh } from '../reload';
 import { clearRoomParam, roomFromUrl } from '../share';
 import { ShareRoom } from '../ShareRoom';
+import { MusicButton, useMusicChoice } from '../MusicButton';
+import { TRACKS_DUEL } from '../tracks';
 import { loadJson, removeKey, saveJson } from '../storage';
 import { Board } from './Board';
 import { CatPicker } from './CatPicker';
@@ -62,7 +64,7 @@ function useRecord(flow: Flow | null) {
   return { best, text, isNew };
 }
 
-function Shell({ onHome, onRules, children }: { onHome: () => void; onRules: () => void; children: React.ReactNode }) {
+function Shell({ onHome, onRules, music, children }: { onHome: () => void; onRules: () => void; music: ReturnType<typeof useMusicChoice>; children: React.ReactNode }) {
   return (
     <SafeAreaView style={s.root}>
       <StatusBar style="light" />
@@ -74,6 +76,7 @@ function Shell({ onHome, onRules, children }: { onHome: () => void; onRules: () 
           <Pressable onPress={onRules} style={s.topIcon} accessibilityLabel="Règles"><Text style={s.topTxt}>📖</Text></Pressable>
         </View>
       </View>
+      <MusicButton choice={music} tracks={TRACKS_DUEL} />
       <ScrollView contentContainerStyle={s.body}>{children}</ScrollView>
     </SafeAreaView>
   );
@@ -124,7 +127,8 @@ export function DuelGame({ onHome }: { onHome: () => void }) {
     );
   }
 
-  const shell = (children: React.ReactNode) => <Shell onHome={onHome} onRules={() => setRules(true)}>{children}</Shell>;
+  const music = useMusicChoice('duel', TRACKS_DUEL);
+  const shell = (children: React.ReactNode) => <Shell onHome={onHome} onRules={() => setRules(true)} music={music}>{children}</Shell>;
 
   if (screen === 'cats') {
     return shell(<CatPicker names={names.slice(0, count)} onDone={(cats) => {
