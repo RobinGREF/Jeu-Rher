@@ -557,9 +557,8 @@ export default function App() {
     if (!blocked.length) return '';
     const named = online || solo;
     const names = blocked.map((i) => (named ? (i === me ? 'Toi' : seat(i).replace(' (machine)', '')) : `J${i + 1}`));
-    const meIn = named && blocked.includes(me);
-    const list = names.join(', ');
-    return `🚫 ${list} ${names.length > 1 || meIn ? (meIn && names.length === 1 ? 'ne peux pas' : 'ne peuvent pas') : 'ne peut pas'} jouer en l'état : aucune carte ne va sur les tas actuels. Seul un changement du tapis avant ${names.length > 1 ? 'leur' : meIn ? 'ton' : 'son'} tour peut les sauver.`.replace('Toi ne peux pas jouer', 'Tu ne peux pas jouer');
+    if (names.length === 1 && names[0] === 'Toi') return "🚫 Tu ne peux pas jouer en l'état";
+    return `🚫 ${names.join(', ')} ne peu${names.length > 1 || names.includes('Toi') ? 'vent' : 't'} pas jouer en l'état`;
   })();
   const waitingBot = !game.over && (online ? pub?.awaitingGo != null && pub.awaitingGo === game.current : solo && clickMode && game.current !== 0);
   const goBot = () => { if (pendingAns.length) return setError('Chacun doit d\'abord dire s\'il peut réussir une mission'); if (online) session()?.go(); else doBotMove(game); setError(''); };
