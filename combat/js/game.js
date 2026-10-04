@@ -132,7 +132,7 @@ function resetRound() {
 function startMatch() {
   const chars = CFG.characters;
   const f = [makeFighter(0, chars[G.picks[0]], false), makeFighter(1, chars[G.picks[1]], G.mode === 1)];
-  G.match = { f, round: 1, proj: [], sparks: [], texts: [], paused: false, winner: -1, stage: CFG.stages[G.stageIdx], roundMsg: '' };
+  G.match = { f, round: 1, proj: [], sparks: [], texts: [], paused: false, winner: -1, stage: CFG.stages[G.stageIdx], roundMsg: '', t0: Date.now() };
   resetRound();
   G.scene = 'fight';
   sfx('start');
@@ -547,7 +547,7 @@ function startOnlineMatch(st) {
   const n = { id: st.id, D: st.d, F: 0, side: net.side, local: [], remote: [], sampled: st.d - 1, prev: [0, 0], stall: 0, lastRecv: performance.now(), lastBits: 0, quitAt: 0 };
   for (let i = 0; i < n.D; i++) { n.local[i] = 0; n.remote[i] = 0; }
   G.stageIdx = stageIdx;
-  G.match = { f, round: 1, proj: [], sparks: [], texts: [], paused: false, winner: -1, stage: CFG.stages[stageIdx], roundMsg: '', net: n };
+  G.match = { f, round: 1, proj: [], sparks: [], texts: [], paused: false, winner: -1, stage: CFG.stages[stageIdx], roundMsg: '', net: n, t0: Date.now() };
   net.matchUnsub = net.be.onValue(net.base + '/in/' + 'hg'[1 - net.side], v => netIngest(n, v));
   resetRound();
   G.scene = 'fight'; G.netMsg = '';
@@ -637,6 +637,7 @@ function simFrame() {
         m.phase = 'match'; m.phaseT = 0;
         m.winner = a.wins === b.wins ? -1 : a.wins > b.wins ? 0 : 1;
         if (m.winner >= 0) S(m.f[m.winner], 'win');
+        recordMatch(m);
       } else { m.round++; resetRound(); }
     }
   } else if (m.phase === 'match') {
@@ -1095,19 +1096,82 @@ function drawBackdrop() {
   ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(0, 0, W, H);
 }
 
+/* ---------------------------------------------------------------- statistiques (cet appareil) */
+const STATS_KEY = 'rf_stats';
+function loadStats() {
+  let st = null;
+  try { st = JSON.parse(localStorage.getItem(STATS_KEY)); } catch (e) {}
+  const z = { matches: 0, rounds: 0, secs: 0, cpu: { p: 0, w: 0, byDiff: {} }, two: { p: 0 }, online: { p: 0, w: 0 }, chars: {}, stages: {}, first: 0, last: 0 };
+  return st && typeof st === 'object' ? Object.assign(z, st) : z;
+}
+/** Une partie (match) terminée : on garde mode, vainqueur, personnages, décor, durée. */
+function recordMatch(m) {
+  try {
+    const st = loadStats(), now = Date.now();
+    st.matches++; st.rounds += m.f[0].wins + m.f[1].wins; st.secs += Math.max(0, Math.round((now - (m.t0 || now)) / 1000));
+    st.first = st.first || now; st.last = now;
+    const stName = m.stage && m.stage.name; if (stName) st.stages[stName] = (st.stages[stName] || 0) + 1;
+    const humans = m.net ? [m.net.side] : G.mode === 1 ? [0] : [0, 1];
+    for (const i of humans) {
+      const c = st.chars[m.f[i].ch.name] || (st.chars[m.f[i].ch.name] = { p: 0, w: 0 });
+      c.p++; if (m.winner === i) c.w++;
+    }
+    if (m.net) { st.online.p++; if (m.winner === m.net.side) st.online.w++; }
+    else if (G.mode === 1) {
+      const d = curDiff().name, b = st.cpu.byDiff[d] || (st.cpu.byDiff[d] = { p: 0, w: 0 });
+      st.cpu.p++; b.p++; if (m.winner === 0) { st.cpu.w++; b.w++; }
+    } else st.two.p++;
+    localStorage.setItem(STATS_KEY, JSON.stringify(st));
+  } catch (e) {}
+}
+function fmtTime(s) { return s >= 3600 ? Math.floor(s / 3600) + ' h ' + String(Math.floor(s / 60) % 60).padStart(2, '0') + ' min' : Math.floor(s / 60) + ' min ' + String(s % 60).padStart(2, '0') + ' s'; }
+function drawStats() {
+  drawBackdrop();
+  ctx.fillStyle = 'rgba(0,0,0,0.55)'; rrect(60, 20, W - 120, H - 40, 14); ctx.fill();
+  text('📊 MES STATS', W / 2, 62, 40, '#ffd23f');
+  const st = loadStats();
+  if (!st.matches) { plainText('Aucun combat terminé pour le moment : joue un match pour voir tes stats.', W / 2, 270, 20, '#fff', 'center'); }
+  else {
+    const pl = (n, w) => n + ' ' + w + (n > 1 ? 's' : '');
+    const pct = (w, p) => p ? Math.round(100 * w / p) + ' %' : '—';
+    const top = o => Object.entries(o).sort((a, b) => (b[1].p || b[1]) - (a[1].p || a[1]))[0];
+    const fav = top(st.chars), favS = top(st.stages);
+    const best = Object.entries(st.chars).filter(e => e[1].p >= 2).sort((a, b) => b[1].w / b[1].p - a[1].w / a[1].p)[0];
+    const diff = Object.entries(st.cpu.byDiff).map(e => e[0] + ' ' + e[1].w + '/' + e[1].p).join(' · ');
+    const rows = [
+      ['Combats terminés', st.matches + '   (' + st.rounds + ' manches · ' + fmtTime(st.secs) + ')'],
+      ['1 joueur (contre l\'ordinateur)', st.cpu.p ? pl(st.cpu.w, 'victoire') + ' / ' + st.cpu.p + '  (' + pct(st.cpu.w, st.cpu.p) + ')' : '—'],
+      ['   par difficulté', diff || '—'],
+      ['2 joueurs (même clavier)', pl(st.two.p, 'combat')],
+      ['En ligne', st.online.p ? pl(st.online.w, 'victoire') + ' / ' + st.online.p + '  (' + pct(st.online.w, st.online.p) + ')' : '—'],
+      ['Combattant le plus joué', fav ? fav[0] + ' (' + pl(fav[1].p, 'combat') + ', ' + pl(fav[1].w, 'victoire') + ')' : '—'],
+      ['Meilleur taux de victoire', best ? best[0] + ' (' + pct(best[1].w, best[1].p) + ')' : '—'],
+      ['Décor préféré', favS ? favS[0] + ' (' + favS[1] + ')' : '—'],
+      ['Première / dernière partie', new Date(st.first).toLocaleDateString('fr-FR') + ' · ' + new Date(st.last).toLocaleDateString('fr-FR')]
+    ];
+    rows.forEach((r, i) => {
+      const y = 120 + i * 40;
+      plainText(r[0], 100, y, 19, 'rgba(255,255,255,0.75)', 'left');
+      plainText(r[1], W - 100, y, 19, '#fff', 'right', 'bold');
+    });
+  }
+  plainText('ÉCHAP : retour' + (st.matches ? '   ·   SUPPR : effacer mes stats' : ''), W / 2, H - 38, 15, 'rgba(255,255,255,0.7)', 'center');
+  clickable(0, 0, W, H, () => { G.scene = 'title'; });
+}
+
 function drawTitle() {
   drawBackdrop();
   const bob = Math.sin(G.t * 0.05) * 4;
   text('FAMILLY', W / 2, 105 + bob, 104, '#ffd23f');
   text('FIGHT', W / 2, 190 + bob, 84, '#ff4d4d');
   if (G.showControls) return drawControls();
-  const items = ['1 JOUEUR  (contre l\'ordinateur)', '2 JOUEURS  (même clavier)', 'EN LIGNE  (salon à code)', '◀ DIFFICULTÉ : ' + curDiff().name + ' ▶', 'COMMANDES'];
+  const items = ['1 JOUEUR  (contre l\'ordinateur)', '2 JOUEURS  (même clavier)', 'EN LIGNE  (salon à code)', '◀ DIFFICULTÉ : ' + curDiff().name + ' ▶', 'COMMANDES', '📊 MES STATS'];
   items.forEach((it, i) => {
-    const y = 258 + i * 50, sel = G.menuIdx === i;
-    if (sel) { ctx.fillStyle = 'rgba(255,210,63,0.18)'; rrect(W / 2 - 300, y - 23, 600, 46, 10); ctx.fill(); }
-    text((sel ? '▶ ' : '') + it, W / 2, y, sel ? 30 : 26, sel ? '#ffd23f' : '#fff');
-    clickable(W / 2 - 300, y - 23, 600, 46, () => { G.menuIdx = i; menuConfirm(); });
-    if (i === 3) { clickable(W / 2 - 300, y - 23, 150, 46, () => { G.menuIdx = 3; cycleDiff(-1); }); clickable(W / 2 + 150, y - 23, 150, 46, () => { G.menuIdx = 3; cycleDiff(1); }); }
+    const y = 252 + i * 44, sel = G.menuIdx === i;
+    if (sel) { ctx.fillStyle = 'rgba(255,210,63,0.18)'; rrect(W / 2 - 300, y - 21, 600, 42, 10); ctx.fill(); }
+    text((sel ? '▶ ' : '') + it, W / 2, y, sel ? 28 : 24, sel ? '#ffd23f' : '#fff');
+    clickable(W / 2 - 300, y - 21, 600, 42, () => { G.menuIdx = i; menuConfirm(); });
+    if (i === 3) { clickable(W / 2 - 300, y - 21, 150, 42, () => { G.menuIdx = 3; cycleDiff(-1); }); clickable(W / 2 + 150, y - 21, 150, 42, () => { G.menuIdx = 3; cycleDiff(1); }); }
   });
   plainText('↑ ↓ pour choisir · ENTRÉE pour valider', W / 2, H - 30, 16, 'rgba(255,255,255,0.7)', 'center');
   plainText(BUILD, W - 10, H - 12, 11, 'rgba(255,255,255,0.4)', 'right');
@@ -1285,6 +1349,7 @@ function menuConfirm() {
   sfx('ok');
   if (G.menuIdx === 3) { cycleDiff(1); return; }
   if (G.menuIdx === 4) { G.showControls = true; return; }
+  if (G.menuIdx === 5) { G.scene = 'stats'; return; }
   if (G.menuIdx === 2) { G.onlineIdx = 0; G.netMsg = ''; G.scene = 'online'; return; }
   G.online = false;
   G.mode = G.menuIdx === 0 ? 1 : 2;
@@ -1320,11 +1385,14 @@ function onPress(code) {
   if (G.scene === 'title') {
     if (G.showControls) { if (k.back || k.ok) G.showControls = false; return; }
     if (k.back) { window.location.href = '../'; return; }
-    if (k.U) { G.menuIdx = (G.menuIdx + 4) % 5; sfx('menu'); }
-    if (k.D) { G.menuIdx = (G.menuIdx + 1) % 5; sfx('menu'); }
+    if (k.U) { G.menuIdx = (G.menuIdx + 5) % 6; sfx('menu'); }
+    if (k.D) { G.menuIdx = (G.menuIdx + 1) % 6; sfx('menu'); }
     if (G.menuIdx === 3 && k.L) cycleDiff(-1);
     if (G.menuIdx === 3 && k.R) cycleDiff(1);
     if (k.ok) menuConfirm();
+  } else if (G.scene === 'stats') {
+    if (k.back || k.ok) { G.scene = 'title'; sfx('menu'); }
+    else if (code === 'Delete') { try { localStorage.removeItem(STATS_KEY); } catch (e) {} sfx('menu'); }
   } else if (G.scene === 'online') {
     if (k.U) { G.onlineIdx = (G.onlineIdx + 2) % 3; sfx('menu'); }
     if (k.D) { G.onlineIdx = (G.onlineIdx + 1) % 3; sfx('menu'); }
@@ -1443,6 +1511,7 @@ function render() {
     case 'title': drawTitle(); break;
     case 'select': drawSelect(); break;
     case 'stage': drawStageSelect(); break;
+    case 'stats': drawStats(); break;
     case 'fight': drawFight(); break;
     case 'online': drawOnline(); break;
     case 'join': drawJoin(); break;

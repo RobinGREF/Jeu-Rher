@@ -24,7 +24,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "tsx --test src/duel/engine.test.ts src/duel/flow.test.ts src/duel/online/session.test.ts src/memo/engine.test.ts src/reload.test.ts src/share.test.ts src/musicCore.test.ts",
+    "test": "tsx --test src/duel/engine.test.ts src/duel/flow.test.ts src/duel/online/session.test.ts src/memo/engine.test.ts src/reload.test.ts src/share.test.ts src/musicCore.test.ts src/stats.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "private": true

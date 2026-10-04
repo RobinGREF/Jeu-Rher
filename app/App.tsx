@@ -9,6 +9,8 @@ import {
 import { Celebration, type Celebrate } from './src/Celebration';
 import { InfoPanel } from './src/InfoPanel';
 import { StatsTable } from './src/StatsTable';
+import { StatsView } from './src/StatsView';
+import { addLifetime, clearLifetime, loadLifetime, saveLifetime } from './src/lifetime';
 import { ScoreBoard, type SharedScores } from './src/ScoreBoard';
 import { addScore, cleanName, clearScores, loadScores, saveScores, type ScoreEntry } from './src/scores';
 import { Lobby } from './src/Lobby';
@@ -120,6 +122,7 @@ export default function App() {
   // Meilleurs scores de cet appareil : enregistrés à la fin de chaque partie, avec les noms des participants.
   const [scores, setScores] = useState<ScoreEntry[]>(loadScores);
   const [scoresOpen, setScoresOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
   const [lastRank, setLastRank] = useState<number | null>(null);
   const [lastScoreId, setLastScoreId] = useState<string | null>(null);
   const [lastCode, setLastCode] = useState<string | null>(null); // salon de la dernière partie en ligne (pour la repérer dans le tableau partagé)
@@ -201,6 +204,8 @@ export default function App() {
       id: `${key}-${game.completed}`, at: Date.now(), completed: game.completed, medal: game.medal,
       plays: online ? pub?.last?.n ?? 0 : history.length, mode, players,
     };
+    const mineSeats = online ? (osnap && osnap.mySeat >= 0 ? [osnap.mySeat] : []) : solo ? [0] : Array.from({ length: game.players }, (_, i) => i);
+    if (mineSeats.length) saveLifetime(addLifetime(loadLifetime(), { mode, completed: game.completed, medal: game.medal, plays: entry.plays }, mineSeats.flatMap((i) => (game.stats?.[i] ? [game.stats[i]] : []))));
     const { list, rank } = addScore(loadScores(), entry);
     saveScores(list);
     setScores(list); setLastRank(rank); setLastScoreId(entry.id); setLastCode(online ? osnap?.code ?? null : null);
@@ -311,6 +316,37 @@ export default function App() {
   if (scoresOpen) {
     return <ScoreBoard local={scores} shared={shared} highlightIds={[lastScoreId, lastCode].filter((x): x is string => !!x)} onBack={() => setScoresOpen(false)} onRefresh={loadShared}
       onClear={() => { clearScores(); setScores([]); setLastRank(null); setLastScoreId(null); }} />;
+  }
+
+  if (statsOpen) {
+    const l = loadLifetime();
+    const day = (t: number | null) => (t ? new Date(t).toLocaleDateString('fr-FR') : '—');
+    return (
+      <SafeAreaView style={s.root}>
+        <StatusBar style="light" />
+        <StatsView title="Mes stats — 50 Missions" intro={l.games ? 'Sur cet appareil, parties terminées.' : 'Aucune partie terminée pour le moment : joue une partie pour voir tes stats.'}
+          onBack={() => setStatsOpen(false)} onReset={() => { clearLifetime(); setStatsOpen(false); }}
+          sections={[
+            { title: 'Parties', rows: [
+              { label: 'Parties terminées', value: l.games },
+              { label: 'Contre des machines', value: l.byMode.solo }, { label: 'En ligne', value: l.byMode.online }, { label: 'Sur un téléphone', value: l.byMode.together },
+              { label: 'Première / dernière', value: `${day(l.first)} · ${day(l.last)}` },
+            ] },
+            { title: 'Missions', rows: [
+              { label: 'Meilleur score', value: `${l.best}/50` },
+              { label: 'Missions par partie (moyenne)', value: l.games ? (l.missions / l.games).toFixed(1) : '—' },
+              { label: '🥉 Bronze · 🥈 Argent · 🥇 Or', value: `${l.medals.bronze} · ${l.medals.argent} · ${l.medals.or}` },
+              { label: '🎉 50 missions réussies', value: l.fifty },
+              { label: 'Cartes posées (toutes les parties)', value: l.plays },
+            ] },
+            { title: 'Mon jeu', rows: [
+              { label: '✅ Missions réussies par mes coups', value: l.mine.done }, { label: '😬 Missions ratées alors que possibles', value: l.mine.missed },
+              { label: '🙋 Appels « je peux »', value: l.mine.calls }, { label: '🎯 Appels suivis d\'une mission', value: l.mine.kept },
+              { label: '❌ Appels à tort', value: l.mine.wrongCalls }, { label: '🙈 « Non » alors que possible', value: l.mine.wrongNo },
+            ] },
+          ]} />
+      </SafeAreaView>
+    );
   }
 
   const quit = () => {
@@ -493,6 +529,7 @@ export default function App() {
           </Pressable>
           <View style={s.row}>
             <Pressable onPress={openScores} style={s.link}><Text style={s.linkTxt}>🏆 Meilleurs scores</Text></Pressable>
+            <Pressable onPress={() => setStatsOpen(true)} style={s.link}><Text style={s.linkTxt}>📊 Mes stats</Text></Pressable>
             <Pressable onPress={() => setScreen('settings')} style={s.link}><Text style={s.linkTxt}>⚙️ Réglages</Text></Pressable>
             <Pressable onPress={reloadFresh} style={s.link} accessibilityLabel="Recharger la dernière version du jeu"><Text style={s.linkTxt}>↻ Mettre à jour</Text></Pressable>
           </View>

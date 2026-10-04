@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { SafeAreaView, ScrollView, Pressable, Text, TextInput, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { reloadFresh } from '../reload';
@@ -7,6 +7,8 @@ import { ShareRoom } from '../ShareRoom';
 import { MusicButton, useMusicChoice } from '../MusicButton';
 import { TRACKS_DUEL } from '../tracks';
 import { loadJson, removeKey, saveJson } from '../storage';
+import { StatsView } from '../StatsView';
+import { addAnswer, addWin, emptyDuelStats, loadDuelStats, pct, saveDuelStats } from './stats';
 import { Board } from './Board';
 import { CatPicker } from './CatPicker';
 import { MAX_PLAYERS, mergeSeen, newDuel, TURN_COLORS } from './engine';
@@ -25,7 +27,7 @@ const KEY_NAMES = 'duel-names';
 const KEY_NAME = 'duel-name';
 
 type Best = { score: number; name: string };
-type Screen = 'menu' | 'cats' | 'local' | 'online';
+type Screen = 'menu' | 'cats' | 'local' | 'online' | 'stats';
 
 const RULES: [string, string[]][] = [
   ['🎯 Le principe', ['Chaque catégorie a une jauge à remplir (la rosace). Le premier joueur qui a rempli toutes les catégories de la partie gagne.']],
@@ -64,6 +66,24 @@ function useRecord(flow: Flow | null) {
   return { best, text, isNew };
 }
 
+/** Garde les stats de cet appareil : chaque question jouée (une seule fois) et chaque victoire. */
+function useDuelStatsRecorder(flow: Flow | null) {
+  const lastTurn = useRef<unknown>(null);
+  const won = useRef(false);
+  useEffect(() => {
+    if (!flow) { won.current = false; return; }
+    if (flow.step === 'result' && flow.turn?.question && lastTurn.current !== flow.turn) {
+      lastTurn.current = flow.turn;
+      const t = flow.turn;
+      saveDuelStats(addAnswer(loadDuelStats(), { cat: t.cat, correct: t.correct, blind: t.blind, hint: !!t.hint, hard: t.diff === 'difficile' }));
+    }
+    if (flow.step === 'victory' && !won.current) {
+      won.current = true;
+      saveDuelStats(addWin(loadDuelStats(), flow.game.players[flow.game.current]?.name ?? '?'));
+    } else if (flow.step !== 'victory') won.current = false;
+  }, [flow]);
+}
+
 function Shell({ onHome, onRules, music, children }: { onHome: () => void; onRules: () => void; music: ReturnType<typeof useMusicChoice>; children: React.ReactNode }) {
   return (
     <SafeAreaView style={s.root}>
@@ -95,6 +115,8 @@ export function DuelGame({ onHome }: { onHome: () => void }) {
   const [rules, setRules] = useState(false);
   const rec = useRecord(flow);
   const onl = useDuelOnline();
+  useDuelStatsRecorder(flow);
+  useDuelStatsRecorder(onl.snap?.view?.flow ?? null);
 
   // Partie sur cet appareil : sauvegardée après chaque tour, et les questions déjà vues sont retenues.
   useEffect(() => {
@@ -129,6 +151,29 @@ export function DuelGame({ onHome }: { onHome: () => void }) {
 
   const music = useMusicChoice('duel', TRACKS_DUEL);
   const shell = (children: React.ReactNode) => <Shell onHome={onHome} onRules={() => setRules(true)} music={music}>{children}</Shell>;
+
+  if (screen === 'stats') {
+    const st = loadDuelStats();
+    const best = Object.entries(st.wins).sort((a, b) => b[1] - a[1]);
+    const cats = Object.entries(st.cats).filter(([, c]) => c.asked > 0).sort((a, b) => b[1].right / b[1].asked - a[1].right / a[1].asked);
+    const label = (k: string) => { const c = CATEGORIES.find((x) => x.key === k); return c ? `${c.emoji} ${c.label}` : k; };
+    const day = (t: number | null) => (t ? new Date(t).toLocaleDateString('fr-FR') : '—');
+    return shell(
+      <StatsView title="Mes stats — Duel de savoir" intro={st.asked ? undefined : 'Aucune question jouée pour le moment : joue une partie pour voir tes stats.'}
+        onBack={() => setScreen('menu')} onReset={() => { saveDuelStats(emptyDuelStats()); setScreen('menu'); }}
+        sections={[
+          { title: 'En résumé', rows: [
+            { label: 'Parties terminées', value: st.games }, { label: 'Questions jouées', value: st.asked },
+            { label: 'Bonnes réponses', value: `${st.right} (${pct(st.right, st.asked)})` },
+            { label: 'Questions difficiles réussies', value: `${st.hard.right}/${st.hard.asked}` },
+            { label: "Réponses à l'aveugle réussies", value: `${st.blindRight}/${st.blindTried}` },
+            { label: 'Indices utilisés', value: st.hints }, { label: 'Première / dernière partie', value: `${day(st.first)} · ${day(st.last)}` },
+          ] },
+          ...(best.length ? [{ title: '🏆 Victoires', rows: best.slice(0, 8).map(([n, w]) => ({ label: n, value: w })) }] : []),
+          ...(cats.length ? [{ title: 'Par catégorie (réussite)', rows: cats.map(([k, c]) => ({ label: label(k), value: `${pct(c.right, c.asked)} · ${c.asked} q.` })) }] : []),
+        ]} />,
+    );
+  }
 
   if (screen === 'cats') {
     return shell(<CatPicker names={names.slice(0, count)} onDone={(cats) => {
@@ -170,6 +215,7 @@ export function DuelGame({ onHome }: { onHome: () => void }) {
         </View>
       ))}
       <Btn kind="ghost" label="Choisir les catégories" onPress={() => setScreen('cats')} />
+      <Btn kind="ghost" label="📊 Mes stats" onPress={() => setScreen('stats')} />
     </>,
   );
 }

@@ -40,3 +40,6 @@ Seule la **page d'accueil « Jeu des vacances »** est installable (« Ajouter �
 
 ## Musique des jeux
 Chaque jeu a sa liste de morceaux synthétisés (aucun fichier audio, aucune œuvre protégée) : `app/src/tracks.ts` (50 Missions), `solo/src/tracks.ts` (Duel, Mémo), `combat/js/music.js` (Familly Fight : un morceau par décor). Le moteur est le même fichier `musicCore.ts` copié dans `app/src/` et `solo/src/` (à garder identique) et compilé pour `combat/js/musiccore.js`. Nouveau morceau = une entrée dans la liste du jeu (tempo, gamme, accords, batterie, graine).
+
+## Stats de chaque jeu
+Chaque jeu a un bouton « 📊 Mes stats » sur son accueil : activité cumulée **sur cet appareil** (stockage du navigateur, rien n'est envoyé) — 50 Missions `50m-lifetime` (`app/src/lifetime.ts`), Duel de savoir `duel-stats` (`solo/src/duel/stats.ts`), Mémo `memo-stats` (`solo/src/memo/stats.ts`), Familly Fight `rf_stats` (`recordMatch` dans `combat/js/game.js`). `StatsView.tsx` (page commune React) est copié dans `app/src/` et `solo/src/`. Un bouton « Effacer mes stats » remet à zéro.
