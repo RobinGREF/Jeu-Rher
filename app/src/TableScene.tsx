@@ -3,6 +3,7 @@ import { Animated, Pressable, StyleSheet, Text, useWindowDimensions, View } from
 import { CardView } from './CardView';
 import type { GameState } from './engine';
 import { SYMBOLS } from './symbols';
+import { setSumOpen, useSumOpen } from './sumState';
 import { sumsOf } from './sums';
 import type { Card } from './types';
 
@@ -35,8 +36,8 @@ function Countdown({ ms }: { ms: number }) {
 function SumBadge({ cards, grid }: { cards: Card[]; grid?: boolean }) {
   const { per, total } = sumsOf(cards);
   // Repliable : on touche le Σ pour déplier / replier (choix retenu sur l'appareil).
-  const [open, setOpen] = useState(() => { try { return localStorage.getItem('50m-sum-open') !== '0'; } catch { return true; } });
-  const toggle = () => { const v = !open; setOpen(v); try { localStorage.setItem('50m-sum-open', v ? '1' : '0'); } catch { /* sans stockage */ } };
+  const open = useSumOpen();
+  const toggle = () => setSumOpen(!open);
   if (!open) {
     return (
       <Pressable onPress={toggle} style={[s.sum, s.sumClosed]} accessibilityLabel={`Sommes repliées, total ${total}. Toucher pour déplier`}>
