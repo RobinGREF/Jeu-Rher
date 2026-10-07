@@ -139,7 +139,7 @@ export default function App() {
   const tallBar = (!!game && game.over && game.completed < 50 && !resultSeen) || (online && !!osnap?.spectator);
   // Sur un téléphone court, c'est la table qu'on réduit davantage (et non les missions, qui sont le but du mode loupe).
   const loupeScale = height >= 800 ? 0.62 : 0.4;
-  const tokenSize = loupe ? Math.max(64, Math.min((width - 32 - 12) / 2, (height - (height >= 800 ? 450 : sumOpen ? 380 : 336) - (tallBar ? 120 : 0)) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
+  const tokenSize = loupe ? Math.max(64, Math.min((width - 32 - 12) / 2, (height - (height >= 800 ? 450 : sumOpen ? 402 : 358) - (tallBar ? 120 : 0)) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
   const scale = loupe ? loupeScale : Math.min(1, Math.max(0.66, (height - 200 - (tallBar ? 90 : 0)) / 560));
 
   const solo = mode === 'solo';
@@ -711,7 +711,7 @@ export default function App() {
         <TableScene game={game} solo={solo} labels={labels} piles={pileViews} onPile={drop}
           meIndex={me} hand={spectator ? [] : hand} handShown={handShown} selectedId={selected}
           onSelect={(id) => { setSelected(selected === id ? null : id); setError(''); setSigMode('play'); }}
-          onReveal={() => { setRevealed(true); setSigMode('play'); }} revealAll={openHands || review} scale={scale}
+          onReveal={() => { setRevealed(true); setSigMode('play'); }} revealAll={openHands || review} scale={scale} handScale={loupe ? 0.62 : undefined}
           lastPlay={lastPlay} pauseMs={effPause}
           who={(i) => (online ? (i === me ? 'Toi' : seat(i)) : solo ? (i === 0 ? 'Toi' : seat(i)) : `J${i + 1}`)}
           onSkip={() => { if (solo && game.current !== 0 && !clickMode) doBotMove(game); else setLastPlay(null); }} />

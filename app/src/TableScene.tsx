@@ -115,6 +115,8 @@ type Props = {
   /** Joueur dont la main est affichée en bas (toi en solo, le joueur courant sinon). */
   meIndex: number; hand: Card[]; handShown: boolean; selectedId: number | null;
   onSelect: (id: number) => void; onReveal: () => void; revealAll: boolean; scale: number;
+  /** Échelle de ta main, si elle doit rester plus grande que celle des tas (mode loupe). */
+  handScale?: number;
   lastPlay: LastPlay | null; pauseMs: number; onSkip: () => void; who: (i: number) => string;
   /** Nom et avatar de chaque siège (sinon : Toi / J2… selon `solo`). */
   labels?: { name: string; avatar: string }[];
@@ -138,7 +140,7 @@ export function TableScene(p: Props) {
   // À 4 joueurs, le logo Σ se met en haut à droite (les côtés sont pris par les joueurs) ; sinon, à droite des tas.
   const sumSide = n !== 4;
   const pileW = Math.min(64 * p.scale, (inner - (n === 4 ? 2 * 62 : 0) - (sumSide ? 44 : 0) - 3 * 6) / 4);
-  const handW = Math.min(66 * p.scale, (inner - 52 - 3 * 6) / 4);
+  const handW = Math.min(66 * (p.handScale ?? p.scale), (inner - 52 - 3 * 6) / 4);
   const label = (i: number) => p.labels?.[i]?.name ?? (solo && i === 0 ? 'Toi' : `J${i + 1}`);
   const avatar = (i: number) => p.labels?.[i]?.avatar ?? (solo ? (i === 0 ? '🙂' : '🤖') : '👤');
   const seat = (rel: number, vertical = false) => {
