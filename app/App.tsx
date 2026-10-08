@@ -139,7 +139,10 @@ export default function App() {
   const tallBar = (!!game && game.over && game.completed < 50 && !resultSeen) || (online && !!osnap?.spectator);
   // Sur un téléphone court, c'est la table qu'on réduit davantage (et non les missions, qui sont le but du mode loupe).
   const loupeScale = height >= 800 ? 0.62 : 0.4;
-  const tokenSize = loupe ? Math.max(64, Math.min((width - 32 - 12) / 2, (height - (height >= 800 ? 450 : sumOpen ? 402 : 358) - (tallBar ? 120 : 0)) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
+  // Téléphone tenu en travers : les missions à gauche (2 × 2), la table et ta main à droite (qui défile si l'écran est trop bas).
+  const land = width > height * 1.15;
+  const landToken = Math.max(56, Math.min(130, (height - 62) / 2 - 3));
+  const tokenSize = land ? landToken : loupe ? Math.max(64, Math.min((width - 32 - 12) / 2, (height - (height >= 800 ? 450 : sumOpen ? 402 : 358) - (tallBar ? 120 : 0)) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
   const scale = loupe ? loupeScale : Math.min(1, Math.max(0.66, (height - 200 - (tallBar ? 90 : 0)) / 560));
 
   const solo = mode === 'solo';
@@ -687,6 +690,8 @@ export default function App() {
     : '';
   const labels = solo ? game.hands.map((_, i) => ({ name: i === 0 ? 'Toi' : seat(i), avatar: i === 0 ? '🙂' : '🤖' })) : online ? game.hands.map((_, i) => ({ name: !spectator && i === me ? 'Toi' : seat(i).replace(' (machine)', ''), avatar: pub?.seats[i]?.bot ? '🤖' : !spectator && i === me ? '🙂' : '👤' })) : undefined;
 
+  const Right: React.ElementType = land ? ScrollView : View;
+  const rightProps = land ? { style: { flex: 1 }, contentContainerStyle: { minHeight: 330, flexGrow: 1, gap: 6 } } : { style: { flex: 1, gap: 6 } };
   return (
     <SafeAreaView style={s.game}>
       <StatusBar style="light" />
@@ -699,7 +704,8 @@ export default function App() {
         <Pressable onPress={() => setMenu(!menu)} style={s.menuBtn} accessibilityLabel="Menu"><Text style={s.menuTxt}>☰</Text></Pressable>
       </View>
 
-      <View style={[s.missRow, loupe && { flexWrap: 'wrap', justifyContent: 'center', gap: 6, alignSelf: 'center', maxWidth: 2 * tokenSize + 8 }]} onLayout={(e) => setRowY(e.nativeEvent.layout.y)}>
+      <View style={{ flex: 1, flexDirection: land ? 'row' : 'column', gap: land ? 10 : 6 }}>
+      <View style={[s.missRow, land && { flexWrap: 'wrap', justifyContent: 'center', alignContent: 'flex-start', gap: 6, width: 2 * tokenSize + 8 }, !land && loupe && { flexWrap: 'wrap', justifyContent: 'center', gap: 6, alignSelf: 'center', maxWidth: 2 * tokenSize + 8 }]} onLayout={(e) => setRowY(e.nativeEvent.layout.y)}>
         {game.missions.map((m) => (
           <MissionToken key={m.id} def={m} size={tokenSize} showText={false} badges={missionBadges(m.id)}
             mark={picking !== null && picked.includes(m.id) ? 'picked' : game.canDo.some((a) => a.missions.includes(m.id)) ? 'announced' : undefined}
@@ -707,6 +713,7 @@ export default function App() {
         ))}
       </View>
 
+      <Right {...rightProps}>
       <View style={s.tableWrap}>
         <TableScene game={game} solo={solo} labels={labels} piles={pileViews} onPile={drop}
           meIndex={me} hand={spectator ? [] : hand} handShown={handShown} selectedId={selected}
@@ -841,6 +848,8 @@ export default function App() {
           <Pressable onPress={quit} style={s.quit}><Text style={s.quitTxt}>Quitter (tu pourras reprendre)</Text></Pressable>
         </View>
       )}
+      </Right>
+      </View>
     </SafeAreaView>
   );
 }
