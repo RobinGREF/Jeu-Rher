@@ -142,7 +142,7 @@ export default function App() {
   // Téléphone tenu en travers : les missions à gauche (2 × 2), la table et ta main à droite (qui défile si l'écran est trop bas).
   const land = width > height * 1.15;
   const landToken = Math.max(56, Math.min(130, (height - 62) / 2 - 3));
-  const tokenSize = land ? landToken : loupe ? Math.max(64, Math.min((width - 32 - 12) / 2, (height - (height >= 800 ? 450 : (game?.players ?? 3) >= 4 ? 440 : sumOpen ? 410 : 366) - (tallBar ? 120 : 0)) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
+  const tokenSize = land ? landToken : loupe ? Math.max(64, Math.min((width - 32 - 12) / 2, (height - (height >= 800 ? 450 : (game?.players ?? 3) >= 4 ? 434 : sumOpen ? 396 : 346) - (tallBar ? 120 : 0)) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
   const scale = loupe ? loupeScale : Math.min(1, Math.max(0.66, (height - 200 - (tallBar ? 90 : 0)) / 560));
 
   const solo = mode === 'solo';
@@ -690,6 +690,11 @@ export default function App() {
     : '';
   const labels = solo ? game.hands.map((_, i) => ({ name: i === 0 ? 'Toi' : seat(i), avatar: i === 0 ? '🙂' : '🤖' })) : online ? game.hands.map((_, i) => ({ name: !spectator && i === me ? 'Toi' : seat(i).replace(' (machine)', ''), avatar: pub?.seats[i]?.bot ? '🤖' : !spectator && i === me ? '🙂' : '👤' })) : undefined;
 
+  // « À toi de jouer ! » / « Au tour de X » : dans la marge noire du bas quand il n'y a aucun bouton à afficher, sinon au-dessus des boutons.
+  const bannerEl = (online || solo ? game.current === me : true)
+    ? <Text style={s.turnMine} numberOfLines={1}>👉 {online || solo ? 'À toi de jouer !' : `J${game.current + 1}, à toi de jouer !`}</Text>
+    : <Text style={s.turnOther} numberOfLines={1}>Au tour de {seat(game.current).replace(' (machine)', '')}</Text>;
+  const bannerInRow = announcers.length === 0 && !canSignal && !waitingBot;
   const Right: React.ElementType = land ? ScrollView : View;
   const rightProps = land ? { style: { flex: 1 }, contentContainerStyle: { minHeight: 330, flexGrow: 1, gap: 6 } } : { style: { flex: 1, gap: 6 } };
   return (
@@ -764,8 +769,7 @@ export default function App() {
           : sigMode !== 'play' ? <Text style={s.barTxt} numberOfLines={1}>{sigHint}</Text>
           : pendingAns.length > 0 && picking === null ? <Text style={s.barWait} numberOfLines={1}>{(solo || online) ? (pendingAns.includes(me) ? '🗣️ Peux-tu réussir une mission ?' : `⏳ On attend : ${pendingAns.map(seat).join(', ')}`) : `🗣️ J${pendingAns[0] + 1}, peux-tu réussir une mission ?`}</Text>
           : waitingBot ? <Text style={s.barWait} numberOfLines={1}>🤖 {botName} va jouer{announcers.length ? ' · tu peux annoncer avant' : ''}</Text>
-          : (online || solo ? game.current === me : true) ? <Text style={s.turnMine} numberOfLines={1}>👉 {online || solo ? 'À toi de jouer !' : `J${game.current + 1}, à toi de jouer !`}</Text>
-          : <Text style={s.turnOther} numberOfLines={1}>Au tour de {seat(game.current).replace(' (machine)', '')}</Text>}
+          : bannerInRow ? null : bannerEl}
         <View style={s.barRow}>
           {picking !== null ? (
             <>
@@ -797,7 +801,7 @@ export default function App() {
                 </Text>
               </Pressable>
             );
-          }) : !canSignal && !waitingBot && <View style={s.barSpacer} />}
+          }) : !canSignal && !waitingBot && <View style={[s.barSpacer, { justifyContent: 'center' }]}>{bannerInRow && bannerEl}</View>}
           {waitingBot && picking === null && pendingAns.length === 0 && (
             <Pressable onPress={goBot} style={[s.goBtn, s.grow]} accessibilityLabel={`Laisser ${botName} jouer`}>
               <Text style={s.goTxt} numberOfLines={1}>▶ Laisser {botShort} jouer</Text>
