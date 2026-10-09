@@ -33,7 +33,7 @@ function Countdown({ ms }: { ms: number }) {
 }
 
 /** Petit logo Σ : les sommes de chaque famille sur les 4 tas, et la somme totale. */
-function SumBadge({ cards, inline }: { cards: Card[]; inline?: boolean }) {
+function SumBadge({ cards, grid }: { cards: Card[]; grid?: boolean }) {
   const { per, total } = sumsOf(cards);
   // Repliable : on touche le Σ pour déplier / replier (choix retenu sur l'appareil).
   const open = useSumOpen();
@@ -47,17 +47,19 @@ function SumBadge({ cards, inline }: { cards: Card[]; inline?: boolean }) {
     );
   }
   return (
-    <View style={[s.sum, inline && s.sumInline]} accessibilityLabel={`Sommes : ${SYMBOLS.map((sy, i) => `${sy.name} ${per[i]}`).join(', ')}, total ${total}`}>
+    <View style={s.sum} accessibilityLabel={`Sommes : ${SYMBOLS.map((sy, i) => `${sy.name} ${per[i]}`).join(', ')}, total ${total}`}>
       <Pressable onPress={toggle} accessibilityLabel="Replier les sommes" style={s.sumHead}>
         <Text style={s.sumTitle}>Σ</Text>
         <Text style={s.sumChevron}>▴</Text>
       </Pressable>
-      {SYMBOLS.map((sy, i) => (
-        <View key={sy.name} style={[s.sumRow, { opacity: per[i] ? 1 : 0.45 }]}>
-          <View style={[s.sumDot, { borderColor: sy.color }]}><Text style={s.sumEmoji}>{sy.emoji}</Text></View>
-          <Text style={s.sumVal}>{per[i]}</Text>
-        </View>
-      ))}
+      <View style={grid ? s.sumGrid : undefined}>
+        {SYMBOLS.map((sy, i) => (
+          <View key={sy.name} style={[s.sumRow, { opacity: per[i] ? 1 : 0.45 }]}>
+            <View style={[s.sumDot, { borderColor: sy.color }]}><Text style={s.sumEmoji}>{sy.emoji}</Text></View>
+            <Text style={s.sumVal}>{per[i]}</Text>
+          </View>
+        ))}
+      </View>
       <Text style={s.sumTotal}>={total}</Text>
     </View>
   );
@@ -136,7 +138,9 @@ export function TableScene(p: Props) {
   const rightRel = n === 4 ? [3] : [];
   const inner = width - 32 - 20;
   // À 4 joueurs, le logo Σ se met en haut à droite (les côtés sont pris par les joueurs) ; sinon, à droite des tas.
-  const pileW = Math.min(74 * p.scale, (inner - (n === 4 ? 2 * 62 : 0) - 3 * 6) / 4);
+  // À 4 joueurs, le logo Σ se met en haut à droite (les côtés sont pris par les joueurs) ; sinon, à droite des tas.
+  const sumSide = n !== 4;
+  const pileW = Math.min(74 * p.scale, (inner - (n === 4 ? 2 * 62 : 0) - (sumSide ? 44 : 0) - 3 * 6) / 4);
   const handW = Math.min(78 * (p.handScale ?? p.scale), (inner - 76 - 3 * 6) / 4);
   const label = (i: number) => p.labels?.[i]?.name ?? (solo && i === 0 ? 'Toi' : `J${i + 1}`);
   const avatar = (i: number) => p.labels?.[i]?.avatar ?? (solo ? (i === 0 ? '🙂' : '🤖') : '👤');
@@ -159,7 +163,7 @@ export function TableScene(p: Props) {
     <View style={s.felt}>
       {topRel.length > 0 && <View style={s.topRow}>{topRel.map((r) => seat(r))}</View>}
 
-      <View style={s.sumBand}><SumBadge cards={piles.map((pv) => pv.card)} inline /></View>
+      {!sumSide && <View style={s.sumCorner}><SumBadge cards={piles.map((pv) => pv.card)} grid /></View>}
 
       <View style={s.mid}>
         {leftRel.map((r) => seat(r, true))}
@@ -185,6 +189,7 @@ export function TableScene(p: Props) {
             </View>
           ))}
         </View>
+        {sumSide && <SumBadge cards={piles.map((pv) => pv.card)} />}
         {rightRel.map((r) => seat(r, true))}
       </View>
 
@@ -255,8 +260,6 @@ const s = StyleSheet.create({
   sumEmoji: { fontSize: 10 },
   sumVal: { color: '#fff', fontSize: 13, fontWeight: '800', minWidth: 14 },
   sumTotal: { color: '#fde68a', fontSize: 13, fontWeight: '900' },
-  sumBand: { alignItems: 'center' },
-  sumInline: { flexDirection: 'row', gap: 8, marginLeft: 0, paddingHorizontal: 8, paddingVertical: 3 },
   sumCorner: { position: 'absolute', top: 6, right: 6, zIndex: 3 },
   mine: { backgroundColor: '#fef9c3', borderRadius: 16, borderWidth: 3, borderColor: '#ca8a04', paddingHorizontal: 6, paddingTop: 16, paddingBottom: 6, marginTop: 6 },
   mineOn: { backgroundColor: '#fde68a', borderColor: '#f59e0b' },

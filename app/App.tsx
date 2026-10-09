@@ -9,6 +9,7 @@ import {
 import { Celebration, type Celebrate } from './src/Celebration';
 import { InfoPanel } from './src/InfoPanel';
 import { StatsTable } from './src/StatsTable';
+import { useSumOpen } from './src/sumState';
 import { StatsView } from './src/StatsView';
 import { addLifetime, clearLifetime, loadLifetime, saveLifetime } from './src/lifetime';
 import { ScoreBoard, type SharedScores } from './src/ScoreBoard';
@@ -134,13 +135,14 @@ export default function App() {
 
   const { width, height } = useWindowDimensions();
   // La barre du bas est plus haute en fin de partie (explication) ou en spectateur : les missions en loupe lui laissent la place.
+  const sumOpen = useSumOpen();
   const tallBar = (!!game && game.over && game.completed < 50 && !resultSeen) || (online && !!osnap?.spectator);
   // Sur un téléphone court, c'est la table qu'on réduit davantage (et non les missions, qui sont le but du mode loupe).
   const loupeScale = height >= 800 ? 0.62 : 0.4;
   // Téléphone tenu en travers : les missions à gauche (2 × 2), la table et ta main à droite (qui défile si l'écran est trop bas).
   const land = width > height * 1.15;
   const landToken = Math.max(56, Math.min(130, (height - 62) / 2 - 3));
-  const tokenSize = land ? landToken : loupe ? Math.max(64, Math.min((width - 32 - 12) / 2, (height - (height >= 800 ? 450 : (game?.players ?? 3) >= 4 ? 466 : 394) - (tallBar ? 120 : 0)) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
+  const tokenSize = land ? landToken : loupe ? Math.max(64, Math.min((width - 32 - 12) / 2, (height - (height >= 800 ? 450 : (game?.players ?? 3) >= 4 ? 446 : sumOpen ? 410 : 366) - (tallBar ? 120 : 0)) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
   const scale = loupe ? loupeScale : Math.min(1, Math.max(0.66, (height - 200 - (tallBar ? 90 : 0)) / 560));
 
   const solo = mode === 'solo';
