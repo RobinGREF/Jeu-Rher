@@ -142,7 +142,7 @@ export default function App() {
   // Téléphone tenu en travers : les missions à gauche (2 × 2), la table et ta main à droite (qui défile si l'écran est trop bas).
   const land = width > height * 1.15;
   const landToken = Math.max(56, Math.min(130, (height - 62) / 2 - 3));
-  const tokenSize = land ? landToken : loupe ? Math.max(64, Math.min((width - 32 - 12) / 2, (height - (height >= 800 ? 450 : (game?.players ?? 3) >= 4 ? 446 : sumOpen ? 410 : 366) - (tallBar ? 120 : 0)) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
+  const tokenSize = land ? landToken : loupe ? Math.max(64, Math.min((width - 32 - 12) / 2, (height - (height >= 800 ? 450 : (game?.players ?? 3) >= 4 ? 440 : sumOpen ? 410 : 366) - (tallBar ? 120 : 0)) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
   const scale = loupe ? loupeScale : Math.min(1, Math.max(0.66, (height - 200 - (tallBar ? 90 : 0)) / 560));
 
   const solo = mode === 'solo';

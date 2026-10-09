@@ -51,6 +51,7 @@ function SumBadge({ cards, grid }: { cards: Card[]; grid?: boolean }) {
       <Pressable onPress={toggle} accessibilityLabel="Replier les sommes" style={s.sumHead}>
         <Text style={s.sumTitle}>Σ</Text>
         <Text style={s.sumChevron}>▴</Text>
+        {grid && <Text style={s.sumTotal}>={total}</Text>}
       </Pressable>
       <View style={grid ? s.sumGrid : undefined}>
         {SYMBOLS.map((sy, i) => (
@@ -60,7 +61,7 @@ function SumBadge({ cards, grid }: { cards: Card[]; grid?: boolean }) {
           </View>
         ))}
       </View>
-      <Text style={s.sumTotal}>={total}</Text>
+      {!grid && <Text style={s.sumTotal}>={total}</Text>}
     </View>
   );
 }
@@ -165,7 +166,7 @@ export function TableScene(p: Props) {
 
       {!sumSide && <View style={s.sumCorner}><SumBadge cards={piles.map((pv) => pv.card)} grid /></View>}
 
-      <View style={s.mid}>
+      <View style={[s.mid, n === 4 && { marginTop: 14 }]}>
         {leftRel.map((r) => seat(r, true))}
         <View style={s.center}>
           {piles.map((pv, i) => (
