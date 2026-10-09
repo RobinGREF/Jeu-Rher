@@ -58,9 +58,10 @@ export const s = StyleSheet.create({
   err: { color: '#fca5a5', textAlign: 'center' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
   // deux colonnes : chaque carte prend un peu moins de la moitié de la largeur (l'écart de 8 s'y glisse)
-  cat: { width: '48.5%', borderWidth: 2, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 10, justifyContent: 'center', minHeight: 48 },
+  cat: { width: '48.5%', borderWidth: 2, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 8, justifyContent: 'center', alignItems: 'center', gap: 2, minHeight: 78 },
+  catEmoji: { fontSize: 24 },
   catBig: { paddingVertical: 14, paddingHorizontal: 14, alignItems: 'center' },
-  catTxt: { color: '#ece7db', fontWeight: '700', fontSize: 14, textAlign: 'center' },
+  catTxt: { color: '#ece7db', fontWeight: '700', fontSize: 14, textAlign: 'center', lineHeight: 17 },
   catSub: { color: '#8b93a7', fontSize: 12, fontWeight: '700', textAlign: 'center' },
   players: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
   pcard: { width: '100%', alignItems: 'center', gap: 6, backgroundColor: '#1a1e2a', borderRadius: 14, borderWidth: 2, borderColor: 'transparent', paddingVertical: 10, paddingHorizontal: 8 },

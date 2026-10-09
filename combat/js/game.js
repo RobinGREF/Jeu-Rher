@@ -1529,11 +1529,11 @@ function drawMusic() {
   const id = musicId(), on = FFMusic.on();
   if (G.scene === 'fight') {
     const m = G.match;
-    if (on && m && m.phase === 'intro' && m.round === 1) plainText('♪ ' + FFMusic.track(id).name, W - 14, H - 14, 13, 'rgba(255,255,255,0.8)', 'right');
+    if (on && m && m.phase === 'intro' && m.round === 1) plainText('♪ ' + FFMusic.track(id).name, W - 14, H - 14, 16, 'rgba(255,255,255,0.8)', 'right');
     return;
   }
   const label = on ? '♪ ' + FFMusic.track(id).name + ' (M)' : '♪ musique coupée (M)';
-  plainText(label, W - 14, H - 14, 13, on ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.5)', 'right');
+  plainText(label, W - 14, H - 14, 16, on ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.5)', 'right');
   clickable(W - 260, H - 30, 260, 28, () => { FFMusic.toggle(); });
 }
 let last = performance.now(), acc = 0;

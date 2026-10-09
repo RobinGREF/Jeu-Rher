@@ -38,7 +38,8 @@ export function CatPicker({ names = [], onDone }: { names?: string[]; onDone: (c
           const on = picked.includes(c.key);
           return (
             <Pressable key={c.key} onPress={() => toggle(c.key)} style={[s.cat, { borderColor: c.color }, on && { backgroundColor: c.color }]} accessibilityState={{ selected: on }}>
-              <Text style={s.catTxt}>{c.emoji} {c.label}</Text>
+              <Text style={s.catEmoji}>{c.emoji}</Text>
+              <Text style={s.catTxt} numberOfLines={2}>{c.label}</Text>
             </Pressable>
           );
         })}

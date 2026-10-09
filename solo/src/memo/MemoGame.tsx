@@ -52,7 +52,7 @@ export function MemoGame({ onHome }: { onHome: () => void }) {
       <Pressable onPress={memo ? () => setMemo(null) : onHome} style={s.topBtn} accessibilityLabel={memo ? 'Changer de niveau' : 'Retour à la liste des jeux'}>
         <Text style={s.topTxt}>{memo ? '← Niveaux' : '← Jeux'}</Text>
       </Pressable>
-      <Text style={s.topTitle}>Mémo des paires</Text>
+      <Text style={s.topTitle}>{memo ? 'Mémo des paires' : ''}</Text>
       <Pressable onPress={reloadFresh} style={[s.topBtn, { alignItems: 'flex-end' }]} accessibilityLabel="Recharger la dernière version du jeu"><Text style={s.topTxt}>↻</Text></Pressable>
     </View>
   );
@@ -97,7 +97,7 @@ export function MemoGame({ onHome }: { onHome: () => void }) {
           {LEVELS.map((l) => (
             <Pressable key={l.key} onPress={() => start(l)} style={s.level} accessibilityRole="button">
               <Text style={s.levelTitle}>{l.label}</Text>
-              <Text style={s.levelSub}>{l.pairs} paires{best[l.key] !== undefined ? ` · record : ${best[l.key]} coups` : ''}</Text>
+              <Text style={s.levelSub}>{l.pairs} paires · {best[l.key] !== undefined ? `🏅 record : ${best[l.key]} coups` : 'pas encore de record'}</Text>
             </Pressable>
           ))}
           <Pressable onPress={() => setShowStats(true)} style={[s.level, s.statsBtn]} accessibilityRole="button"><Text style={s.levelTitle}>📊 Mes stats</Text><Text style={s.levelSub}>Parties, records, moyenne par niveau</Text></Pressable>

@@ -30,10 +30,15 @@
   #inv button{font:bold 13px Arial,sans-serif;color:#fff;background:#334155;border:2px solid rgba(255,255,255,.35);border-radius:12px;padding:6px 10px;cursor:pointer}
   #inv .wa{background:#15803d}
   #codeIn{display:none;position:fixed;left:50%;top:44%;transform:translate(-50%,-50%);width:min(260px,70vw);font:900 clamp(30px,8vw,48px) Impact,'Arial Black',sans-serif;letter-spacing:.3em;text-align:center;text-transform:uppercase;color:#ffd23f;background:rgba(0,0,0,.75);border:3px solid #ffd23f;border-radius:12px;padding:6px 0 6px .3em;outline:none;z-index:6}
+  #rotate{display:none;position:fixed;left:50%;top:7%;transform:translateX(-50%);z-index:9;width:min(300px,86vw);text-align:center;color:#fff;font:bold 16px Arial,sans-serif;background:rgba(20,20,30,.8);border:2px solid rgba(255,255,255,.4);border-radius:14px;padding:12px 14px;pointer-events:none}
+  #rotate b{display:block;font-size:34px;line-height:1.2;animation:turn 2.4s ease-in-out infinite}
+  @keyframes turn{0%,30%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+  @media (orientation:portrait) and (max-width:700px){#rotate{display:block}}
 </style>
 </head>
 <body>
 <canvas id="game" width="960" height="540"></canvas>
+<div id="rotate"><b>📱</b>Tourne ton téléphone en travers pour jouer en grand</div>
 <!-- Personnalisation : voir js/data.js (personnages, décors, réglages) -->
 <div id="touch">
   <button class="dp" id="tl" data-k="ArrowLeft">◀</button><button class="dp" id="tr" data-k="ArrowRight">▶</button>

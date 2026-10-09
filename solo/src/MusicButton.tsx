@@ -26,7 +26,7 @@ export function MusicButton({ choice, tracks }: { choice: { track: TrackSpec | n
   return (
     <View style={st.wrap}>
       <Pressable onPress={next} style={st.btn} accessibilityLabel={track ? `Musique : ${track.name}. Toucher pour changer` : 'Musique coupée. Toucher pour la remettre'}>
-        <Text style={st.txt} numberOfLines={1}>{track ? `${track.emoji} ${track.name}` : '🔇 Musique'}</Text>
+        <Text style={st.txt} numberOfLines={1}>{track ? `${track.emoji} ${track.name}` : '🔇 Musique coupée'}<Text style={st.hint}>  ·  toucher pour changer</Text></Text>
       </Pressable>
     </View>
   );
@@ -35,5 +35,6 @@ export function MusicButton({ choice, tracks }: { choice: { track: TrackSpec | n
 const st = StyleSheet.create({
   wrap: { alignItems: 'center', paddingBottom: 4 },
   btn: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 14, paddingVertical: 6, paddingHorizontal: 12 },
-  txt: { color: '#e5e7eb', fontSize: 13, fontWeight: '700' },
+  txt: { color: '#e5e7eb', fontSize: 14, fontWeight: '700' },
+  hint: { color: '#9ca3af', fontSize: 12, fontWeight: '500' },
 });

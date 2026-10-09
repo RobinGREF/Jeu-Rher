@@ -84,13 +84,13 @@ function useDuelStatsRecorder(flow: Flow | null) {
   }, [flow]);
 }
 
-function Shell({ onHome, onRules, music, children }: { onHome: () => void; onRules: () => void; music: ReturnType<typeof useMusicChoice>; children: React.ReactNode }) {
+function Shell({ onHome, onRules, music, children, bare }: { onHome: () => void; onRules: () => void; music: ReturnType<typeof useMusicChoice>; children: React.ReactNode; bare?: boolean }) {
   return (
     <SafeAreaView style={s.root}>
       <StatusBar style="light" />
       <View style={s.top}>
         <Pressable onPress={onHome} style={s.topBtn} accessibilityLabel="Retour à la liste des jeux"><Text style={s.topTxt}>← Jeux</Text></Pressable>
-        <Text style={s.topTitle}>Duel de Savoir</Text>
+        <Text style={s.topTitle}>{bare ? '' : 'Duel de Savoir'}</Text>
         <View style={s.topRight}>
           <Pressable onPress={reloadFresh} style={s.topIcon} accessibilityLabel="Recharger la dernière version du jeu"><Text style={s.topTxt}>↻</Text></Pressable>
           <Pressable onPress={onRules} style={s.topIcon} accessibilityLabel="Règles"><Text style={s.topTxt}>📖</Text></Pressable>
@@ -150,7 +150,7 @@ export function DuelGame({ onHome }: { onHome: () => void }) {
   }
 
   const music = useMusicChoice('duel', TRACKS_DUEL);
-  const shell = (children: React.ReactNode) => <Shell onHome={onHome} onRules={() => setRules(true)} music={music}>{children}</Shell>;
+  const shell = (children: React.ReactNode, bare?: boolean) => <Shell onHome={onHome} onRules={() => setRules(true)} music={music} bare={bare}>{children}</Shell>;
 
   if (screen === 'stats') {
     const st = loadDuelStats();
@@ -217,6 +217,7 @@ export function DuelGame({ onHome }: { onHome: () => void }) {
       <Btn kind="ghost" label="Choisir les catégories" onPress={() => setScreen('cats')} />
       <Btn kind="ghost" label="📊 Mes stats" onPress={() => setScreen('stats')} />
     </>,
+    true,
   );
 }
 
