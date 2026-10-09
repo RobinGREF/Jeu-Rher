@@ -136,8 +136,8 @@ export function TableScene(p: Props) {
   const rightRel = n === 4 ? [3] : [];
   const inner = width - 32 - 20;
   // À 4 joueurs, le logo Σ se met en haut à droite (les côtés sont pris par les joueurs) ; sinon, à droite des tas.
-  const pileW = Math.min(64 * p.scale, (inner - (n === 4 ? 2 * 62 : 0) - 3 * 6) / 4);
-  const handW = Math.min(66 * (p.handScale ?? p.scale), (inner - 52 - 3 * 6) / 4);
+  const pileW = Math.min(74 * p.scale, (inner - (n === 4 ? 2 * 62 : 0) - 3 * 6) / 4);
+  const handW = Math.min(78 * (p.handScale ?? p.scale), (inner - 76 - 3 * 6) / 4);
   const label = (i: number) => p.labels?.[i]?.name ?? (solo && i === 0 ? 'Toi' : `J${i + 1}`);
   const avatar = (i: number) => p.labels?.[i]?.avatar ?? (solo ? (i === 0 ? '🙂' : '🤖') : '👤');
   const seat = (rel: number, vertical = false) => {
@@ -154,7 +154,6 @@ export function TableScene(p: Props) {
     if (n === 4) return rel === 1 ? { x: -150, y: 0 } : rel === 2 ? { x: 0, y: -150 } : { x: 150, y: 0 };
     return n === 2 ? { x: 0, y: -150 } : { x: rel === 1 ? -70 : 70, y: -150 };
   };
-  const cardTxt = (c: Card) => `${c.value}${SYMBOLS[c.symbol].emoji}`;
 
   return (
     <View style={s.felt}>
@@ -190,10 +189,7 @@ export function TableScene(p: Props) {
       </View>
 
       {lp && (
-        <Pressable key={lp.key} onPress={p.onSkip} style={s.caption}>
-          <Text style={s.captionTxt}>
-            {p.who(lp.seat) === 'Toi' ? 'Tu poses' : `${p.who(lp.seat)} pose`} {cardTxt(lp.card)} sur {cardTxt(lp.covered)} · tas {lp.pile + 1}{lp.gained ? ` · 🎯 +${lp.gained}` : ''}
-          </Text>
+        <Pressable key={lp.key} onPress={p.onSkip} style={s.caption} accessibilityLabel="Passer l'affichage du coup">
           <Countdown ms={p.pauseMs} />
         </Pressable>
       )}
@@ -243,7 +239,7 @@ const s = StyleSheet.create({
   name: { color: '#f0fdf4', fontWeight: '800', fontSize: 13 },
   nameOn: { color: '#fbbf24' },
   sub: { color: '#bbf7d0', fontSize: 11, fontWeight: '700' },
-  caption: { position: 'absolute', bottom: 112, alignSelf: 'center', backgroundColor: 'rgba(15,23,42,0.92)', borderRadius: 12, paddingVertical: 6, paddingHorizontal: 12, gap: 4, zIndex: 8, borderWidth: 1, borderColor: '#f59e0b' },
+  caption: { position: 'absolute', bottom: 112, alignSelf: 'center', width: 120, paddingVertical: 8, zIndex: 8 },
   captionTxt: { color: '#fde68a', fontWeight: '800', fontSize: 13, textAlign: 'center' },
   countTrack: { height: 3, backgroundColor: '#334155', borderRadius: 2, overflow: 'hidden' },
   countBar: { height: 3, backgroundColor: '#f59e0b' },

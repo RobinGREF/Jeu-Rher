@@ -140,7 +140,7 @@ export default function App() {
   // Téléphone tenu en travers : les missions à gauche (2 × 2), la table et ta main à droite (qui défile si l'écran est trop bas).
   const land = width > height * 1.15;
   const landToken = Math.max(56, Math.min(130, (height - 62) / 2 - 3));
-  const tokenSize = land ? landToken : loupe ? Math.max(64, Math.min((width - 32 - 12) / 2, (height - (height >= 800 ? 450 : (game?.players ?? 3) >= 4 ? 452 : 380) - (tallBar ? 120 : 0)) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
+  const tokenSize = land ? landToken : loupe ? Math.max(64, Math.min((width - 32 - 12) / 2, (height - (height >= 800 ? 450 : (game?.players ?? 3) >= 4 ? 466 : 394) - (tallBar ? 120 : 0)) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
   const scale = loupe ? loupeScale : Math.min(1, Math.max(0.66, (height - 200 - (tallBar ? 90 : 0)) / 560));
 
   const solo = mode === 'solo';
@@ -717,7 +717,7 @@ export default function App() {
         <TableScene game={game} solo={solo} labels={labels} piles={pileViews} onPile={drop}
           meIndex={me} hand={spectator ? [] : hand} handShown={handShown} selectedId={selected}
           onSelect={(id) => { setSelected(selected === id ? null : id); setError(''); setSigMode('play'); }}
-          onReveal={() => { setRevealed(true); setSigMode('play'); }} revealAll={openHands || review} scale={scale} handScale={loupe ? 0.62 : undefined}
+          onReveal={() => { setRevealed(true); setSigMode('play'); }} revealAll={openHands || review} scale={scale} handScale={loupe ? 0.54 : undefined}
           lastPlay={lastPlay} pauseMs={effPause}
           who={(i) => (online ? (i === me ? 'Toi' : seat(i)) : solo ? (i === 0 ? 'Toi' : seat(i)) : `J${i + 1}`)}
           onSkip={() => { if (solo && game.current !== 0 && !clickMode) doBotMove(game); else setLastPlay(null); }} />
@@ -762,7 +762,8 @@ export default function App() {
           : sigMode !== 'play' ? <Text style={s.barTxt} numberOfLines={1}>{sigHint}</Text>
           : pendingAns.length > 0 && picking === null ? <Text style={s.barWait} numberOfLines={1}>{(solo || online) ? (pendingAns.includes(me) ? '🗣️ Peux-tu réussir une mission ?' : `⏳ On attend : ${pendingAns.map(seat).join(', ')}`) : `🗣️ J${pendingAns[0] + 1}, peux-tu réussir une mission ?`}</Text>
           : waitingBot ? <Text style={s.barWait} numberOfLines={1}>🤖 {botName} va jouer{announcers.length ? ' · tu peux annoncer avant' : ''}</Text>
-          : <Text style={s.barTxt} numberOfLines={2}>{hist[0] ?? (game.current === me ? 'À toi de commencer' : `${seat(game.current)} commence`)}</Text>}
+          : (online || solo ? game.current === me : true) ? <Text style={s.turnMine} numberOfLines={1}>👉 {online || solo ? 'À toi de jouer !' : `J${game.current + 1}, à toi de jouer !`}</Text>
+          : <Text style={s.turnOther} numberOfLines={1}>Au tour de {seat(game.current).replace(' (machine)', '')}</Text>}
         <View style={s.barRow}>
           {picking !== null ? (
             <>
@@ -875,6 +876,8 @@ const s = StyleSheet.create({
   barTxt: { color: '#e2e8f0', fontSize: 14, textAlign: 'center', fontWeight: '600' },
   barErr: { color: '#fca5a5', fontSize: 14, textAlign: 'center', fontWeight: '700' },
   barRow: { flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' },
+  turnMine: { color: '#fbbf24', fontSize: 20, textAlign: 'center', fontWeight: '900' },
+  turnOther: { color: '#f8fafc', fontSize: 17, textAlign: 'center', fontWeight: '800' },
   barWait: { color: '#fde68a', fontSize: 15, textAlign: 'center', fontWeight: '800' },
   goBtn: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, backgroundColor: '#22c55e' },
   goTxt: { color: '#052e16', fontWeight: '900', fontSize: 15 },
