@@ -694,6 +694,7 @@ export default function App() {
   const bannerEl = (online || solo ? game.current === me : true)
     ? <Text style={s.turnMine} numberOfLines={1}>👉 {online || solo ? 'À toi de jouer !' : `J${game.current + 1}, à toi de jouer !`}</Text>
     : <Text style={s.turnOther} numberOfLines={1}>Au tour de {seat(game.current).replace(' (machine)', '')}</Text>;
+  const bannerIsDefault = !error && picking === null && sigMode === 'play' && pendingAns.length === 0 && !waitingBot;
   const bannerInRow = announcers.length === 0 && !canSignal && !waitingBot;
   const Right: React.ElementType = land ? ScrollView : View;
   const rightProps = land ? { style: { flex: 1 }, contentContainerStyle: { minHeight: 330, flexGrow: 1, gap: 6 } } : { style: { flex: 1, gap: 6 } };
@@ -769,7 +770,7 @@ export default function App() {
           : sigMode !== 'play' ? <Text style={s.barTxt} numberOfLines={1}>{sigHint}</Text>
           : pendingAns.length > 0 && picking === null ? <Text style={s.barWait} numberOfLines={1}>{(solo || online) ? (pendingAns.includes(me) ? '🗣️ Peux-tu réussir une mission ?' : `⏳ On attend : ${pendingAns.map(seat).join(', ')}`) : `🗣️ J${pendingAns[0] + 1}, peux-tu réussir une mission ?`}</Text>
           : waitingBot ? <Text style={s.barWait} numberOfLines={1}>🤖 {botName} va jouer{announcers.length ? ' · tu peux annoncer avant' : ''}</Text>
-          : bannerInRow ? null : bannerEl}
+          : null}
         <View style={s.barRow}>
           {picking !== null ? (
             <>
@@ -801,7 +802,7 @@ export default function App() {
                 </Text>
               </Pressable>
             );
-          }) : !canSignal && !waitingBot && <View style={[s.barSpacer, { justifyContent: 'center' }]}>{bannerInRow && bannerEl}</View>}
+          }) : !canSignal && !waitingBot && <View style={[s.barSpacer, { justifyContent: 'center' }]}>{bannerIsDefault && bannerInRow && bannerEl}</View>}
           {waitingBot && picking === null && pendingAns.length === 0 && (
             <Pressable onPress={goBot} style={[s.goBtn, s.grow]} accessibilityLabel={`Laisser ${botName} jouer`}>
               <Text style={s.goTxt} numberOfLines={1}>▶ Laisser {botShort} jouer</Text>
@@ -813,6 +814,7 @@ export default function App() {
             </Pressable>
           ))}
         </View>
+        {bannerIsDefault && !bannerInRow && bannerEl}
         {canSignal && !solo && !online && sigMode !== 'play' && (
           <View style={s.barRow}>
             <Text style={s.barTxt}>Qui parle ?</Text>
