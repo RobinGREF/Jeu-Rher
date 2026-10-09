@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import type { ScoreEntry } from './scores';
@@ -38,6 +38,8 @@ export function ScoreBoard({ local, shared, highlightIds, onBack, onClear, onRef
   const [confirm, setConfirm] = useState(false);
   const hasShared = shared.status !== 'off';
   const [tab, setTab] = useState<'shared' | 'local'>(hasShared ? 'shared' : 'local');
+  // Tableau partagé vide ou en erreur alors que cet appareil a des parties : on ouvre directement « Cet appareil ».
+  useEffect(() => { if ((shared.status === 'error' || (shared.status === 'ready' && shared.list.length === 0)) && local.length > 0) setTab('local'); }, [shared.status, shared.list.length, local.length]);
   const current = hasShared ? tab : 'local';
   const denied = shared.error?.includes('permission_denied');
 

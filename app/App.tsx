@@ -142,7 +142,9 @@ export default function App() {
   // Téléphone tenu en travers : les missions à gauche (2 × 2), la table et ta main à droite (qui défile si l'écran est trop bas).
   const land = width > height * 1.15;
   const landToken = Math.max(56, Math.min(130, (height - 62) / 2 - 3));
-  const tokenSize = land ? landToken : loupe ? Math.max(64, Math.min((width - 32 - 12) / 2, (height - (height >= 800 ? 450 : (game?.players ?? 3) >= 4 ? 434 : sumOpen ? 396 : 346) - (tallBar ? 120 : 0)) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
+  // Écran haut : les missions passent en 2 × 2 plus grandes (au lieu d'une rangée de 4 petites).
+  const roomy = !loupe && !land && height >= 700;
+  const tokenSize = land ? landToken : roomy ? Math.max(70, Math.min(104, (width - 44) / 2, (height - 470 - (tallBar ? 120 : 0)) / 2 - 16)) : loupe ? Math.max(64, Math.min((width - 32 - 12) / 2, (height - (height >= 800 ? 450 : (game?.players ?? 3) >= 4 ? 434 : sumOpen ? 396 : 346) - (tallBar ? 120 : 0)) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
   const scale = loupe ? loupeScale : Math.min(1, Math.max(0.66, (height - 200 - (tallBar ? 90 : 0)) / 560));
 
   const solo = mode === 'solo';
@@ -436,25 +438,33 @@ export default function App() {
           <StatusBar style="light" />
           <ScrollView contentContainerStyle={s.home}>
             <Text style={s.title}>Réglages</Text>
-            <Toggle on={loupe} onPress={() => setLoupe(!loupe)} title="🔍 Mode loupe (malvoyant)" sub="Les 4 missions en grand, en carré sur 2 colonnes ; la table et la main sont réduites au nécessaire." />
-            <Toggle on={hint} onPress={() => setHint(!hint)} title="💡 Indice « je peux » (pour moi)" sub="Activé : le jeu te propose « Oui, je peux » seulement quand tu peux vraiment réussir une mission. Désactivé : le bouton est toujours là et tu peux te positionner sur une mission même si aucune n'est faisable (à toi de juger). Réglage personnel à chaque joueur." />
-            <Toggle on={riskOn} onPress={() => setRiskOn(!riskOn)} title="🚫 Joueurs bloqués (pour moi)" sub="Après chaque coup, le jeu indique qui n'a aucune carte jouable sur le tapis tel qu'il est : cette personne ne jouera que si les coups d'avant son tour changent un tas, sinon la partie s'arrête. Il ne montre pas les cartes." />
-            <Toggle on={ask} onPress={() => setAsk(!ask)} title="🗣️ Tour de table" sub="Avant chaque coup, chaque joueur dit s'il peut réussir une mission ou non. Personne ne joue avant." />
+            <Text style={s.label}>Affichage</Text>
+            <Toggle on={loupe} onPress={() => setLoupe(!loupe)} title="🔍 Mode loupe (malvoyant)" sub="Missions en grand, sur 2 colonnes." />
+            <Text style={s.label}>Aide au jeu (réglages personnels)</Text>
+            <Toggle on={hint} onPress={() => setHint(!hint)} title="💡 Indice « je peux »" sub="Le bouton « Oui, je peux » n'apparaît que si tu peux vraiment réussir une mission. Désactivé : toujours là, à toi de juger." />
+            <Toggle on={riskOn} onPress={() => setRiskOn(!riskOn)} title="🚫 Joueurs bloqués" sub="Après chaque coup, indique qui n'a aucune carte jouable sur le tapis actuel." />
+            <Toggle on={ask} onPress={() => setAsk(!ask)} title="🗣️ Tour de table" sub="Chacun dit s'il peut réussir une mission avant chaque coup." />
             {!ask && (
-              <Toggle on={manual} onPress={() => setManual(!manual)} title="👆 Machines : attendre mon clic" sub="Avant chaque machine, un message te prévient et elle ne joue que quand tu touches « Laisser jouer »." />
+              <Toggle on={manual} onPress={() => setManual(!manual)} title="👆 Machines : attendre mon clic" sub="Une machine ne joue que quand tu touches « Laisser jouer »." />
             )}
-            <Toggle on={musicOn} onPress={() => setMusicOn(!musicOn)} title="🎵 Musique de fond" sub="Morceaux composés pour le jeu, synthétisés par le navigateur. Se coupe aussi avec le bouton 🎵 en haut de la table." />
+            <Toggle on={phrasesOn} onPress={() => setPhrasesOn(!phrasesOn)} title="💬 Phrases du livret" sub="« Je peux aider », « bonne carte ici », « ne jouez pas ici »." />
+            <Text style={s.label}>Son</Text>
+            <Toggle on={musicOn} onPress={() => setMusicOn(!musicOn)} title="🎵 Musique de fond" sub="Aussi coupable avec 🎵 en haut de la table." />
             {musicOn && (
-              <View style={s.tracks}>
-                {TRACKS_50M.map((tr) => (
-                  <Pressable key={tr.id} onPress={() => setMusicTrack(tr.id)} accessibilityLabel={`Musique : ${tr.name}`} style={[s.trackChip, musicTrack === tr.id && s.trackChipOn]}>
-                    <Text style={[s.trackTxt, musicTrack === tr.id && s.trackTxtOn]}>{tr.emoji} {tr.name}</Text>
-                  </Pressable>
-                ))}
-              </View>
+              <>
+                <Text style={s.hint}>Morceau :</Text>
+                <View style={s.tracks}>
+                  {TRACKS_50M.map((tr) => (
+                    <Pressable key={tr.id} onPress={() => setMusicTrack(tr.id)} accessibilityLabel={`Musique : ${tr.name}`} style={[s.trackChip, musicTrack === tr.id && s.trackChipOn]}>
+                      <Text style={[s.trackTxt, musicTrack === tr.id && s.trackTxtOn]}>{tr.emoji} {tr.name}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </>
             )}
-            <Toggle on={alertsOn} onPress={() => setAlertsOn(!alertsOn)} title="🔔 Alertes (son, vibration, titre)" sub="En ligne : un bip et une vibration quand un joueur rejoint le salon ou quand c'est ton tour ; le titre de l'onglet clignote si la page est cachée." />
-            <Text style={s.label}>Pause entre les coups</Text>
+            <Toggle on={alertsOn} onPress={() => setAlertsOn(!alertsOn)} title="🔔 Alertes en ligne" sub="Bip, vibration et titre de l'onglet quand un joueur arrive ou que c'est ton tour." />
+            <Text style={s.label}>Rythme</Text>
+            <Text style={s.hint}>Pause entre les coups (durée d'affichage de la carte posée) :</Text>
             <View style={s.row}>
               {([5000, 2000, 1000] as const).map((ms) => (
                 <Pressable key={ms} onPress={() => setPauseMs(ms)} style={[s.mode, pauseMs === ms && s.modeOn]}>
@@ -462,9 +472,6 @@ export default function App() {
                 </Pressable>
               ))}
             </View>
-            <Text style={s.hint}>Temps pendant lequel on voit la carte se poser sur celle qu'elle recouvre. Sans « attendre mon clic », c'est aussi le délai avant que la machine suivante joue.</Text>
-            <Text style={s.label}>Options</Text>
-            <Toggle on={phrasesOn} onPress={() => setPhrasesOn(!phrasesOn)} title="💬 Phrases du livret" sub="En plus de l'annonce « je peux » : « je peux aider », « bonne carte ici », « ne jouez pas ici »." />
             <Pressable style={s.btn} onPress={() => setScreen('home')}><Text style={s.btnTxt}>Terminé</Text></Pressable>
           </ScrollView>
         </SafeAreaView>
@@ -506,7 +513,7 @@ export default function App() {
 
           <Text style={s.label}>Ton prénom</Text>
           <TextInput value={myName} onChangeText={(v) => { setMyName(v); try { localStorage.setItem('50m-name', v); } catch { /* sans stockage */ } }}
-            placeholder="Robin" placeholderTextColor="#64748b" maxLength={14} style={s.input} accessibilityLabel="Ton prénom" />
+            placeholder="Écris ton prénom" placeholderTextColor="#64748b" maxLength={14} style={s.input} accessibilityLabel="Ton prénom" />
 
           {!onl.kind ? (
             <Text style={s.err}>Le mode en ligne n'est pas configuré sur cette version (voir docs/en-ligne.md). Tu peux jouer contre des machines.</Text>
@@ -524,7 +531,7 @@ export default function App() {
                 </Pressable>
               </View>
               {!!onl.error && <Text style={s.err}>{onl.error}</Text>}
-              <Pressable onPress={() => setScreen('tv')} style={s.link}><Text style={s.linkTxt}>📺 Écran télé (suivre la table sans jouer)</Text></Pressable>
+              <Pressable onPress={() => setScreen('tv')} style={s.tvBtn}><Text style={s.tileTxt}>📺 Écran télé · suivre la table sans jouer</Text></Pressable>
               {onl.kind === 'local' && <Text style={s.hint}>Test local : les autres joueurs sont les autres onglets de ce navigateur.</Text>}
             </>
           )}
@@ -534,11 +541,11 @@ export default function App() {
             <Text style={s.bigTitle}>🤖 Contre des machines</Text>
             <Text style={s.bigSub}>Seul, avec 1 à 3 joueurs machine</Text>
           </Pressable>
-          <View style={s.row}>
-            <Pressable onPress={openScores} style={s.link}><Text style={s.linkTxt}>🏆 Meilleurs scores</Text></Pressable>
-            <Pressable onPress={() => setStatsOpen(true)} style={s.link}><Text style={s.linkTxt}>📊 Mes stats</Text></Pressable>
-            <Pressable onPress={() => setScreen('settings')} style={s.link}><Text style={s.linkTxt}>⚙️ Réglages</Text></Pressable>
-            <Pressable onPress={reloadFresh} style={s.link} accessibilityLabel="Recharger la dernière version du jeu"><Text style={s.linkTxt}>↻ Mettre à jour</Text></Pressable>
+          <View style={s.tiles}>
+            <Pressable onPress={openScores} style={s.tile}><Text style={s.tileIco}>🏆</Text><Text style={s.tileTxt}>Meilleurs scores</Text></Pressable>
+            <Pressable onPress={() => setStatsOpen(true)} style={s.tile}><Text style={s.tileIco}>📊</Text><Text style={s.tileTxt}>Mes stats</Text></Pressable>
+            <Pressable onPress={() => setScreen('settings')} style={s.tile}><Text style={s.tileIco}>⚙️</Text><Text style={s.tileTxt}>Réglages</Text></Pressable>
+            <Pressable onPress={reloadFresh} style={s.tile} accessibilityLabel="Recharger la dernière version du jeu"><Text style={s.tileIco}>↻</Text><Text style={s.tileTxt}>Mettre à jour</Text></Pressable>
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -703,7 +710,7 @@ export default function App() {
       <StatusBar style="light" />
 
       <View style={s.head}>
-        <Text style={s.headTitle} numberOfLines={1}>{turnTitle}</Text>
+        <Text style={s.headTitle} numberOfLines={1}>{review || spectator ? turnTitle : '50 Missions'}</Text>
         <Text style={[s.headStat, !!party && s.headStatOn]} numberOfLines={1}>🎯 {game.completed}/50{game.medal ? ` ${MEDAL[game.medal].split(' ')[0]}` : ''} · 📚 {game.symbolDeck.length}</Text>
         <Pressable onPress={() => setMusicOn(!musicOn)} style={s.menuBtn} accessibilityLabel={musicOn ? 'Couper la musique' : 'Mettre la musique'}><Text style={s.menuTxt}>{musicOn ? '🎵' : '🔇'}</Text></Pressable>
         <Pressable onPress={() => { setInfo(true); setMenu(false); }} style={s.menuBtn} accessibilityLabel="Infos sur la partie"><Text style={s.menuTxt}>ℹ️</Text></Pressable>
@@ -711,7 +718,7 @@ export default function App() {
       </View>
 
       <View style={{ flex: 1, flexDirection: land ? 'row' : 'column', gap: land ? 10 : 6 }}>
-      <View style={[s.missRow, land && { flexWrap: 'wrap', justifyContent: 'center', alignContent: 'flex-start', gap: 6, width: 2 * tokenSize + 8 }, !land && loupe && { flexWrap: 'wrap', justifyContent: 'center', gap: 6, alignSelf: 'center', maxWidth: 2 * tokenSize + 8 }]} onLayout={(e) => setRowY(e.nativeEvent.layout.y)}>
+      <View style={[s.missRow, land && { flexWrap: 'wrap', justifyContent: 'center', alignContent: 'flex-start', gap: 6, width: 2 * tokenSize + 8 }, !land && (loupe || roomy) && { flexWrap: 'wrap', justifyContent: 'center', gap: 6, alignSelf: 'center', maxWidth: 2 * tokenSize + 8 }]} onLayout={(e) => setRowY(e.nativeEvent.layout.y)}>
         {game.missions.map((m) => (
           <MissionToken key={m.id} def={m} size={tokenSize} showText={false} badges={missionBadges(m.id)}
             mark={picking !== null && picked.includes(m.id) ? 'picked' : game.canDo.some((a) => a.missions.includes(m.id)) ? 'announced' : undefined}
@@ -899,6 +906,11 @@ const s = StyleSheet.create({
   bigTitle: { color: '#f8fafc', fontSize: 19, fontWeight: '800' },
   bigSub: { color: '#94a3b8', fontSize: 14 },
   link: { alignSelf: 'center', padding: 12 },
+  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center', alignSelf: 'stretch' },
+  tile: { width: '48%', backgroundColor: '#1e293b', borderRadius: 14, paddingVertical: 14, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#334155' },
+  tileIco: { fontSize: 22 },
+  tileTxt: { color: '#e2e8f0', fontSize: 15, fontWeight: '700', textAlign: 'center' },
+  tvBtn: { alignSelf: 'stretch', borderWidth: 1, borderColor: '#475569', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   linkTxt: { color: '#cbd5e1', fontSize: 16, fontWeight: '700' },
   setup: { gap: 14, paddingVertical: 8, paddingLeft: 16, paddingRight: 16, flexGrow: 1, justifyContent: 'center' },
   title: { color: '#fff', fontSize: 30, fontWeight: '800', textAlign: 'center' },
