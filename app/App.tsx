@@ -140,11 +140,15 @@ export default function App() {
   // Sur un téléphone court, c'est la table qu'on réduit davantage (et non les missions, qui sont le but du mode loupe).
   const loupeScale = height >= 800 ? 0.62 : 0.4;
   // Téléphone tenu en travers : les missions à gauche (2 × 2), la table et ta main à droite (qui défile si l'écran est trop bas).
+  // Débordement mesuré du tapis (appareil dont les textes sont plus gros, etc.) : on réduit les missions de moitié de ce débordement.
+  const [shrink, setShrink] = useState(0);
+  useEffect(() => { setShrink(0); }, [width, height, loupe, game?.players]);
+  const onOverflow = (ov: number) => setShrink((cur) => (ov > 1 ? cur + ov : ov < -30 && cur > 0 ? Math.max(0, cur - 10) : cur));
   const land = width > height * 1.15;
   const landToken = Math.max(56, Math.min(130, (height - 62) / 2 - 3));
   // Écran haut : les missions passent en 2 × 2 plus grandes (au lieu d'une rangée de 4 petites).
   const roomy = !loupe && !land && height >= 700;
-  const tokenSize = land ? landToken : roomy ? Math.max(70, Math.min(104, (width - 44) / 2, (height - 470 - (tallBar ? 120 : 0)) / 2 - 16)) : loupe ? Math.max(64, Math.min((width - 32 - 12) / 2, (height - (height >= 800 ? 450 : (game?.players ?? 3) >= 4 ? 434 : sumOpen ? 396 : 346) - (tallBar ? 120 : 0)) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
+  const tokenSize = land ? landToken : roomy ? Math.max(70, Math.min(104, (width - 44) / 2, (height - 470 - (tallBar ? 120 : 0) - shrink) / 2 - 16)) : loupe ? Math.max(56, Math.min((width - 32 - 12) / 2, (height - (height >= 800 ? 450 : (game?.players ?? 3) >= 4 ? 434 : sumOpen ? 396 : 346) - (tallBar ? 120 : 0) - shrink) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
   const scale = loupe ? loupeScale : Math.min(1, Math.max(0.66, (height - 200 - (tallBar ? 90 : 0)) / 560));
 
   const solo = mode === 'solo';
@@ -732,7 +736,7 @@ export default function App() {
         <TableScene game={game} solo={solo} labels={labels} piles={pileViews} onPile={drop}
           meIndex={me} hand={spectator ? [] : hand} handShown={handShown} selectedId={selected}
           onSelect={(id) => { setSelected(selected === id ? null : id); setError(''); setSigMode('play'); }}
-          onReveal={() => { setRevealed(true); setSigMode('play'); }} revealAll={openHands || review} scale={scale} handScale={loupe ? 0.54 : undefined}
+          onReveal={() => { setRevealed(true); setSigMode('play'); }} revealAll={openHands || review} scale={scale} handScale={loupe ? 0.54 : undefined} onOverflow={loupe || roomy ? onOverflow : undefined}
           lastPlay={lastPlay} pauseMs={effPause}
           who={(i) => (online ? (i === me ? 'Toi' : seat(i)) : solo ? (i === 0 ? 'Toi' : seat(i)) : `J${i + 1}`)}
           onSkip={() => { if (solo && game.current !== 0 && !clickMode) doBotMove(game); else setLastPlay(null); }} />
@@ -834,6 +838,8 @@ export default function App() {
         )}
       </View>
       )}
+      </Right>
+      </View>
 
       {party && (
         <Celebration key={party.key} c={party} onEnd={() => setParty((cur) => (cur && cur.key === party.key ? null : cur))} width={width} height={height} tokenSize={tokenSize} rowY={rowY} target={{ x: width - 126, y: 16 }} />
@@ -862,8 +868,6 @@ export default function App() {
           <Pressable onPress={quit} style={s.quit}><Text style={s.quitTxt}>Quitter (tu pourras reprendre)</Text></Pressable>
         </View>
       )}
-      </Right>
-      </View>
     </SafeAreaView>
   );
 }

@@ -118,6 +118,8 @@ type Props = {
   onSelect: (id: number) => void; onReveal: () => void; revealAll: boolean; scale: number;
   /** Échelle de ta main, si elle doit rester plus grande que celle des tas (mode loupe). */
   handScale?: number;
+  /** Débordement mesuré (px) du panneau de ta main sous le tapis ; sert à réduire les missions si l'écran est trop juste. */
+  onOverflow?: (px: number) => void;
   lastPlay: LastPlay | null; pauseMs: number; onSkip: () => void; who: (i: number) => string;
   /** Nom et avatar de chaque siège (sinon : Toi / J2… selon `solo`). */
   labels?: { name: string; avatar: string }[];
@@ -150,6 +152,12 @@ export function TableScene(p: Props) {
     return <Seat key={i} game={game} i={i} name={label(i)} avatar={avatar(i)} vertical={vertical} reveal={p.revealAll} />;
   };
   const me = p.meIndex;
+  const [feltH, setFeltH] = useState(0);
+  const [mine, setMine] = useState({ y: 0, h: 0 });
+  useEffect(() => {
+    if (!p.onOverflow || !feltH || !mine.h) return;
+    p.onOverflow(mine.y + mine.h - (feltH - 13));
+  }, [feltH, mine.y, mine.h]); // eslint-disable-line react-hooks/exhaustive-deps
   const meCurrent = me === game.current;
   const lp = p.lastPlay;
   // D'où vient la carte : du siège du joueur, vu depuis la table.
@@ -161,7 +169,7 @@ export function TableScene(p: Props) {
   };
 
   return (
-    <View style={s.felt}>
+    <View style={s.felt} onLayout={(e) => setFeltH(e.nativeEvent.layout.height)}>
       {topRel.length > 0 && <View style={s.topRow}>{topRel.map((r) => seat(r))}</View>}
 
       {!sumSide && <View style={s.sumCorner}><SumBadge cards={piles.map((pv) => pv.card)} grid /></View>}
@@ -200,7 +208,7 @@ export function TableScene(p: Props) {
         </Pressable>
       )}
 
-      <View style={[s.me, s.mine, meCurrent && s.mineOn]}>
+      <View style={[s.me, s.mine, meCurrent && s.mineOn]} onLayout={(e) => setMine({ y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height })}>
         <Text style={[s.mineTag, meCurrent && s.mineTagOn]}>{p.mineLabel ?? 'TON JEU'}{meCurrent ? ' · à toi' : ''}</Text>
         <View style={s.meSeat}>
           <View style={[s.avatar, meCurrent && s.avatarOn]}>
