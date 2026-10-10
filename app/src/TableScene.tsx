@@ -154,10 +154,13 @@ export function TableScene(p: Props) {
   const me = p.meIndex;
   const [feltH, setFeltH] = useState(0);
   const [mine, setMine] = useState({ y: 0, h: 0 });
+  const [midBox, setMidBox] = useState({ y: 0, h: 0 });
   useEffect(() => {
-    if (!p.onOverflow || !feltH || !mine.h) return;
-    p.onOverflow(mine.y + mine.h - (feltH - 13) + 10); // +10 : petite marge de sécurité
-  }, [feltH, mine.y, mine.h]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!p.onOverflow || !feltH || !mine.h || !midBox.h) return;
+    const ov = mine.y + mine.h - (feltH - 13) + 10; // > 0 : le panneau de ta main déborde (+10 : marge de sécurité)
+    const free = 2 * Math.max(0, mine.y - 6 - (midBox.y + midBox.h)); // espace libre du tapis, réparti entre ses deux intervalles
+    p.onOverflow(ov > 1 ? ov : -free);
+  }, [feltH, mine.y, mine.h, midBox.y, midBox.h]); // eslint-disable-line react-hooks/exhaustive-deps
   const meCurrent = me === game.current;
   const lp = p.lastPlay;
   // D'où vient la carte : du siège du joueur, vu depuis la table.
@@ -174,7 +177,7 @@ export function TableScene(p: Props) {
 
       {!sumSide && <View style={s.sumCorner}><SumBadge cards={piles.map((pv) => pv.card)} grid /></View>}
 
-      <View style={[s.mid, n === 4 && { marginTop: 14 }]}>
+      <View style={[s.mid, n === 4 && { marginTop: 14 }]} onLayout={(e) => setMidBox({ y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height })}>
         {leftRel.map((r) => seat(r, true))}
         <View style={s.center}>
           {piles.map((pv, i) => (

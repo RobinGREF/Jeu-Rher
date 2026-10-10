@@ -143,7 +143,7 @@ export default function App() {
   // Débordement mesuré du tapis (appareil dont les textes sont plus gros, etc.) : on réduit les missions de moitié de ce débordement.
   const [shrink, setShrink] = useState(0);
   useEffect(() => { setShrink(0); }, [width, height, loupe, game?.players]);
-  const onOverflow = (ov: number) => setShrink((cur) => (ov > 1 ? cur + ov : ov < -40 && cur > 0 ? Math.max(0, cur - 10) : cur));
+  const onOverflow = (v: number) => setShrink((cur) => (v > 1 ? cur + v : -v > 40 && cur > 0 ? cur - Math.min(cur, -v - 30) : cur));
   const land = width > height * 1.15;
   const landToken = Math.max(56, Math.min(130, (height - 62) / 2 - 3));
   // Écran haut : les missions passent en 2 × 2 plus grandes (au lieu d'une rangée de 4 petites).
@@ -774,7 +774,7 @@ export default function App() {
       ) : (
       <View style={s.bar}>
         {!!error ? <Text style={s.barErr} numberOfLines={1}>{error}</Text>
-          : picking !== null ? <Text style={s.barTxt} numberOfLines={1}>Touche la ou les missions que tu peux réussir, puis valide</Text>
+          : picking !== null ? <Text style={s.barTxt} numberOfLines={1}>Touche tes missions réalisables, puis valide</Text>
           : sigMode !== 'play' ? <Text style={s.barTxt} numberOfLines={1}>{sigHint}</Text>
           : pendingAns.length > 0 && picking === null ? <Text style={s.barWait} numberOfLines={1}>{(solo || online) ? (pendingAns.includes(me) ? '🗣️ Peux-tu réussir une mission ?' : `⏳ On attend : ${pendingAns.map(seat).join(', ')}`) : `🗣️ J${pendingAns[0] + 1}, peux-tu réussir une mission ?`}</Text>
           : waitingBot ? <Text style={s.barWait} numberOfLines={1}>🤖 {botName} va jouer{announcers.length ? ' · tu peux annoncer avant' : ''}</Text>
