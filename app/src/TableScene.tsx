@@ -156,7 +156,7 @@ export function TableScene(p: Props) {
   const [mine, setMine] = useState({ y: 0, h: 0 });
   useEffect(() => {
     if (!p.onOverflow || !feltH || !mine.h) return;
-    p.onOverflow(mine.y + mine.h - (feltH - 13));
+    p.onOverflow(mine.y + mine.h - (feltH - 13) + 10); // +10 : petite marge de sécurité
   }, [feltH, mine.y, mine.h]); // eslint-disable-line react-hooks/exhaustive-deps
   const meCurrent = me === game.current;
   const lp = p.lastPlay;

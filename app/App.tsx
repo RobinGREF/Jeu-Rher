@@ -143,7 +143,7 @@ export default function App() {
   // Débordement mesuré du tapis (appareil dont les textes sont plus gros, etc.) : on réduit les missions de moitié de ce débordement.
   const [shrink, setShrink] = useState(0);
   useEffect(() => { setShrink(0); }, [width, height, loupe, game?.players]);
-  const onOverflow = (ov: number) => setShrink((cur) => (ov > 1 ? cur + ov : ov < -30 && cur > 0 ? Math.max(0, cur - 10) : cur));
+  const onOverflow = (ov: number) => setShrink((cur) => (ov > 1 ? cur + ov : ov < -40 && cur > 0 ? Math.max(0, cur - 10) : cur));
   const land = width > height * 1.15;
   const landToken = Math.max(56, Math.min(130, (height - 62) / 2 - 3));
   // Écran haut : les missions passent en 2 × 2 plus grandes (au lieu d'une rangée de 4 petites).
@@ -740,9 +740,6 @@ export default function App() {
           lastPlay={lastPlay} pauseMs={effPause}
           who={(i) => (online ? (i === me ? 'Toi' : seat(i)) : solo ? (i === 0 ? 'Toi' : seat(i)) : `J${i + 1}`)}
           onSkip={() => { if (solo && game.current !== 0 && !clickMode) doBotMove(game); else setLastPlay(null); }} />
-        {!!missionText && (
-          <Pressable onPress={() => setTextFor(null)} style={s.tip}><Text style={s.tipTxt}>{missionText}</Text></Pressable>
-        )}
       </View>
 
       {online && osnap?.isHost && osnap.requests.map((r) => (
@@ -841,6 +838,10 @@ export default function App() {
       </Right>
       </View>
 
+      {!!missionText && (
+        <Pressable onPress={() => setTextFor(null)} style={s.tip} accessibilityLabel="Fermer l'explication de la mission"><Text style={s.tipTxt}>{missionText}</Text></Pressable>
+      )}
+
       {party && (
         <Celebration key={party.key} c={party} onEnd={() => setParty((cur) => (cur && cur.key === party.key ? null : cur))} width={width} height={height} tokenSize={tokenSize} rowY={rowY} target={{ x: width - 126, y: 16 }} />
       )}
@@ -882,8 +883,8 @@ const s = StyleSheet.create({
   menuTxt: { color: '#f8fafc', fontSize: 20 },
   missRow: { flexDirection: 'row', justifyContent: 'space-between' },
   tableWrap: { flex: 1 },
-  tip: { position: 'absolute', top: 6, left: 8, right: 8, backgroundColor: '#f59e0b', borderRadius: 10, padding: 8 },
-  tipTxt: { color: '#111827', fontWeight: '800', fontSize: 13, textAlign: 'center' },
+  tip: { position: 'absolute', bottom: 6, left: 12, right: 12, backgroundColor: '#f59e0b', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, zIndex: 30 },
+  tipTxt: { color: '#111827', fontWeight: '800', fontSize: 15, textAlign: 'center' },
   bar: { gap: 4 },
   whyTitle: { color: '#fca5a5', fontWeight: '900', fontSize: 15, textAlign: 'center' },
   whyTxt: { color: '#f8fafc', fontWeight: '700', fontSize: 13, textAlign: 'center' },
