@@ -142,16 +142,13 @@ export default function App() {
   // Sur un téléphone court, c'est la table qu'on réduit davantage (et non les missions, qui sont le but du mode loupe).
   const loupeScale = height >= 800 ? 0.62 : 0.4;
   // Téléphone tenu en travers : les missions à gauche (2 × 2), la table et ta main à droite (qui défile si l'écran est trop bas).
-  // Débordement mesuré du tapis (appareil dont les textes sont plus gros, etc.) : on réduit les missions de moitié de ce débordement.
-  const [shrink, setShrink] = useState(0);
-  useEffect(() => { setShrink(0); }, [width, height, size, game?.players]);
-  // Par paliers de 8 px et avec une grande zone morte (on rétrécit dès 6 px de débordement, on ne regrandit qu'avec 80 px de libres) : pas de va-et-vient, donc pas de vibration de l'écran.
-  const onOverflow = (v: number) => setShrink((cur) => (v > 6 ? cur + Math.ceil(v / 8) * 8 : -v > 80 && cur > 0 ? cur - 8 : cur));
+  // Plus de mesure dynamique du tapis : elle pouvait osciller (écran qui vibre). Les réserves de place ci-dessous sont fixes.
+  const shrink = 0;
   const land = width > height * 1.15;
   const landToken = Math.max(56, Math.min(130, (height - 62) / 2 - 3));
   // Écran haut : les missions passent en 2 × 2 plus grandes (au lieu d'une rangée de 4 petites).
   const roomy = size === 'medium' && !land;
-  const tokenSize = land ? landToken : roomy ? Math.max(64, Math.min(120, (width - 44) / 2, (height - ((game?.players ?? 3) >= 4 ? 470 : sumOpen ? 440 : 400) - (tallBar ? 120 : 0) - shrink) / 2 - 16)) : loupe ? Math.max(56, Math.min((width - 32 - 12) / 2, (height - (height >= 800 ? 450 : (game?.players ?? 3) >= 4 ? 434 : sumOpen ? 396 : 346) - (tallBar ? 120 : 0) - shrink) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
+  const tokenSize = land ? landToken : roomy ? Math.max(64, Math.min(128, (width - 44) / 2, (height - ((game?.players ?? 3) >= 4 ? 480 : sumOpen ? 450 : 410) - (tallBar ? 120 : 0) - shrink) / 2 - 16)) : loupe ? Math.max(56, Math.min((width - 32 - 12) / 2, (height - (height >= 800 ? 450 : (game?.players ?? 3) >= 4 ? 434 : sumOpen ? 396 : 346) - (tallBar ? 120 : 0) - shrink) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
   const scale = roomy ? 0.7 : loupe ? loupeScale : Math.min(1, Math.max(0.66, (height - 200 - (tallBar ? 90 : 0)) / 560));
 
   const solo = mode === 'solo';
@@ -699,7 +696,7 @@ export default function App() {
     tags: [...signalTags('good', { pile: i }), ...signalTags('stop', { pile: i })].map((text) => ({ text, stop: text.startsWith(KIND_ICON.stop) })),
   }));
 
-  const missionText = game.missions.find((m) => m.id === textFor)?.label;
+  const zoomDef = game.missions.find((m) => m.id === textFor) ?? null;
   const sigHint = { play: '', help: 'Touche la mission pour laquelle tu peux aider', good: 'Touche le tas où tu as une bonne carte', stop: 'Touche le tas où il ne faut pas jouer' }[sigMode];
   const toggleSig = (k: SignalKind) => setSigMode(sigMode === k ? 'play' : k);
   const turnTitle = review ? '🛑 Fin' : spectator ? `👀 ${seat(game.current)} joue…` : solo || online ? (game.current === me ? 'À toi de jouer' : waitingBot ? `${botName} va jouer` : `${seat(game.current)} joue…`) : `Joueur ${game.current + 1} joue`;
@@ -747,7 +744,7 @@ export default function App() {
         <TableScene game={game} solo={solo} labels={labels} piles={pileViews} onPile={drop}
           meIndex={me} hand={spectator ? [] : hand} handShown={handShown} selectedId={selected}
           onSelect={(id) => { setSelected(selected === id ? null : id); setError(''); setSigMode('play'); }}
-          onReveal={() => { setRevealed(true); setSigMode('play'); }} revealAll={openHands || review} scale={scale} handScale={loupe ? 0.54 : roomy ? 0.72 : undefined} onOverflow={loupe || roomy ? onOverflow : undefined}
+          onReveal={() => { setRevealed(true); setSigMode('play'); }} revealAll={openHands || review} scale={scale} handScale={loupe ? 0.54 : roomy ? 0.72 : undefined} 
           lastPlay={lastPlay} pauseMs={effPause}
           who={(i) => (online ? (i === me ? 'Toi' : seat(i)) : solo ? (i === 0 ? 'Toi' : seat(i)) : `J${i + 1}`)}
           onSkip={() => { if (solo && game.current !== 0 && !clickMode) doBotMove(game); else setLastPlay(null); }} />
@@ -849,8 +846,14 @@ export default function App() {
       </Right>
       </View>
 
-      {!!missionText && (
-        <Pressable onPress={() => setTextFor(null)} style={s.tip} accessibilityLabel="Fermer l'explication de la mission"><Text style={s.tipTxt}>{missionText}</Text></Pressable>
+      {!!zoomDef && (
+        <View style={s.zoom} accessibilityViewIsModal>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setTextFor(null)} accessibilityLabel="Fermer l'agrandissement de la mission" />
+          <Pressable onPress={() => setTextFor(null)} style={s.zoomX} accessibilityLabel="Fermer"><Text style={s.zoomXTxt}>✕</Text></Pressable>
+          <View pointerEvents="none"><MissionToken def={zoomDef} size={Math.min(width - 48, 340)} showText={false} onPress={() => {}} /></View>
+          <Text style={s.zoomTxt} pointerEvents="none">{zoomDef.label}</Text>
+          <Text style={s.zoomHint} pointerEvents="none">Touche pour fermer</Text>
+        </View>
       )}
 
       {party && (
@@ -894,6 +897,11 @@ const s = StyleSheet.create({
   menuTxt: { color: '#f8fafc', fontSize: 20 },
   missRow: { flexDirection: 'row', justifyContent: 'space-between' },
   tableWrap: { flex: 1 },
+  zoom: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40, backgroundColor: 'rgba(8,12,24,0.96)', alignItems: 'center', justifyContent: 'center', gap: 20, padding: 24 },
+  zoomX: { position: 'absolute', top: 14, right: 14, width: 48, height: 48, borderRadius: 24, backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#475569', alignItems: 'center', justifyContent: 'center', zIndex: 2 },
+  zoomXTxt: { color: '#f8fafc', fontSize: 24, fontWeight: '800' },
+  zoomTxt: { color: '#f8fafc', fontSize: 22, fontWeight: '800', textAlign: 'center', lineHeight: 30 },
+  zoomHint: { color: '#94a3b8', fontSize: 14 },
   tip: { position: 'absolute', bottom: 6, left: 12, right: 12, backgroundColor: '#f59e0b', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, zIndex: 30 },
   tipTxt: { color: '#111827', fontWeight: '800', fontSize: 15, textAlign: 'center' },
   bar: { gap: 4 },
