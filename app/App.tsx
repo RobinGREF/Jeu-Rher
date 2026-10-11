@@ -34,7 +34,7 @@ import { reloadFresh } from './src/reload';
 type Mode = 'solo' | 'together' | 'online';
 type Screen = 'home' | 'together' | 'settings' | 'tv' | 'machines';
 
-const DEFAULTS = { bots: 2, pauseMs: 5000, manual: true, phrasesOn: false, openHands: false, alertsOn: true, ask: true, musicOn: true, musicTrack: DEFAULT_TRACK_50M, hint: true, risk: true, loupe: false };
+const DEFAULTS = { bots: 2, pauseMs: 5000, manual: true, phrasesOn: false, openHands: false, alertsOn: true, ask: true, musicOn: true, musicTrack: DEFAULT_TRACK_50M, hint: true, risk: true, loupe: false, size: '' };
 /** Réglages gardés d'une visite à l'autre (facultatif : sans stockage, on repart des valeurs par défaut). */
 function loadSettings(): typeof DEFAULTS {
   try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem('50m-settings') ?? '{}') }; } catch { return DEFAULTS; }
@@ -80,7 +80,9 @@ export default function App() {
   const [manual, setManual] = useState(saved.manual); // les machines attendent mon clic
   const [musicOn, setMusicOn] = useState(saved.musicOn); // musique de fond
   const [musicTrack, setMusicTrack] = useState<string>(TRACKS_50M.some((t) => t.id === saved.musicTrack) ? saved.musicTrack : DEFAULT_TRACK_50M); // morceau choisi dans les réglages
-  const [loupe, setLoupe] = useState(saved.loupe); // mode loupe : missions en grand (2 colonnes), le reste réduit
+  // Taille des missions : « normal » (4 en rangée), « moyen » (2 × 2, table moyenne), « grand » (loupe : 2 × 2 très grandes, table réduite).
+  const [size, setSize] = useState<'normal' | 'medium' | 'large'>(saved.size === 'normal' || saved.size === 'medium' || saved.size === 'large' ? saved.size : saved.loupe ? 'large' : 'medium');
+  const loupe = size === 'large';
   const [riskOn, setRiskOn] = useState(saved.risk); // affiche qui n'a aucune carte jouable sur le tapis actuel
   const [hint, setHint] = useState(saved.hint); // le jeu m'indique si je peux réussir une mission (bouton « je peux » seulement si c'est vrai)
   const [ask, setAsk] = useState(saved.ask); // tour de table : chacun dit s'il peut ou non avant que le joueur ne joue
@@ -142,14 +144,14 @@ export default function App() {
   // Téléphone tenu en travers : les missions à gauche (2 × 2), la table et ta main à droite (qui défile si l'écran est trop bas).
   // Débordement mesuré du tapis (appareil dont les textes sont plus gros, etc.) : on réduit les missions de moitié de ce débordement.
   const [shrink, setShrink] = useState(0);
-  useEffect(() => { setShrink(0); }, [width, height, loupe, game?.players]);
+  useEffect(() => { setShrink(0); }, [width, height, size, game?.players]);
   const onOverflow = (v: number) => setShrink((cur) => (v > 1 ? cur + v : -v > 40 && cur > 0 ? cur - Math.min(cur, -v - 30) : cur));
   const land = width > height * 1.15;
   const landToken = Math.max(56, Math.min(130, (height - 62) / 2 - 3));
   // Écran haut : les missions passent en 2 × 2 plus grandes (au lieu d'une rangée de 4 petites).
-  const roomy = !loupe && !land && height >= 700;
-  const tokenSize = land ? landToken : roomy ? Math.max(70, Math.min(104, (width - 44) / 2, (height - 470 - (tallBar ? 120 : 0) - shrink) / 2 - 16)) : loupe ? Math.max(56, Math.min((width - 32 - 12) / 2, (height - (height >= 800 ? 450 : (game?.players ?? 3) >= 4 ? 434 : sumOpen ? 396 : 346) - (tallBar ? 120 : 0) - shrink) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
-  const scale = loupe ? loupeScale : Math.min(1, Math.max(0.66, (height - 200 - (tallBar ? 90 : 0)) / 560));
+  const roomy = size === 'medium' && !land;
+  const tokenSize = land ? landToken : roomy ? Math.max(64, Math.min(120, (width - 44) / 2, (height - ((game?.players ?? 3) >= 4 ? 470 : sumOpen ? 440 : 400) - (tallBar ? 120 : 0) - shrink) / 2 - 16)) : loupe ? Math.max(56, Math.min((width - 32 - 12) / 2, (height - (height >= 800 ? 450 : (game?.players ?? 3) >= 4 ? 434 : sumOpen ? 396 : 346) - (tallBar ? 120 : 0) - shrink) / 2 - 16)) : Math.min(96, (width - 32 - 3 * 6) / 4);
+  const scale = roomy ? 0.7 : loupe ? loupeScale : Math.min(1, Math.max(0.66, (height - 200 - (tallBar ? 90 : 0)) / 560));
 
   const solo = mode === 'solo';
   const botSeats = (n: number) => (solo ? Array.from({ length: n - 1 }, (_, i) => i + 1) : []);
@@ -244,8 +246,8 @@ export default function App() {
   }, [pub?.v]);
 
   useEffect(() => {
-    try { localStorage.setItem('50m-settings', JSON.stringify({ bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask, musicOn, musicTrack, hint, risk: riskOn, loupe })); } catch { /* sans stockage */ }
-  }, [bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask, musicOn, musicTrack, hint, riskOn, loupe]);
+    try { localStorage.setItem('50m-settings', JSON.stringify({ bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask, musicOn, musicTrack, hint, risk: riskOn, loupe: size === 'large', size })); } catch { /* sans stockage */ }
+  }, [bots, pauseMs, manual, phrasesOn, openHands, alertsOn, ask, musicOn, musicTrack, hint, riskOn, size]);
   useEffect(() => { setMusic(musicOn ? musicTrack : null); }, [musicOn, musicTrack]);
 
   // Alertes en ligne : un joueur rejoint le salon, la partie démarre, c'est ton tour.
@@ -443,7 +445,15 @@ export default function App() {
           <ScrollView contentContainerStyle={s.home}>
             <Text style={s.title}>Réglages</Text>
             <Text style={s.label}>Affichage</Text>
-            <Toggle on={loupe} onPress={() => setLoupe(!loupe)} title="🔍 Mode loupe (malvoyant)" sub="Missions en grand, sur 2 colonnes." />
+            <Text style={s.hint}>Taille des missions :</Text>
+            <View style={s.row}>
+              {([['normal', 'Normal'], ['medium', 'Moyen'], ['large', '🔍 Grand (loupe)']] as const).map(([k, label]) => (
+                <Pressable key={k} onPress={() => setSize(k)} style={[s.mode, size === k && s.modeOn]} accessibilityLabel={`Taille des missions : ${label}`}>
+                  <Text style={[s.modeTxt, size === k && s.modeTxtOn]}>{label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={s.hint}>Normal : 4 missions en ligne, table grande. Moyen : missions et table de taille moyenne. Grand : missions très grandes, table réduite.</Text>
             <Text style={s.label}>Aide au jeu (réglages personnels)</Text>
             <Toggle on={hint} onPress={() => setHint(!hint)} title="💡 Indice « je peux »" sub="Le bouton « Oui, je peux » n'apparaît que si tu peux vraiment réussir une mission. Désactivé : toujours là, à toi de juger." />
             <Toggle on={riskOn} onPress={() => setRiskOn(!riskOn)} title="🚫 Joueurs bloqués" sub="Après chaque coup, indique qui n'a aucune carte jouable sur le tapis actuel." />
@@ -736,7 +746,7 @@ export default function App() {
         <TableScene game={game} solo={solo} labels={labels} piles={pileViews} onPile={drop}
           meIndex={me} hand={spectator ? [] : hand} handShown={handShown} selectedId={selected}
           onSelect={(id) => { setSelected(selected === id ? null : id); setError(''); setSigMode('play'); }}
-          onReveal={() => { setRevealed(true); setSigMode('play'); }} revealAll={openHands || review} scale={scale} handScale={loupe ? 0.54 : undefined} onOverflow={loupe || roomy ? onOverflow : undefined}
+          onReveal={() => { setRevealed(true); setSigMode('play'); }} revealAll={openHands || review} scale={scale} handScale={loupe ? 0.54 : roomy ? 0.72 : undefined} onOverflow={loupe || roomy ? onOverflow : undefined}
           lastPlay={lastPlay} pauseMs={effPause}
           who={(i) => (online ? (i === me ? 'Toi' : seat(i)) : solo ? (i === 0 ? 'Toi' : seat(i)) : `J${i + 1}`)}
           onSkip={() => { if (solo && game.current !== 0 && !clickMode) doBotMove(game); else setLastPlay(null); }} />
@@ -864,7 +874,7 @@ export default function App() {
             </Pressable>
           ) : null))}
           <Pressable onPress={() => { const i = TRACKS_50M.findIndex((x) => x.id === musicTrack); setMusicTrack(TRACKS_50M[(i + 1) % TRACKS_50M.length].id); setMusicOn(true); }} style={s.quit} accessibilityLabel="Changer de musique"><Text style={s.quitTxt}>🎵 Musique : {(TRACKS_50M.find((x) => x.id === musicTrack) ?? TRACKS_50M[0]).name} ▸</Text></Pressable>
-          <Pressable onPress={() => setLoupe(!loupe)} style={s.quit}><Text style={s.quitTxt}>{loupe ? '🔍 Mode loupe : activé' : '🔍 Mode loupe : désactivé'}</Text></Pressable>
+          <Pressable onPress={() => setSize(size === 'normal' ? 'medium' : size === 'medium' ? 'large' : 'normal')} style={s.quit}><Text style={s.quitTxt}>🔍 Taille des missions : {size === 'normal' ? 'normale' : size === 'medium' ? 'moyenne' : 'grande'}</Text></Pressable>
           <Pressable onPress={() => setHint(!hint)} style={s.quit}><Text style={s.quitTxt}>{hint ? '💡 Indice « je peux » : activé' : '💡 Indice « je peux » : désactivé'}</Text></Pressable>
           <Pressable onPress={quit} style={s.quit}><Text style={s.quitTxt}>Quitter (tu pourras reprendre)</Text></Pressable>
         </View>
