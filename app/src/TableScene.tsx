@@ -159,7 +159,7 @@ export function TableScene(p: Props) {
     if (!p.onOverflow || !feltH || !mine.h || !midBox.h) return;
     const raw = mine.y + mine.h - (feltH - 13); // > 0 : le panneau de ta main déborde du tapis
     const free = 2 * Math.max(0, mine.y - 6 - (midBox.y + midBox.h)); // espace libre du tapis, réparti entre ses deux intervalles
-    p.onOverflow(raw > 2 ? raw + 6 : -free); // +6 : petite marge de sécurité, seulement quand il y a vraiment débordement
+    p.onOverflow(raw > 6 ? raw : -free);
   }, [feltH, mine.y, mine.h, midBox.y, midBox.h]); // eslint-disable-line react-hooks/exhaustive-deps
   const meCurrent = me === game.current;
   const lp = p.lastPlay;

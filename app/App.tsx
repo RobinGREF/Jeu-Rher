@@ -145,7 +145,8 @@ export default function App() {
   // Débordement mesuré du tapis (appareil dont les textes sont plus gros, etc.) : on réduit les missions de moitié de ce débordement.
   const [shrink, setShrink] = useState(0);
   useEffect(() => { setShrink(0); }, [width, height, size, game?.players]);
-  const onOverflow = (v: number) => setShrink((cur) => (v > 1 ? cur + v : -v > 40 && cur > 0 ? cur - Math.min(cur, -v - 30) : cur));
+  // Par paliers de 8 px et avec une grande zone morte (on rétrécit dès 6 px de débordement, on ne regrandit qu'avec 80 px de libres) : pas de va-et-vient, donc pas de vibration de l'écran.
+  const onOverflow = (v: number) => setShrink((cur) => (v > 6 ? cur + Math.ceil(v / 8) * 8 : -v > 80 && cur > 0 ? cur - 8 : cur));
   const land = width > height * 1.15;
   const landToken = Math.max(56, Math.min(130, (height - 62) / 2 - 3));
   // Écran haut : les missions passent en 2 × 2 plus grandes (au lieu d'une rangée de 4 petites).
