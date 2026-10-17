@@ -123,9 +123,20 @@ test('dictionnaire : un mot inconnu vaut 0, sauf si plus de la moitié des autre
 test('pays : un pays inventé est refusé, les vrais passent (réserve des machines comprise)', async () => {
   const { COUNTRIES } = await import('./countries');
   const { WORDS } = await import('./words');
-  const known = makeKnown(() => true, () => false, COUNTRIES);
+  const known = makeKnown(() => true, () => false, { pays: COUNTRIES });
   assert.equal(known('pays', 'Ogwanda'), false);
   assert.equal(known('pays', 'Ouganda'), true);
   assert.equal(known('pays', "Côte d'Ivoire"), true);
   for (const ws of Object.values(WORDS.pays)) for (const w of ws) assert.equal(known('pays', w), true, w);
+});
+
+test('ville : une ville inventée est refusée, les vraies passent (réserve des machines comprise)', async () => {
+  const { CITIES_FR } = await import('./countries');
+  const { WORDS } = await import('./words');
+  const known = makeKnown(() => true, (cat, f) => Object.values(WORDS[cat] ?? {}).some((l) => l.some((w) => core(w) === f)), { ville: new Set(['paris', 'lyon', ...CITIES_FR]) });
+  assert.equal(known('ville', 'Zorbaville'), false);
+  assert.equal(known('ville', 'Londres'), true);
+  assert.equal(known('ville', 'Lyon'), true);
+  for (const ws of Object.values(WORDS.ville)) for (const w of ws) assert.equal(known('ville', w), true, w);
+  assert.equal(makeKnown(() => true)('ville', 'Zorbaville'), true, 'sans liste de villes : pas de contrôle');
 });
