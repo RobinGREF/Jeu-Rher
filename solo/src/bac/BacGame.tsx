@@ -317,7 +317,7 @@ export function BacGame({ onHome }: { onHome: () => void }) {
             <View key={c} style={[st.card, { borderLeftWidth: 6, borderLeftColor: cat?.color }]}>
               <Text style={[st.head, { color: cat?.color }]}>{cat?.emoji} {cat?.label}</Text>
               {view.seats.map((p) => <ScoreLine key={p.uid} name={`${p.bot ? '🤖 ' : ''}${p.name}`} cell={cells[c]?.[p.uid]} me={p.uid === me} />)}
-              {ideas && <Ideas cat={c} letter={view.letter} used={view.seats.map((p) => cells[c]?.[p.uid]?.word ?? '')} />}
+              {ideas && <Ideas cat={c} letter={view.letter} used={view.seats.map((p) => cells[c]?.[p.uid]?.word ?? '')} nobody={view.seats.every((p) => !(cells[c]?.[p.uid]?.pts))} />}
             </View>
           );
         })}
@@ -390,11 +390,11 @@ function Confetti() {
 }
 
 /** Fin de manche : quelques mots possibles pour la catégorie et la lettre, parmi ceux que personne n'a donnés. */
-function Ideas({ cat, letter, used }: { cat: string; letter: string; used: string[] }) {
+function Ideas({ cat, letter, used, nobody }: { cat: string; letter: string; used: string[]; nobody: boolean }) {
   const taken = used.map((w) => core(w));
-  const ideas = wordsFor(cat, letter).filter((w) => !taken.includes(core(w))).slice(0, 4);
-  if (!ideas.length) return null;
-  return <Text style={st.ideas} accessibilityLabel={`Idées de mots : ${ideas.join(', ')}`}>💡 Idées : {ideas.join(' · ')}</Text>;
+  const ideas = wordsFor(cat, letter).filter((w) => !taken.includes(core(w))).slice(0, nobody ? 6 : 4);
+  if (!ideas.length) return nobody ? <Text style={st.ideas}>😮 Personne n'a trouvé, et je n'ai pas d'idée non plus !</Text> : null;
+  return <Text style={[st.ideas, nobody && st.ideasNobody]} accessibilityLabel={`Idées de mots : ${ideas.join(', ')}`}>{nobody ? '😮 Personne n\'a trouvé ! Par exemple : ' : '💡 Idées : '}{ideas.join(' · ')}</Text>;
 }
 
 function ScoreLine({ name, cell, me }: { name: string; cell?: Cell; me: boolean }) {
@@ -471,6 +471,7 @@ const st = StyleSheet.create({
   field: { gap: 4, borderLeftWidth: 6, borderLeftColor: '#22c55e', paddingLeft: 10, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 8, paddingVertical: 6, paddingRight: 6 },
   fieldLabel: { color: '#e2e8f0', fontSize: 15, fontWeight: '800' },
   ideas: { color: '#fde68a', fontSize: 14, fontWeight: '700', marginTop: 4, backgroundColor: 'rgba(253,230,138,0.08)', borderRadius: 8, padding: 8 },
+  ideasNobody: { backgroundColor: 'rgba(251,146,60,0.18)', color: '#fed7aa' },
   okTxt: { color: '#86efac', fontSize: 13, fontWeight: '700' },
   badTxt: { color: '#fca5a5', fontSize: 13, fontWeight: '700' },
   botRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
