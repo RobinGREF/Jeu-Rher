@@ -150,8 +150,17 @@ export function BacGame({ onHome }: { onHome: () => void }) {
         <Text style={st.muted}>Envoie l'invitation : le lien ouvre le jeu directement sur ce salon.</Text>
         <ShareRoom game="Petit bac" code={snap.code} />
         <View style={st.card}>
-          <Text style={st.head}>Joueurs ({snap.players.length}/8)</Text>
+          <Text style={st.head}>Joueurs ({snap.players.length + snap.bots.length}/8)</Text>
           {snap.players.map((p, i) => <Text key={p.uid} style={st.text}>{i === 0 ? '👑 ' : '• '}{p.name}{p.uid === snap.uid ? ' (toi)' : ''}</Text>)}
+          {snap.bots.map((n) => (
+            <View key={n} style={st.botRow}>
+              <Text style={[st.text, { flex: 1 }]}>🤖 {n} (machine)</Text>
+              {snap.isHost && <Pressable onPress={() => { void onl.session.current?.removeBot(n); }} style={st.botX} accessibilityLabel={`Retirer la machine ${n}`}><Text style={st.botXTxt}>✕</Text></Pressable>}
+            </View>
+          ))}
+          {snap.isHost && snap.players.length + snap.bots.length < 8 && (
+            <Pressable onPress={() => { void onl.session.current?.addBot(); }} style={st.addBot} accessibilityLabel="Ajouter une machine"><Text style={st.addBotTxt}>🤖 Ajouter une machine</Text></Pressable>
+          )}
         </View>
         {snap.isHost ? (
           <>
@@ -163,7 +172,7 @@ export function BacGame({ onHome }: { onHome: () => void }) {
             <View style={st.chips}>
               {CATEGORIES.map((c) => <Chip key={c.key} on={settings.categories.includes(c.key)} label={`${c.emoji} ${c.label}`} onPress={() => toggleCat(c.key)} />)}
             </View>
-            <Btn label={snap.players.length > 1 ? `Lancer la partie (${snap.players.length} joueurs)` : 'Lancer (seul pour le moment)'} onPress={() => { void onl.session.current?.start(settings); }} />
+            <Btn label={snap.players.length + snap.bots.length > 1 ? `Lancer la partie (${snap.players.length + snap.bots.length} joueurs)` : 'Ajoute une machine ou attends un joueur'} disabled={snap.players.length + snap.bots.length < 2} onPress={() => { void onl.session.current?.start(settings); }} />
           </>
         ) : <Text style={st.muted}>En attente du lancement par l'hôte…</Text>}
       </>,
@@ -173,7 +182,7 @@ export function BacGame({ onHome }: { onHome: () => void }) {
   // ———— En jeu ————
   const me = snap.uid;
   const seated = snap.mySeat >= 0;
-  const nameOf = (uid: string) => view.seats.find((x) => x.uid === uid)?.name ?? '?';
+  const nameOf = (uid: string) => { const x = view.seats.find((y) => y.uid === uid); return x ? (x.bot ? `🤖 ${x.name}` : x.name) : '?'; };
   const cats = view.settings.categories;
   const header = (
     <View style={st.roundBar}>
@@ -223,7 +232,7 @@ export function BacGame({ onHome }: { onHome: () => void }) {
       <>
         {header}
         <Text style={st.title}>Vote · lettre {view.letter}</Text>
-        <Text style={st.sub}>Touche ✗ sous un mot que tu trouves faux. Il saute si plus de la moitié des autres joueurs le contestent.</Text>
+        <Text style={st.sub}>Touche ✗ sous un mot que tu trouves faux. Il saute si plus de la moitié des autres joueurs (les machines ne votent pas) le contestent.</Text>
         {cats.map((c) => {
           const cat = labelOf(c);
           return (
@@ -238,7 +247,7 @@ export function BacGame({ onHome }: { onHome: () => void }) {
                 return (
                   <View key={p.uid} style={st.voteRow}>
                     <View style={{ flex: 1 }}>
-                      <Text style={st.voteName}>{p.name}{mineWord ? ' (toi)' : ''}</Text>
+                      <Text style={st.voteName}>{p.bot ? '🤖 ' : ''}{p.name}{mineWord ? ' (toi)' : ''}</Text>
                       <Text style={[st.voteWord, !!auto && st.voteBad, contests.length * 2 > view.seats.length - 1 && st.voteBad]}>{word || '—'}</Text>
                       {!!auto && word ? <Text style={st.badTxt}>{auto}</Text> : null}
                     </View>
@@ -274,7 +283,7 @@ export function BacGame({ onHome }: { onHome: () => void }) {
           return (
             <View key={c} style={st.card}>
               <Text style={st.head}>{cat?.emoji} {cat?.label}</Text>
-              {view.seats.map((p) => <ScoreLine key={p.uid} name={p.name} cell={cells[c]?.[p.uid]} me={p.uid === me} />)}
+              {view.seats.map((p) => <ScoreLine key={p.uid} name={`${p.bot ? '🤖 ' : ''}${p.name}`} cell={cells[c]?.[p.uid]} me={p.uid === me} />)}
             </View>
           );
         })}
@@ -384,6 +393,11 @@ const st = StyleSheet.create({
   fieldLabel: { color: '#e2e8f0', fontSize: 15, fontWeight: '800' },
   okTxt: { color: '#86efac', fontSize: 13, fontWeight: '700' },
   badTxt: { color: '#fca5a5', fontSize: 13, fontWeight: '700' },
+  botRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  botX: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: '#64748b', alignItems: 'center', justifyContent: 'center' },
+  botXTxt: { color: '#e2e8f0', fontSize: 16, fontWeight: '800' },
+  addBot: { borderWidth: 1, borderColor: '#22c55e', borderStyle: 'dashed', borderRadius: 12, padding: 10, alignItems: 'center', marginTop: 4 },
+  addBotTxt: { color: '#22c55e', fontWeight: '800', fontSize: 15 },
   voteRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
   voteName: { color: '#94a3b8', fontSize: 13, fontWeight: '700' },
   voteWord: { color: '#f8fafc', fontSize: 18, fontWeight: '800' },

@@ -57,3 +57,37 @@ test('contestation : il faut plus de la moitié des autres joueurs', () => {
 test('classement : égalités au même rang', () => {
   assert.deepEqual(ranking({ a: 30, b: 50, c: 30, d: 10 }).map((x) => [x.uid, x.rank]), [['b', 1], ['a', 2], ['c', 2], ['d', 4]]);
 });
+
+import { botAnswers, BOT_NAMES } from './bots';
+import { WORDS } from './words';
+
+test('réserve des machines : tous les mots commencent par leur lettre', () => {
+  for (const [cat, byLetter] of Object.entries(WORDS)) {
+    for (const [letter, list] of Object.entries(byLetter)) {
+      for (const w of list) assert.ok(startsWithLetter(w, letter), `${cat} ${letter} : « ${w} »`);
+    }
+  }
+  assert.ok(Object.keys(WORDS).length >= 14);
+});
+
+test('machines : réponses valides, jamais hors catégories, parfois vides', () => {
+  let seed = 7; const rng = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const cats = ['prenom', 'pays', 'animal'];
+  let empty = 0, total = 0;
+  for (const l of LETTERS) for (let i = 0; i < 20; i++) {
+    const a = botAnswers(l, cats, rng);
+    assert.deepEqual(Object.keys(a), cats);
+    for (const c of cats) { total++; if (!a[c]) empty++; else assert.ok(startsWithLetter(a[c], l)); }
+  }
+  assert.ok(empty > 0 && empty < total * 0.5, 'les machines ratent parfois');
+  assert.ok(BOT_NAMES.length >= 7);
+});
+
+test('contestation : seuls les joueurs humains votent', () => {
+  const answers = { h: { animal: 'Ane' }, b: { animal: 'Aigle' } };
+  const r = { letter: 'A', answers, contests: { animal: { b: ['h'] } } };
+  const s = scoreRound(r, ['h', 'b'], ['animal'], ['h']);
+  assert.equal(s.cells.animal.b.status, 'conteste', 'seul humain : sa contestation suffit même si une machine est à la table');
+  const none = scoreRound({ ...r, contests: { animal: { h: ['b'] } } }, ['h', 'b'], ['animal'], ['h']);
+  assert.equal(none.cells.animal.h.pts, 10, 'une machine ne contestera jamais');
+});

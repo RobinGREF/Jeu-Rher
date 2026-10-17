@@ -1,9 +1,10 @@
 import type { Backend } from '../duel/online/backend';
 import { DEFAULT_CATEGORIES, drawLetter, MAX_CATEGORIES, MAX_PLAYERS, MIN_CATEGORIES, scoreRound, type Cell, type Round } from './engine';
+import { botAnswers, BOT_NAMES } from './bots';
 
 export { MAX_PLAYERS };
 
-export type Seat = { uid: string; name: string };
+export type Seat = { uid: string; name: string; bot?: boolean };
 export type Settings = { rounds: number; seconds: number; categories: string[] };
 export const DEFAULT_SETTINGS: Settings = { rounds: 5, seconds: 90, categories: DEFAULT_CATEGORIES };
 export type Phase = 'write' | 'collect' | 'vote' | 'scores' | 'final';
@@ -30,12 +31,14 @@ export type Intent =
   | { t: 'ready' };
 
 export type LobbyPlayer = { uid: string; name: string; joinedAt: number };
-type Meta = { hostUid: string; createdAt: number; phase: 'lobby' | 'playing' };
+type Meta = { hostUid: string; createdAt: number; phase: 'lobby' | 'playing'; bots?: string[] };
 
 export type Snapshot = {
   phase: 'connecting' | 'lobby' | 'playing' | 'error';
   code: string; uid: string; isHost: boolean; name: string;
   players: LobbyPlayer[];
+  /** Machines inscrites au salon (prénoms), avant le début de la partie. */
+  bots: string[];
   view: View | null;
   /** Heure locale de réception de la vue : sert au compte à rebours. */
   recvAt: number;
@@ -96,7 +99,7 @@ export class BacSession {
   private v = 0;
 
   private constructor(private be: Backend, code: string, uid: string, name: string, private timing: Timing) {
-    this.snap = { phase: 'connecting', code, uid, isHost: false, name, players: [], view: null, recvAt: 0, mySeat: -1, error: null };
+    this.snap = { phase: 'connecting', code, uid, isHost: false, name, players: [], bots: [], view: null, recvAt: 0, mySeat: -1, error: null };
   }
 
   get snapshot() { return this.snap; }
@@ -145,7 +148,7 @@ export class BacSession {
     this.offs.push(this.be.onValue(this.path('meta'), (v) => {
       if (v === null) { if (this.meta) this.update({ phase: 'error', error: 'Le salon a été fermé par son hôte.' }); return; }
       this.meta = v as Meta;
-      this.update({ isHost: this.meta.hostUid === this.snap.uid, phase: this.snap.view ? 'playing' : this.meta.phase === 'playing' ? 'connecting' : 'lobby' });
+      this.update({ bots: this.meta.bots ?? [], isHost: this.meta.hostUid === this.snap.uid, phase: this.snap.view ? 'playing' : this.meta.phase === 'playing' ? 'connecting' : 'lobby' });
     }, onErr));
     this.offs.push(this.be.onValue(this.path('players'), (v) => {
       const raw = (v ?? {}) as Record<string, { name: string; joinedAt: number }>;
@@ -171,7 +174,9 @@ export class BacSession {
   async start(settings: Partial<Settings> = {}) {
     if (!this.snap.isHost || this.snap.phase !== 'lobby') return;
     this.settings = cleanSettings(settings);
-    this.seats = this.snap.players.slice(0, MAX_PLAYERS).map((p) => ({ uid: p.uid, name: p.name }));
+    const humans = this.snap.players.slice(0, MAX_PLAYERS).map((p): Seat => ({ uid: p.uid, name: p.name }));
+    const bots = (this.meta?.bots ?? []).slice(0, MAX_PLAYERS - humans.length).map((n, i): Seat => ({ uid: `bot-${i + 1}`, name: n, bot: true }));
+    this.seats = [...humans, ...bots];
     this.totals = Object.fromEntries(this.seats.map((s) => [s.uid, 0]));
     this.roundNo = 0; this.used = [];
     try {
@@ -179,6 +184,22 @@ export class BacSession {
       await this.beginRound();
     } catch (e) { this.fail(e); }
   }
+
+  /** Hôte : ajoute une machine au salon (avant le début), dans la limite des 8 places. */
+  async addBot() {
+    if (!this.snap.isHost || this.snap.phase !== 'lobby' || !this.meta) return;
+    const bots = this.meta.bots ?? [];
+    if (this.snap.players.length + bots.length >= MAX_PLAYERS) return;
+    const name = BOT_NAMES.find((n) => !bots.includes(n)) ?? `Machine ${bots.length + 1}`;
+    try { await this.be.set(this.path('meta'), { ...this.meta, bots: [...bots, name] }); } catch (e) { this.fail(e); }
+  }
+
+  async removeBot(name: string) {
+    if (!this.snap.isHost || this.snap.phase !== 'lobby' || !this.meta) return;
+    try { await this.be.set(this.path('meta'), { ...this.meta, bots: (this.meta.bots ?? []).filter((n) => n !== name) }); } catch (e) { this.fail(e); }
+  }
+
+  private humans() { return this.seats.filter((s) => !s.bot); }
 
   private clearTimer() { if (this.timer) clearTimeout(this.timer); this.timer = null; }
 
@@ -206,13 +227,18 @@ export class BacSession {
   private async toVote() {
     if (this.phase !== 'collect') return;
     this.clearTimer();
-    this.phase = 'vote'; this.ready = [];
+    for (const b of this.seats.filter((x) => x.bot)) {
+      this.round.answers[b.uid] = botAnswers(this.letter, this.settings.categories);
+      if (!this.submitted.includes(b.uid)) this.submitted = [...this.submitted, b.uid];
+    }
+    this.phase = 'vote'; this.ready = this.seats.filter((x) => x.bot).map((x) => x.uid); // les machines ont déjà « fini de voter »
+    if (this.ready.length >= this.seats.length) { await this.toScores(); return; }
     await this.publish();
   }
 
   private async toScores() {
     if (this.phase !== 'vote') return;
-    const { cells, totals } = scoreRound(this.round, this.seats.map((s) => s.uid), this.settings.categories);
+    const { cells, totals } = scoreRound(this.round, this.seats.map((s) => s.uid), this.settings.categories, this.humans().map((s) => s.uid));
     this.cells = cells; this.roundPts = totals;
     for (const [u, p] of Object.entries(totals)) this.totals[u] = (this.totals[u] ?? 0) + p;
     this.phase = 'scores';
@@ -256,7 +282,7 @@ export class BacSession {
         for (const cat of this.settings.categories) clean[cat] = String(it.answers?.[cat] ?? '').slice(0, 40);
         this.round.answers[uid] = clean;
         this.submitted = [...this.submitted, uid];
-        if (this.phase === 'collect' && this.submitted.length >= this.seats.length) await this.toVote();
+        if (this.phase === 'collect' && this.humans().every((h) => this.submitted.includes(h.uid))) await this.toVote();
         else await this.publish();
       } else if (it.t === 'contest') {
         if (this.phase !== 'vote' || uid === it.target || !this.settings.categories.includes(it.cat) || !this.seats.some((s) => s.uid === it.target)) return;

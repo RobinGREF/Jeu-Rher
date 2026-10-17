@@ -109,3 +109,5 @@ Une manche : lettre tirée → chacun écrit ses mots → fin au chrono ou dès 
 ⚠️ **Il faut republier les règles** : Firebase → Realtime Database → Règles → coller le contenu de `app/firebase.rules.json` → Publier.
 
 Limites : si l'hôte quitte ou recharge, la partie s'arrête ; arrivé après le début, on regarde en spectateur ; le vote est à la confiance (pas de dictionnaire).
+
+Machines au Petit bac : l'hôte peut ajouter jusqu'à 7 machines dans le salon (« 🤖 Ajouter une machine », prénoms Jack, Anne, Morgan…), ce qui permet de jouer seul. Elles piochent dans une réserve de mots (`solo/src/bac/words.ts`, une quinzaine de catégories) : environ 80 % de réussite par catégorie, parfois rien. Elles ne votent pas ; un humain seul à la table suffit pour contester un de leurs mots. Les machines sont enregistrées dans `meta.bots` du salon (aucune règle Firebase en plus).

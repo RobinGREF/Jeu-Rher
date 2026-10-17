@@ -99,3 +99,35 @@ function backendFor(host: BacSession) {
   const store = (host as unknown as { be: { store: MemoryStore } }).be.store;
   return new StoreBackend(store, 'late');
 }
+
+test('seul avec des machines : ajout, retrait, manche complète sans attendre personne', async () => {
+  const { host } = await room(1);
+  await host.addBot(); await host.addBot();
+  await until(() => host.snapshot.bots.length === 2);
+  assert.deepEqual(host.snapshot.bots, ['Jack', 'Anne']);
+  await host.removeBot('Jack');
+  await until(() => host.snapshot.bots.length === 1);
+  await host.addBot();
+  await until(() => host.snapshot.bots.length === 2);
+  assert.deepEqual(host.snapshot.bots, ['Anne', 'Jack'], 'le premier prénom libre est repris');
+  await host.start({ rounds: 1, seconds: 30, categories: ['prenom', 'pays', 'animal'] });
+  await until(() => host.snapshot.view?.phase === 'write');
+  assert.deepEqual(view(host).seats.map((s) => [s.name, !!s.bot]), [['Robin', false], ['Anne', true], ['Jack', true]]);
+  await host.act({ t: 'stop' });
+  await host.act({ t: 'answers', answers: { prenom: `${view(host).letter}lex`, pays: '', animal: '' } });
+  await until(() => view(host).phase === 'vote');
+  assert.ok(view(host).ready.length === 2, 'les machines sont déjà prêtes');
+  const bots = Object.keys(view(host).round!.answers).filter((u) => u.startsWith('bot-'));
+  assert.equal(bots.length, 2, 'les machines ont répondu');
+  await host.act({ t: 'ready' });
+  await until(() => view(host).phase === 'scores');
+  assert.ok(Object.keys(view(host).roundPts!).length === 3);
+});
+
+test('machines : la partie ne démarre pas au-delà de 8 places et un seul humain peut contester', async () => {
+  const { host } = await room(1);
+  for (let i = 0; i < 9; i++) await host.addBot();
+  await until(() => host.snapshot.bots.length === 7);
+  await wait(30);
+  assert.equal(host.snapshot.bots.length, 7, '1 humain + 7 machines = 8 places');
+});

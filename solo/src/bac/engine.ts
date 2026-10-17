@@ -79,18 +79,19 @@ export type Round = {
 
 export const POINTS = { seul: 15, unique: 10, doublon: 5 } as const;
 
-/** Une contestation l'emporte quand plus de la moitié des AUTRES joueurs la portent. */
-export function isContested(round: Round, cat: string, author: string, players: number): boolean {
-  const n = round.contests[cat]?.[author]?.filter((u) => u !== author).length ?? 0;
-  return players > 1 && n * 2 > players - 1;
+/** Une contestation l'emporte quand plus de la moitié des AUTRES joueurs humains (les machines ne votent pas) la portent. */
+export function isContested(round: Round, cat: string, author: string, voters: string[]): boolean {
+  const others = voters.filter((u) => u !== author);
+  const n = (round.contests[cat]?.[author] ?? []).filter((u) => others.includes(u)).length;
+  return others.length > 0 && n * 2 > others.length;
 }
 
 /**
  * Points de la manche. Pour chaque catégorie : un mot invalide (vide, mauvaise lettre, contesté) vaut 0 ;
  * parmi les mots valides, le même mot chez plusieurs joueurs vaut 5 chacun, un mot différent des autres 10,
- * et le seul mot valide de la catégorie 15.
+ * et le seul mot valide de la catégorie 15. `humans` : les joueurs qui peuvent contester (par défaut tous).
  */
-export function scoreRound(round: Round, uids: string[], categories: string[]): { cells: Record<string, Record<string, Cell>>; totals: Record<string, number> } {
+export function scoreRound(round: Round, uids: string[], categories: string[], humans: string[] = uids): { cells: Record<string, Record<string, Cell>>; totals: Record<string, number> } {
   const cells: Record<string, Record<string, Cell>> = {};
   const totals: Record<string, number> = Object.fromEntries(uids.map((u) => [u, 0]));
   for (const cat of categories) {
@@ -100,7 +101,7 @@ export function scoreRound(round: Round, uids: string[], categories: string[]): 
       const word = (round.answers[uid]?.[cat] ?? '').trim();
       if (!word) row[uid] = { word, status: 'vide', pts: 0 };
       else if (!startsWithLetter(word, round.letter)) row[uid] = { word, status: 'faux', pts: 0 };
-      else if (isContested(round, cat, uid, uids.length)) row[uid] = { word, status: 'conteste', pts: 0 };
+      else if (isContested(round, cat, uid, humans)) row[uid] = { word, status: 'conteste', pts: 0 };
       else { row[uid] = { word, status: 'unique', pts: 0 }; valid.push({ uid, key: core(word) }); }
     }
     for (const v of valid) {
