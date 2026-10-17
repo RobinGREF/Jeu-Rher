@@ -43,7 +43,7 @@
 </main>
 <script>
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  fetch('games.json').then((r) => r.json()).then(({ games }) => {
+  fetch('games.json', { cache: 'no-store' }).then((r) => r.json()).then(({ games }) => {
     document.getElementById('liste').innerHTML = games.map((g) => {
       const c = /^#[0-9a-f]{3,8}$/i.test(g.couleur) ? g.couleur : '#64748b';
       const inner = `<span class="icon">${esc(g.emoji)}</span><span class="txt"><div class="t">${esc(g.titre)}</div><div class="d">${esc(g.description)}</div></span>`;
