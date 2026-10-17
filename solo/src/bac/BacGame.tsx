@@ -7,10 +7,11 @@ import { ShareRoom } from '../ShareRoom';
 import { MusicButton, useMusicChoice } from '../MusicButton';
 import { TRACKS_BAC } from '../tracks';
 import { loadJson, saveJson } from '../storage';
-import { CATEGORIES, isRescued, labelOf, LETTERS, MAX_CATEGORIES, MIN_CATEGORIES, ranking, startsWithLetter, type Cell, type Status } from './engine';
+import { CATEGORIES, core, isRescued, labelOf, LETTERS, MAX_CATEGORIES, MIN_CATEGORIES, ranking, startsWithLetter, type Cell, type Status } from './engine';
 import { DEFAULT_SETTINGS, normalizeCode, type Settings } from './session';
 import { useBacOnline } from './useBacOnline';
 import { LetterWheel } from './LetterWheel';
+import { wordsFor } from './words';
 
 const KEY_NAME = 'bac-name';
 const KEY_BEST = 'bac-best';
@@ -310,6 +311,7 @@ export function BacGame({ onHome }: { onHome: () => void }) {
             <View key={c} style={[st.card, { borderLeftWidth: 6, borderLeftColor: cat?.color }]}>
               <Text style={[st.head, { color: cat?.color }]}>{cat?.emoji} {cat?.label}</Text>
               {view.seats.map((p) => <ScoreLine key={p.uid} name={`${p.bot ? '🤖 ' : ''}${p.name}`} cell={cells[c]?.[p.uid]} me={p.uid === me} />)}
+              <Ideas cat={c} letter={view.letter} used={view.seats.map((p) => cells[c]?.[p.uid]?.word ?? '')} />
             </View>
           );
         })}
@@ -379,6 +381,14 @@ function Confetti() {
       ))}
     </View>
   );
+}
+
+/** Fin de manche : quelques mots possibles pour la catégorie et la lettre, parmi ceux que personne n'a donnés. */
+function Ideas({ cat, letter, used }: { cat: string; letter: string; used: string[] }) {
+  const taken = used.map((w) => core(w));
+  const ideas = wordsFor(cat, letter).filter((w) => !taken.includes(core(w))).slice(0, 4);
+  if (!ideas.length) return null;
+  return <Text style={st.ideas} accessibilityLabel={`Idées de mots : ${ideas.join(', ')}`}>💡 Idées : {ideas.join(' · ')}</Text>;
 }
 
 function ScoreLine({ name, cell, me }: { name: string; cell?: Cell; me: boolean }) {
@@ -454,6 +464,7 @@ const st = StyleSheet.create({
   timerLow: { color: '#fca5a5', fontSize: 22, fontWeight: '900' },
   field: { gap: 4, borderLeftWidth: 6, borderLeftColor: '#22c55e', paddingLeft: 10, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 8, paddingVertical: 6, paddingRight: 6 },
   fieldLabel: { color: '#e2e8f0', fontSize: 15, fontWeight: '800' },
+  ideas: { color: '#fde68a', fontSize: 14, fontWeight: '700', marginTop: 4, backgroundColor: 'rgba(253,230,138,0.08)', borderRadius: 8, padding: 8 },
   okTxt: { color: '#86efac', fontSize: 13, fontWeight: '700' },
   badTxt: { color: '#fca5a5', fontSize: 13, fontWeight: '700' },
   botRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
