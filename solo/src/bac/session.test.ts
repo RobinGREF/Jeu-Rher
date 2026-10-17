@@ -5,7 +5,7 @@ import { BacSession, cleanSettings, type View } from './session';
 
 const wait = (ms = 15) => new Promise((r) => setTimeout(r, ms));
 const until = async (f: () => boolean) => { for (let i = 0; i < 200 && !f(); i++) await wait(5); assert.ok(f(), 'condition non atteinte'); };
-const timing = { collectMs: 60 };
+const timing = { collectMs: 60, spinMs: 0 };
 
 async function room(n: number) {
   const store = new MemoryStore();

@@ -3,23 +3,23 @@
  * validité et calcul des points d'une manche. Le salon en ligne (session.ts) ne fait qu'orchestrer.
  */
 
-export type Category = { key: string; label: string; emoji: string };
+export type Category = { key: string; label: string; emoji: string; color: string };
 
 export const CATEGORIES: Category[] = [
-  { key: 'prenom', label: 'Prénom', emoji: '🧑' },
-  { key: 'pays', label: 'Pays', emoji: '🌍' },
-  { key: 'ville', label: 'Ville', emoji: '🏙️' },
-  { key: 'animal', label: 'Animal', emoji: '🐾' },
-  { key: 'metier', label: 'Métier', emoji: '🧑‍🔧' },
-  { key: 'fruitleg', label: 'Fruit ou légume', emoji: '🍎' },
-  { key: 'objet', label: 'Objet', emoji: '🔧' },
-  { key: 'marque', label: 'Marque', emoji: '🏷️' },
-  { key: 'celebrite', label: 'Célébrité', emoji: '⭐' },
-  { key: 'film', label: 'Film ou série', emoji: '🎬' },
-  { key: 'sport', label: 'Sport', emoji: '⚽' },
-  { key: 'vetement', label: 'Vêtement', emoji: '👕' },
-  { key: 'plat', label: 'Plat ou boisson', emoji: '🍽️' },
-  { key: 'matiere', label: 'Matière scolaire', emoji: '📚' },
+  { key: 'prenom', color: '#f97316', label: 'Prénom', emoji: '🧑' },
+  { key: 'pays', color: '#22c55e', label: 'Pays', emoji: '🌍' },
+  { key: 'ville', color: '#06b6d4', label: 'Ville', emoji: '🏙️' },
+  { key: 'animal', color: '#eab308', label: 'Animal', emoji: '🐾' },
+  { key: 'metier', color: '#ec4899', label: 'Métier', emoji: '🧑‍🔧' },
+  { key: 'fruitleg', color: '#ef4444', label: 'Fruit ou légume', emoji: '🍎' },
+  { key: 'objet', color: '#8b5cf6', label: 'Objet', emoji: '🔧' },
+  { key: 'marque', color: '#14b8a6', label: 'Marque', emoji: '🏷️' },
+  { key: 'celebrite', color: '#f59e0b', label: 'Célébrité', emoji: '⭐' },
+  { key: 'film', color: '#6366f1', label: 'Film ou série', emoji: '🎬' },
+  { key: 'sport', color: '#84cc16', label: 'Sport', emoji: '⚽' },
+  { key: 'vetement', color: '#d946ef', label: 'Vêtement', emoji: '👕' },
+  { key: 'plat', color: '#fb7185', label: 'Plat ou boisson', emoji: '🍽️' },
+  { key: 'matiere', color: '#3b82f6', label: 'Matière scolaire', emoji: '📚' },
 ];
 
 /** Catégories d'une partie « classique ». */

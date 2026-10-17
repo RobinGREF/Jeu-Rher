@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Easing, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { reloadFresh } from '../reload';
 import { clearRoomParam, roomFromUrl } from '../share';
@@ -7,9 +7,10 @@ import { ShareRoom } from '../ShareRoom';
 import { MusicButton, useMusicChoice } from '../MusicButton';
 import { TRACKS_BAC } from '../tracks';
 import { loadJson, saveJson } from '../storage';
-import { CATEGORIES, labelOf, MAX_CATEGORIES, MIN_CATEGORIES, ranking, startsWithLetter, type Cell, type Status } from './engine';
+import { CATEGORIES, labelOf, LETTERS, MAX_CATEGORIES, MIN_CATEGORIES, ranking, startsWithLetter, type Cell, type Status } from './engine';
 import { DEFAULT_SETTINGS, normalizeCode, type Settings } from './session';
 import { useBacOnline } from './useBacOnline';
+import { LetterWheel } from './LetterWheel';
 
 const KEY_NAME = 'bac-name';
 const KEY_BEST = 'bac-best';
@@ -107,7 +108,7 @@ export function BacGame({ onHome }: { onHome: () => void }) {
   if (!snap) {
     return wrap(
       <>
-        <Text style={st.title}>✏️ Petit bac</Text>
+        <RainbowTitle text="✏️ Petit bac" />
         <Text style={st.sub}>Une lettre, des catégories : trouve un mot pour chacune avant les autres. Chacun sur son téléphone, en ligne.</Text>
         {!onl.kind ? (
           <Text style={st.err}>Le mode en ligne n'est pas configuré sur cette version (voir docs/en-ligne.md).</Text>
@@ -170,7 +171,7 @@ export function BacGame({ onHome }: { onHome: () => void }) {
             <View style={st.row}>{SECONDS_CHOICES.map((n) => <Chip key={n} on={settings.seconds === n} label={`${n} s`} onPress={() => setSettings({ ...settings, seconds: n })} />)}</View>
             <Text style={st.label}>Catégories ({settings.categories.length})</Text>
             <View style={st.chips}>
-              {CATEGORIES.map((c) => <Chip key={c.key} on={settings.categories.includes(c.key)} label={`${c.emoji} ${c.label}`} onPress={() => toggleCat(c.key)} />)}
+              {CATEGORIES.map((c) => <Chip key={c.key} color={c.color} on={settings.categories.includes(c.key)} label={`${c.emoji} ${c.label}`} onPress={() => toggleCat(c.key)} />)}
             </View>
             <Btn label={snap.players.length + snap.bots.length > 1 ? `Lancer la partie (${snap.players.length + snap.bots.length} joueurs)` : 'Ajoute une machine ou attends un joueur'} disabled={snap.players.length + snap.bots.length < 2} onPress={() => { void onl.session.current?.start(settings); }} />
           </>
@@ -193,26 +194,40 @@ export function BacGame({ onHome }: { onHome: () => void }) {
 
   if (view.phase === 'write' || view.phase === 'collect') {
     const left = view.phase === 'write' ? Math.max(0, view.remainingMs - (now - snap.recvAt)) : 0;
+    const writeMs = view.settings.seconds * 1000;
+    const spinning = view.phase === 'write' && view.spinMs > 0 && left > writeMs + 50; // la roue tourne, le chrono n'a pas commencé
+    const shown = Math.min(left, writeMs);
     const filled = cats.every((c) => startsWithLetter(draft[c] ?? '', view.letter));
+    const lc = letterColor(view.letter);
+    if (spinning) {
+      return wrap(
+        <>
+          {header}
+          <Text style={st.spinTitle}>🎡 Tirage de la lettre…</Text>
+          <View style={{ alignItems: 'center', marginTop: 8 }}><LetterWheel key={view.roundNo} letter={view.letter} ms={view.spinMs} /></View>
+          <Text style={st.muted}>Prépare-toi, le chrono démarre juste après !</Text>
+        </>,
+      );
+    }
     return wrap(
       <>
         {header}
-        <View style={st.letterBox}>
+        <View style={[st.letterBox, { backgroundColor: lc }]}>
           <Text style={st.letter} accessibilityLabel={`Lettre ${view.letter}`}>{view.letter}</Text>
           {view.phase === 'write'
-            ? <Text style={[st.timer, left < 10000 && st.timerLow]}>{Math.ceil(left / 1000)} s</Text>
-            : <Text style={st.timerLow}>{view.stoppedBy ? `✋ ${nameOf(view.stoppedBy)} a fini !` : '⏰ Temps écoulé !'}</Text>}
+            ? <Text style={[st.timer, shown < 10000 && st.timerLow]}>⏱️ {Math.ceil(shown / 1000)} s</Text>
+            : <Text style={st.timerStop}>{view.stoppedBy ? `✋ ${nameOf(view.stoppedBy)} a fini !` : '⏰ Temps écoulé !'}</Text>}
         </View>
         {seated ? cats.map((c) => {
           const v = draft[c] ?? '';
           const bad = !!v.trim() && !startsWithLetter(v, view.letter);
           const cat = labelOf(c);
           return (
-            <View key={c} style={st.field}>
-              <Text style={st.fieldLabel}>{cat?.emoji} {cat?.label}</Text>
+            <View key={c} style={[st.field, { borderLeftColor: cat?.color ?? '#22c55e' }]}>
+              <Text style={[st.fieldLabel, { color: cat?.color }]}>{cat?.emoji} {cat?.label}</Text>
               <TextInput value={v} onChangeText={(t) => setDraft({ ...draft, [c]: t })} editable={view.phase === 'write'} maxLength={40}
                 autoCapitalize="words" autoCorrect={false} placeholder={`${view.letter}…`} placeholderTextColor="#475569"
-                style={[st.input, bad && st.inputBad]} accessibilityLabel={`${cat?.label}, un mot qui commence par ${view.letter}`} />
+                style={[st.input, { borderColor: bad ? '#ef4444' : v.trim() ? cat?.color : 'transparent' }]} accessibilityLabel={`${cat?.label}, un mot qui commence par ${view.letter}`} />
               {bad && <Text style={st.badTxt}>Doit commencer par {view.letter}</Text>}
             </View>
           );
@@ -231,13 +246,13 @@ export function BacGame({ onHome }: { onHome: () => void }) {
     return wrap(
       <>
         {header}
-        <Text style={st.title}>Vote · lettre {view.letter}</Text>
+        <Text style={[st.title, { color: letterColor(view.letter) }]}>🗳️ Vote · lettre {view.letter}</Text>
         <Text style={st.sub}>Touche ✗ sous un mot que tu trouves faux. Il saute si plus de la moitié des autres joueurs (les machines ne votent pas) le contestent.</Text>
         {cats.map((c) => {
           const cat = labelOf(c);
           return (
-            <View key={c} style={st.card}>
-              <Text style={st.head}>{cat?.emoji} {cat?.label}</Text>
+            <View key={c} style={[st.card, { borderLeftWidth: 6, borderLeftColor: cat?.color }]}>
+              <Text style={[st.head, { color: cat?.color }]}>{cat?.emoji} {cat?.label}</Text>
               {view.seats.map((p) => {
                 const word = (round.answers[p.uid]?.[c] ?? '').trim();
                 const mineWord = p.uid === me;
@@ -277,12 +292,12 @@ export function BacGame({ onHome }: { onHome: () => void }) {
     return wrap(
       <>
         {header}
-        <Text style={st.title}>Points · lettre {view.letter}</Text>
+        <Text style={[st.title, { color: letterColor(view.letter) }]}>🎯 Points · lettre {view.letter}</Text>
         {cats.map((c) => {
           const cat = labelOf(c);
           return (
-            <View key={c} style={st.card}>
-              <Text style={st.head}>{cat?.emoji} {cat?.label}</Text>
+            <View key={c} style={[st.card, { borderLeftWidth: 6, borderLeftColor: cat?.color }]}>
+              <Text style={[st.head, { color: cat?.color }]}>{cat?.emoji} {cat?.label}</Text>
               {view.seats.map((p) => <ScoreLine key={p.uid} name={`${p.bot ? '🤖 ' : ''}${p.name}`} cell={cells[c]?.[p.uid]} me={p.uid === me} />)}
             </View>
           );
@@ -309,15 +324,49 @@ export function BacGame({ onHome }: { onHome: () => void }) {
   const medals = ['🥇', '🥈', '🥉'];
   return wrap(
     <>
-      <Text style={st.title}>🏁 Classement final</Text>
+      <Confetti />
+      <RainbowTitle text="🏁 Classement final" />
       {rank.map((r) => (
-        <View key={r.uid} style={[st.card, r.rank === 1 && st.winner]}>
+        <View key={r.uid} style={[st.card, { borderLeftWidth: 8, borderLeftColor: ['#fbbf24', '#cbd5e1', '#d97706'][r.rank - 1] ?? '#334155' }, r.rank === 1 && st.winner]}>
           <Text style={st.podium}>{medals[r.rank - 1] ?? `${r.rank}.`} {nameOf(r.uid)}{r.uid === me ? ' (toi)' : ''}</Text>
           <Text style={st.totalPts}>{r.pts} pts</Text>
         </View>
       ))}
       <Btn label="← Retour au menu" onPress={leave} />
     </>,
+  );
+}
+
+const letterColor = (l: string) => `hsl(${Math.round((Math.max(0, LETTERS.indexOf(l)) * 360) / LETTERS.length)}, 70%, 38%)`;
+const RAINBOW = ['#f97316', '#eab308', '#22c55e', '#06b6d4', '#8b5cf6', '#ec4899'];
+
+/** Titre dont chaque lettre a sa couleur. */
+function RainbowTitle({ text }: { text: string }) {
+  let k = 0;
+  return (
+    <Text style={st.title} accessibilityLabel={text}>
+      {[...text].map((ch, i) => (ch === ' ' ? ' ' : <Text key={i} style={{ color: RAINBOW[k++ % RAINBOW.length] }}>{ch}</Text>))}
+    </Text>
+  );
+}
+
+/** Confettis qui tombent une fois, à l'arrivée du classement final. */
+function Confetti() {
+  const { width } = useWindowDimensions();
+  const pieces = useRef(Array.from({ length: 30 }, (_, i) => ({
+    x: Math.random() * Math.min(width, 560), color: RAINBOW[i % RAINBOW.length], delay: Math.random() * 900, dur: 2600 + Math.random() * 1600, size: 8 + Math.random() * 8, v: new Animated.Value(0),
+  }))).current;
+  useEffect(() => {
+    pieces.forEach((p) => Animated.timing(p.v, { toValue: 1, duration: p.dur, delay: p.delay, easing: Easing.in(Easing.quad), useNativeDriver: false }).start());
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <View pointerEvents="none" style={st.confetti}>
+      {pieces.map((p, i) => (
+        <Animated.View key={i} style={{ position: 'absolute', left: p.x, width: p.size, height: p.size * 1.6, backgroundColor: p.color, borderRadius: 2,
+          opacity: p.v.interpolate({ inputRange: [0, 0.05, 0.85, 1], outputRange: [0, 1, 1, 0] }),
+          transform: [{ translateY: p.v.interpolate({ inputRange: [0, 1], outputRange: [-30, 760] }) }, { rotate: p.v.interpolate({ inputRange: [0, 1], outputRange: ['0deg', `${360 + i * 40}deg`] }) }] }} />
+      ))}
+    </View>
   );
 }
 
@@ -344,9 +393,9 @@ function Btn({ label, onPress, kind = 'main', disabled }: { label: string; onPre
   );
 }
 
-function Chip({ on, label, onPress }: { on: boolean; label: string; onPress: () => void }) {
+function Chip({ on, label, onPress, color }: { on: boolean; label: string; onPress: () => void; color?: string }) {
   return (
-    <Pressable onPress={onPress} style={[st.chip, on && st.chipOn]} accessibilityState={{ selected: on }}>
+    <Pressable onPress={onPress} style={[st.chip, color && { borderWidth: 2, borderColor: color }, on && st.chipOn, on && color && { backgroundColor: color }]} accessibilityState={{ selected: on }}>
       <Text style={[st.chipTxt, on && st.chipTxtOn]}>{label}</Text>
     </Pressable>
   );
@@ -385,11 +434,14 @@ const st = StyleSheet.create({
   text: { color: '#e2e8f0', fontSize: 16 },
   roundBar: { flexDirection: 'row', justifyContent: 'space-between' },
   roundTxt: { color: '#94a3b8', fontSize: 14, fontWeight: '800' },
-  letterBox: { alignItems: 'center', gap: 4, backgroundColor: '#14532d', borderRadius: 20, paddingVertical: 12 },
+  letterBox: { alignItems: 'center', gap: 4, backgroundColor: '#14532d', borderRadius: 24, paddingVertical: 12, borderWidth: 3, borderColor: 'rgba(255,255,255,0.35)' },
+  spinTitle: { color: '#fde68a', fontSize: 24, fontWeight: '900', textAlign: 'center', marginTop: 8 },
+  timerStop: { color: '#fff', fontSize: 22, fontWeight: '900' },
+  confetti: { position: 'absolute', top: 0, left: 0, right: 0, height: 760, overflow: 'hidden', zIndex: 5 },
   letter: { color: '#f0fdf4', fontSize: 96, fontWeight: '900', lineHeight: 104 },
   timer: { color: '#fde68a', fontSize: 28, fontWeight: '900' },
   timerLow: { color: '#fca5a5', fontSize: 22, fontWeight: '900' },
-  field: { gap: 4 },
+  field: { gap: 4, borderLeftWidth: 6, borderLeftColor: '#22c55e', paddingLeft: 10, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 8, paddingVertical: 6, paddingRight: 6 },
   fieldLabel: { color: '#e2e8f0', fontSize: 15, fontWeight: '800' },
   okTxt: { color: '#86efac', fontSize: 13, fontWeight: '700' },
   badTxt: { color: '#fca5a5', fontSize: 13, fontWeight: '700' },
@@ -409,6 +461,6 @@ const st = StyleSheet.create({
   contestTxtOn: { color: '#fff' },
   roundPts: { color: GREEN, fontSize: 18, fontWeight: '900', minWidth: 48, textAlign: 'right' },
   totalPts: { color: '#fbbf24', fontSize: 20, fontWeight: '900', minWidth: 48, textAlign: 'right' },
-  winner: { borderWidth: 2, borderColor: '#fbbf24' },
+  winner: { borderWidth: 2, borderColor: '#fbbf24', backgroundColor: '#3b2f0b' },
   podium: { color: '#f8fafc', fontSize: 22, fontWeight: '900' },
 });

@@ -16,6 +16,8 @@ export type View = {
   roundNo: number; phase: Phase; letter: string;
   /** Temps restant pour écrire au moment de la publication (chaque appareil compte à partir de sa réception). */
   remainingMs: number;
+  /** Durée du tirage de la lettre au début de la manche (comprise dans `remainingMs`). */
+  spinMs: number;
   stoppedBy: string | null;
   submitted: string[]; ready: string[];
   round?: Round;
@@ -58,7 +60,9 @@ const parse = <T,>(raw: unknown): T | null => {
 const ordered = (players: LobbyPlayer[], hostUid?: string) =>
   [...players].sort((a, b) => Number(b.uid === hostUid) - Number(a.uid === hostUid) || a.joinedAt - b.joinedAt || a.uid.localeCompare(b.uid));
 
-export type Timing = { collectMs: number };
+/** `collectMs` : attente des réponses après l'arrêt ; `spinMs` : durée du tirage de la lettre (la roue tourne, le chrono n'a pas commencé). */
+export type Timing = { collectMs: number; spinMs: number };
+const DEFAULT_TIMING: Timing = { collectMs: 4000, spinMs: 3600 };
 
 /** Réglages valides (bornes), même si un appareil envoie n'importe quoi. */
 export function cleanSettings(s: Partial<Settings>): Settings {
@@ -112,7 +116,7 @@ export class BacSession {
   private fail(e: unknown) { this.update({ phase: 'error', error: e instanceof Error ? e.message : String(e) }); }
   private path = (p: string) => `bac/rooms/${this.snap.code}/${p}`;
 
-  static async create(be: Backend, name: string, timing: Timing = { collectMs: 4000 }): Promise<BacSession> {
+  static async create(be: Backend, name: string, timing: Timing = DEFAULT_TIMING): Promise<BacSession> {
     const uid = await be.uid();
     for (let i = 0; i < 8; i++) {
       const code = randomCode();
@@ -126,7 +130,7 @@ export class BacSession {
     throw new Error('Impossible de créer un salon, réessaie.');
   }
 
-  static async join(be: Backend, rawCode: string, name: string, timing: Timing = { collectMs: 4000 }): Promise<BacSession> {
+  static async join(be: Backend, rawCode: string, name: string, timing: Timing = DEFAULT_TIMING): Promise<BacSession> {
     const code = normalizeCode(rawCode);
     if (code.length !== 4) throw new Error('Le code a 4 lettres.');
     const uid = await be.uid();
@@ -211,8 +215,9 @@ export class BacSession {
     this.round = { letter: this.letter, answers: {}, contests: {} };
     this.submitted = []; this.ready = []; this.stoppedBy = null; this.cells = undefined; this.roundPts = undefined;
     this.phase = 'write';
-    this.endsAt = Date.now() + this.settings.seconds * 1000;
-    this.timer = setTimeout(() => { void this.toCollect(null); }, this.settings.seconds * 1000);
+    const total = this.timing.spinMs + this.settings.seconds * 1000;
+    this.endsAt = Date.now() + total;
+    this.timer = setTimeout(() => { void this.toCollect(null); }, total);
     await this.publish();
   }
 
@@ -261,7 +266,7 @@ export class BacSession {
     const showAnswers = this.phase === 'vote' || this.phase === 'scores' || this.phase === 'final';
     const view: View = {
       v: this.v, seats: this.seats, settings: this.settings, roundNo: this.roundNo, phase: this.phase, letter: this.letter,
-      remainingMs: this.phase === 'write' ? Math.max(0, this.endsAt - Date.now()) : 0,
+      remainingMs: this.phase === 'write' ? Math.max(0, this.endsAt - Date.now()) : 0, spinMs: this.timing.spinMs,
       stoppedBy: this.stoppedBy, submitted: this.submitted, ready: this.ready,
       ...(showAnswers ? { round: this.round } : {}),
       ...(this.phase === 'scores' || this.phase === 'final' ? { cells: this.cells, roundPts: this.roundPts } : {}),

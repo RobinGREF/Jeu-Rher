@@ -111,3 +111,5 @@ Une manche : lettre tirée → chacun écrit ses mots → fin au chrono ou dès 
 Limites : si l'hôte quitte ou recharge, la partie s'arrête ; arrivé après le début, on regarde en spectateur ; le vote est à la confiance (pas de dictionnaire).
 
 Machines au Petit bac : l'hôte peut ajouter jusqu'à 7 machines dans le salon (« 🤖 Ajouter une machine », prénoms Jack, Anne, Morgan…), ce qui permet de jouer seul. Elles piochent dans une réserve de mots (`solo/src/bac/words.ts`, une quinzaine de catégories) : environ 80 % de réussite par catégorie, parfois rien. Elles ne votent pas ; un humain seul à la table suffit pour contester un de leurs mots. Les machines sont enregistrées dans `meta.bots` du salon (aucune règle Firebase en plus).
+
+Petit bac, tirage de la lettre : au début de chaque manche, une roue de 19 lettres tourne environ 3,6 s sur tous les appareils et s'arrête sur la lettre tirée par l'hôte ; le chrono ne démarre qu'ensuite (`spinMs` dans `solo/src/bac/session.ts`). Chaque catégorie a sa couleur (`solo/src/bac/engine.ts`).
