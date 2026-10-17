@@ -80,7 +80,7 @@ export type Round = {
 };
 
 /** Catégories de noms communs : le dictionnaire peut refuser un mot qui n'existe pas (les noms propres, marques et titres restent au vote). */
-export const DICT_CATEGORIES = ['animal', 'metier', 'fruitleg', 'objet', 'vetement', 'sport', 'plat', 'matiere'];
+export const DICT_CATEGORIES = ['animal', 'metier', 'fruitleg', 'objet', 'vetement', 'sport', 'plat', 'matiere', 'pays'];
 
 /** « Ce mot existe-t-il ? » pour une catégorie. Toujours vrai pour les catégories de noms propres. */
 export type Known = (cat: string, word: string) => boolean;
@@ -88,11 +88,12 @@ export type Known = (cat: string, word: string) => boolean;
 const STOP = new Set(['et', 'ou', 'au', 'aux', 'sur', 'sous', 'avec', 'sans', 'en', 'un', 'une', 'le', 'la', 'les', 'du', 'des', 'de', 'd', 'l']);
 
 /** Fabrique le contrôle à partir d'une liste de mots sans accents (minuscules) et, en plus, d'une réserve de mots connus. */
-export function makeKnown(has: (w: string) => boolean, extra: (cat: string, folded: string) => boolean = () => false): Known {
+export function makeKnown(has: (w: string) => boolean, extra: (cat: string, folded: string) => boolean = () => false, countries?: Set<string>): Known {
   return (cat, word) => {
     if (!DICT_CATEGORIES.includes(cat)) return true;
     const folded = core(word);
     if (!folded) return false;
+    if (cat === 'pays') return countries ? countries.has(folded) : true;
     if (extra(cat, folded)) return true;
     return folded.split(' ').every((t) => t.length <= 1 || STOP.has(t) || has(t));
   };

@@ -119,3 +119,13 @@ test('dictionnaire : un mot inconnu vaut 0, sauf si plus de la moitié des autre
   const half = scoreRound({ ...base, accepts: { animal: { a: ['b'] } } }, ['a', 'b', 'c'], ['animal'], ['a', 'b', 'c'], known);
   assert.equal(half.cells.animal.a.status, 'inconnu', 'un accord sur deux ne suffit pas');
 });
+
+test('pays : un pays inventé est refusé, les vrais passent (réserve des machines comprise)', async () => {
+  const { COUNTRIES } = await import('./countries');
+  const { WORDS } = await import('./words');
+  const known = makeKnown(() => true, () => false, COUNTRIES);
+  assert.equal(known('pays', 'Ogwanda'), false);
+  assert.equal(known('pays', 'Ouganda'), true);
+  assert.equal(known('pays', "Côte d'Ivoire"), true);
+  for (const ws of Object.values(WORDS.pays)) for (const w of ws) assert.equal(known('pays', w), true, w);
+});

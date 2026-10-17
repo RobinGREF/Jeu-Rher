@@ -1,3 +1,4 @@
+import { COUNTRIES } from './countries';
 import { makeKnown, type Known } from './engine';
 import { core } from './engine';
 import { WORDS } from './words';
@@ -15,14 +16,14 @@ export function dictionaryUrl(): string {
 
 let cached: Promise<Known | null> | null = null;
 
-/** Charge (une seule fois) la liste de ~320 000 mots français ; sans réseau, aucun contrôle (renvoie null). */
+/** Charge (une seule fois) la liste de ~320 000 mots français ; sans réseau, seuls les pays restent contrôlés. */
 export function loadKnown(url = dictionaryUrl()): Promise<Known | null> {
   cached ??= fetch(url)
     .then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
     .then((t) => {
       const set = new Set(t.split('\n'));
-      return set.size > 1000 ? makeKnown((w) => set.has(w), bank) : null;
+      return makeKnown(set.size > 1000 ? (w) => set.has(w) : () => true, bank, COUNTRIES);
     })
-    .catch(() => null);
+    .catch(() => makeKnown(() => true, bank, COUNTRIES));
   return cached;
 }
