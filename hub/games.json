@@ -16,13 +16,6 @@
       "url": "famille-fight/"
     },
     {
-      "titre": "Mémo des paires",
-      "description": "Retrouve toutes les paires en un minimum de coups, solo, 3 niveaux.",
-      "emoji": "🎴",
-      "couleur": "#0ea5e9",
-      "url": "memo/"
-    },
-    {
       "titre": "Duel de savoir",
       "description": "Quiz façon Trivial Pursuit : 20 catégories, 1176 questions, 1 à 6 joueurs sur un appareil.",
       "emoji": "🧠",
@@ -35,6 +28,13 @@
       "emoji": "✏️",
       "couleur": "#16a34a",
       "url": "petit-bac/"
+    },
+    {
+      "titre": "Mémo des paires",
+      "description": "Retrouve toutes les paires en un minimum de coups, solo, 3 niveaux.",
+      "emoji": "🎴",
+      "couleur": "#0ea5e9",
+      "url": "memo/"
     }
   ]
 }
