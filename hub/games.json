@@ -28,6 +28,13 @@
       "emoji": "🧠",
       "couleur": "#2563eb",
       "url": "duel-de-savoir/"
+    },
+    {
+      "titre": "Petit bac",
+      "description": "Une lettre, des catégories : trouve un mot pour chacune avant les autres. 2 à 8 joueurs, chacun sur son téléphone, vote des mots.",
+      "emoji": "✏️",
+      "couleur": "#16a34a",
+      "url": "petit-bac/"
     }
   ]
 }

@@ -9,11 +9,12 @@ Ce dépôt contient **tous les jeux de Robin**. Chaque jeu a **son propre dossie
 | Familly Fight | `combat/` | `/famille-fight/` |
 | Duel de savoir | `solo/src/duel/` | `/duel-de-savoir/` |
 | Mémo des paires | `solo/src/memo/` | `/memo/` |
+| Petit bac | `solo/src/bac/` | `/petit-bac/` |
 
 ## Règles
 1. **Ne pas intégrer un jeu dans l'appli d'un autre** et ne pas créer de seconde « liste de jeux » dans une appli (une première tentative de ce genre — `GameHub`/`Root` dans `app/` — a été retirée). La liste est **uniquement** `hub/games.json`.
 2. **Un jeu = un dossier.** Nouveau jeu : son dossier, une étape d'assemblage dans `.github/workflows/pages.yml` (copie vers `site/<nom>/`), et un bloc dans `hub/games.json` (titre, description, emoji, couleur, `url` relative ; `url` vide = « Bientôt »).
-3. Les jeux solo en React Native / Expo (Duel, Mémo) vivent dans `solo/` : un projet, construit une fois par jeu avec `EXPO_PUBLIC_GAME=duel|memo`. Nouveau jeu solo : dossier dans `solo/src/`, un cas dans `solo/App.tsx`, une entrée dans la boucle du workflow.
+3. Les jeux solo en React Native / Expo (Duel, Mémo, Petit bac) vivent dans `solo/` : un projet, construit une fois par jeu avec `EXPO_PUBLIC_GAME=duel|memo|bac`. Nouveau jeu solo : dossier dans `solo/src/`, un cas dans `solo/App.tsx`, une entrée dans la boucle du workflow.
 4. Un jeu a un bouton de retour vers l'accueil : `window.location.href = '../'`.
 5. **Ne pas toucher** à `app/` (50 Missions : en ligne, Firebase, machines) ni aux autres jeux sans demande de Robin.
 6. Les tests de chaque projet doivent passer (`npm test` dans `app/` et dans `solo/`) : ils bloquent le déploiement.

@@ -52,13 +52,13 @@ jobs:
           # Familly Fight : site statique du dossier combat/
           mkdir -p site/famille-fight
           cp -r combat/. site/famille-fight/
-      - name: Petits jeux solo (Duel de savoir, Mémo des paires)
+      - name: Petits jeux solo (Duel de savoir, Mémo des paires, Petit bac)
         working-directory: solo
         run: |
           npm ci
           npm run typecheck
           npm test
-          for g in duel:duel-de-savoir memo:memo; do
+          for g in duel:duel-de-savoir memo:memo bac:petit-bac; do
             id=${g%%:*}; dir=${g##*:}
             EXPO_PUBLIC_GAME=$id EXPO_BASE_URL=/${{ github.event.repository.name }}/$dir CI=1 EXPO_NO_TELEMETRY=1 npx expo export --platform web --output-dir dist-$id
             mkdir -p ../site/$dir

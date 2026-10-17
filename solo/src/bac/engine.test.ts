@@ -1,0 +1,59 @@
+import { strict as assert } from 'node:assert';
+import { test } from 'node:test';
+import { core, drawLetter, fold, LETTERS, ranking, scoreRound, startsWithLetter, type Round } from './engine';
+
+test('normalisation : accents, majuscules, articles', () => {
+  assert.equal(fold("L'Éléphant"), 'l elephant');
+  assert.equal(core("L'Éléphant"), 'elephant');
+  assert.equal(core('le chat'), 'chat');
+  assert.equal(core('Un Âne'), 'ane');
+  assert.equal(core('les'), 'les', 'un article seul reste un mot');
+  assert.ok(startsWithLetter('Éléphant', 'e'));
+  assert.ok(startsWithLetter("l'oiseau", 'O'));
+  assert.ok(!startsWithLetter('chat', 'A'));
+  assert.ok(!startsWithLetter('a', 'A'), 'un mot d\'une lettre est refusé');
+});
+
+test('tirage : jamais deux fois la même lettre tant qu\'il en reste', () => {
+  const used: string[] = [];
+  for (let i = 0; i < LETTERS.length; i++) { const l = drawLetter(used); assert.ok(!used.includes(l)); used.push(l); }
+  assert.ok(LETTERS.includes(drawLetter(used)), 'quand toutes ont servi, on recommence');
+  assert.ok(!LETTERS.includes('K') && !LETTERS.includes('W'));
+});
+
+const round = (letter: string, answers: Round['answers'], contests: Round['contests'] = {}): Round => ({ letter, answers, contests });
+
+test('points : seul 15, différent 10, doublon 5, invalide 0', () => {
+  const r = round('A', {
+    a: { animal: 'Âne', pays: 'Algérie', metier: 'Avocat', objet: '' },
+    b: { animal: 'ane', pays: 'Argentine', metier: 'Boulanger', objet: '' },
+    c: { animal: 'Aigle', pays: '', metier: '', objet: '' },
+  });
+  const { cells, totals } = scoreRound(r, ['a', 'b', 'c'], ['animal', 'pays', 'metier', 'objet']);
+  assert.equal(cells.animal.a.status, 'doublon'); assert.equal(cells.animal.a.pts, 5);
+  assert.equal(cells.animal.b.pts, 5);
+  assert.equal(cells.animal.c.status, 'unique'); assert.equal(cells.animal.c.pts, 10);
+  assert.equal(cells.pays.a.pts, 10); assert.equal(cells.pays.b.pts, 10); assert.equal(cells.pays.c.status, 'vide');
+  assert.equal(cells.metier.a.status, 'seul'); assert.equal(cells.metier.a.pts, 15, 'seul à avoir un mot valide');
+  assert.equal(cells.metier.b.status, 'faux'); assert.equal(cells.metier.b.pts, 0, 'Boulanger ne commence pas par A');
+  assert.equal(cells.objet.a.status, 'vide');
+  assert.deepEqual(totals, { a: 5 + 10 + 15, b: 5 + 10, c: 10 });
+});
+
+test('contestation : il faut plus de la moitié des autres joueurs', () => {
+  const answers = { a: { animal: 'Ane' }, b: { animal: 'Aigle' }, c: { animal: 'Ara' } };
+  const one = scoreRound(round('A', answers, { animal: { a: ['b'] } }), ['a', 'b', 'c'], ['animal']);
+  assert.equal(one.cells.animal.a.pts, 10, 'un seul contestataire sur deux autres : pas assez');
+  const two = scoreRound(round('A', answers, { animal: { a: ['b', 'c'] } }), ['a', 'b', 'c'], ['animal']);
+  assert.equal(two.cells.animal.a.status, 'conteste');
+  assert.equal(two.cells.animal.a.pts, 0);
+  const self = scoreRound(round('A', answers, { animal: { a: ['a', 'a'] } }), ['a', 'b', 'c'], ['animal']);
+  assert.equal(self.cells.animal.a.pts, 10, 'on ne peut pas contester son propre mot');
+  const duo = scoreRound(round('A', { a: { animal: 'Ane' }, b: { animal: 'Aigle' } }, { animal: { a: ['b'] } }), ['a', 'b'], ['animal']);
+  assert.equal(duo.cells.animal.a.pts, 0, 'à deux, l\'autre joueur suffit');
+  assert.equal(duo.cells.animal.b.status, 'seul', 'un mot contesté ne compte plus comme concurrent');
+});
+
+test('classement : égalités au même rang', () => {
+  assert.deepEqual(ranking({ a: 30, b: 50, c: 30, d: 10 }).map((x) => [x.uid, x.rank]), [['b', 1], ['a', 2], ['c', 2], ['d', 4]]);
+});

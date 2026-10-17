@@ -15,3 +15,10 @@ export const TRACKS_MEMO: TrackSpec[] = [
   { id: 'jardin', name: 'Jardin', emoji: '🌼', bpm: 92, root: 60, mode: 'lydian', prog: [0, 1, 3, 0], lead: 'triangle', bass: 'sine', pad: true, drums: 'soft', density: 0.5, seed: 203 },
   { id: 'petits', name: 'Petits pas', emoji: '👣', bpm: 108, root: 65, mode: 'major', prog: [0, 4, 5, 3], lead: 'triangle', bass: 'triangle', drums: 'march', density: 0.55, seed: 204 },
 ];
+
+/** Petit bac : de l'urgence du chrono à l'ambiance de salon. */
+export const TRACKS_BAC: TrackSpec[] = [
+  { id: 'chrono', name: 'Le chrono tourne', emoji: '⏱️', bpm: 132, root: 62, mode: 'dorian', prog: [0, 3, 0, 4], lead: 'square', bass: 'triangle', drums: 'dance', density: 0.65, seed: 301 },
+  { id: 'cerveau', name: 'Cerveau en marche', emoji: '🧠', bpm: 104, root: 57, mode: 'minor', prog: [0, 5, 3, 4], lead: 'triangle', bass: 'sine', pad: true, drums: 'pulse', density: 0.45, seed: 302 },
+  { id: 'salon', name: 'Ambiance de salon', emoji: '🛋️', bpm: 84, root: 60, mode: 'mixolydian', prog: [0, 3, 4, 3], lead: 'box', bass: 'sine', pad: true, drums: 'soft', density: 0.4, seed: 303 },
+];

@@ -98,3 +98,14 @@ Limites : 2 joueurs ; le code (4 lettres) n'est pas un secret fort (il donne acc
 ## Inviter par lien (WhatsApp, SMS…)
 Dans le salon d'attente de chaque jeu en ligne (50 Missions, Duel de savoir, Familly Fight), les boutons **📤 Partager / 💬 WhatsApp / ✉️ SMS** envoient une invitation : « Rejoins ma partie de <jeu> ! Code du salon : ABCD » avec un lien du type `https://robingref.github.io/Jeu-Rher/50-missions/?salle=ABCD`. Le lien ouvre **le bon jeu** directement sur le salon : si le prénom est déjà enregistré sur l'appareil, l'invité rejoint tout de suite ; sinon le code est pré-rempli et il tape son prénom puis « Rejoindre ». Un nouveau jeu en ligne reprend `src/share.ts` et `src/ShareRoom.tsx` (copies identiques dans `app/src` et `solo/src`).
 Familly Fight (site HTML à part) a ses propres boutons dans le salon (en haut à gauche de la barre du bas) et lit `?salle=` au chargement : l'invité arrive directement sur le choix de son combattant.
+
+
+## Petit bac en ligne
+
+Petit bac (dossier `solo/src/bac/`, adresse `/petit-bac/`) utilise le même projet Firebase, dans son propre nœud `bac/rooms/<code>` (règles ajoutées à `app/firebase.rules.json`, calquées sur celles du Duel). Un joueur crée un salon et choisit le nombre de manches (3, 5 ou 8), le temps (60, 90 ou 120 s) et les catégories (3 à 10) ; les autres rejoignent avec le code à 4 lettres ou le lien d'invitation.
+
+Une manche : lettre tirée → chacun écrit ses mots → fin au chrono ou dès qu'un joueur a tout rempli et crie « Bac ! » → tous les appareils envoient leurs réponses → **vote** : chaque mot s'affiche avec son auteur, chacun peut contester (✗) ceux des autres ; un mot est refusé quand plus de la moitié des autres joueurs le contestent → points : mot seul valide de la catégorie 15, mot différent de ceux des autres 10, même mot chez plusieurs joueurs 5, mot vide ou mauvaise lettre 0 (l'article d'ouverture et les accents sont ignorés). L'hôte fait tourner la partie ; il peut passer au calcul des points sans attendre tout le monde.
+
+⚠️ **Il faut republier les règles** : Firebase → Realtime Database → Règles → coller le contenu de `app/firebase.rules.json` → Publier.
+
+Limites : si l'hôte quitte ou recharge, la partie s'arrête ; arrivé après le début, on regarde en spectateur ; le vote est à la confiance (pas de dictionnaire).
