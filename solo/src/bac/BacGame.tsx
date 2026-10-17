@@ -15,6 +15,7 @@ import { wordsFor } from './words';
 
 const KEY_NAME = 'bac-name';
 const KEY_BEST = 'bac-best';
+const KEY_IDEAS = 'bac-ideas';
 const ROUND_CHOICES = [3, 5, 8];
 const SECONDS_CHOICES = [60, 90, 120];
 
@@ -33,6 +34,8 @@ export function BacGame({ onHome }: { onHome: () => void }) {
   const [pending, setPending] = useState(invite);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [draft, setDraft] = useState<Record<string, string>>({});
+  const [ideas, setIdeas] = useState(() => loadJson<boolean>(KEY_IDEAS, false));
+  const toggleIdeas = () => { setIdeas(!ideas); saveJson(KEY_IDEAS, !ideas); };
   const [now, setNow] = useState(Date.now());
   const [best, setBest] = useState<Best>(() => loadJson<Best>(KEY_BEST, { games: 0, wins: 0, record: 0 }));
   const sent = useRef<number>(0);
@@ -249,6 +252,9 @@ export function BacGame({ onHome }: { onHome: () => void }) {
         {header}
         <Text style={[st.title, { color: letterColor(view.letter, 65) }]}>🗳️ Vote · lettre {view.letter}</Text>
         <Text style={st.sub}>Touche ✗ sous un mot que tu trouves faux. Les mots que le dictionnaire ne connaît pas sont barrés : touche ✓ pour en défendre un. Il saute si plus de la moitié des autres joueurs (les machines ne votent pas) le contestent.</Text>
+        <Pressable onPress={toggleIdeas} style={[st.btn, st.btnGhost]} accessibilityRole="button" accessibilityLabel="Afficher ou masquer les idées de mots">
+          <Text style={[st.btnTxt, st.btnGhostTxt]}>{ideas ? '🙈 Masquer les idées de mots' : '💡 Voir des idées de mots'}</Text>
+        </Pressable>
         {cats.map((c) => {
           const cat = labelOf(c);
           return (
@@ -311,7 +317,7 @@ export function BacGame({ onHome }: { onHome: () => void }) {
             <View key={c} style={[st.card, { borderLeftWidth: 6, borderLeftColor: cat?.color }]}>
               <Text style={[st.head, { color: cat?.color }]}>{cat?.emoji} {cat?.label}</Text>
               {view.seats.map((p) => <ScoreLine key={p.uid} name={`${p.bot ? '🤖 ' : ''}${p.name}`} cell={cells[c]?.[p.uid]} me={p.uid === me} />)}
-              <Ideas cat={c} letter={view.letter} used={view.seats.map((p) => cells[c]?.[p.uid]?.word ?? '')} />
+              {ideas && <Ideas cat={c} letter={view.letter} used={view.seats.map((p) => cells[c]?.[p.uid]?.word ?? '')} />}
             </View>
           );
         })}
