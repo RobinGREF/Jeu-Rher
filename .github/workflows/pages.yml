@@ -63,6 +63,7 @@ jobs:
             EXPO_PUBLIC_GAME=$id EXPO_BASE_URL=/${{ github.event.repository.name }}/$dir CI=1 EXPO_NO_TELEMETRY=1 npx expo export --platform web --output-dir dist-$id
             mkdir -p ../site/$dir
             cp -r dist-$id/. ../site/$dir/
+            if [ "$id" = bac ]; then cp dict/mots-fr.txt ../site/$dir/mots-fr.txt; fi  # dictionnaire du Petit bac (chargé à la demande)
           done
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

@@ -65,7 +65,7 @@ export function startsWithLetter(word: string, letter: string): boolean {
   return c.length >= 2 && c[0] === fold(letter);
 }
 
-export type Status = 'vide' | 'faux' | 'conteste' | 'seul' | 'unique' | 'doublon';
+export type Status = 'vide' | 'faux' | 'inconnu' | 'conteste' | 'seul' | 'unique' | 'doublon';
 
 export type Cell = { word: string; status: Status; pts: number };
 
@@ -75,14 +75,44 @@ export type Round = {
   answers: Record<string, Record<string, string>>;
   /** Contestations : catégorie → uid de l'auteur → uids de ceux qui contestent le mot. */
   contests: Record<string, Record<string, string[]>>;
+  /** Mots refusés par le dictionnaire mais défendus par des joueurs : catégorie → auteur → uids qui les acceptent. */
+  accepts?: Record<string, Record<string, string[]>>;
 };
+
+/** Catégories de noms communs : le dictionnaire peut refuser un mot qui n'existe pas (les noms propres, marques et titres restent au vote). */
+export const DICT_CATEGORIES = ['animal', 'metier', 'fruitleg', 'objet', 'vetement', 'sport', 'plat', 'matiere'];
+
+/** « Ce mot existe-t-il ? » pour une catégorie. Toujours vrai pour les catégories de noms propres. */
+export type Known = (cat: string, word: string) => boolean;
+
+const STOP = new Set(['et', 'ou', 'au', 'aux', 'sur', 'sous', 'avec', 'sans', 'en', 'un', 'une', 'le', 'la', 'les', 'du', 'des', 'de', 'd', 'l']);
+
+/** Fabrique le contrôle à partir d'une liste de mots sans accents (minuscules) et, en plus, d'une réserve de mots connus. */
+export function makeKnown(has: (w: string) => boolean, extra: (cat: string, folded: string) => boolean = () => false): Known {
+  return (cat, word) => {
+    if (!DICT_CATEGORIES.includes(cat)) return true;
+    const folded = core(word);
+    if (!folded) return false;
+    if (extra(cat, folded)) return true;
+    return folded.split(' ').every((t) => t.length <= 1 || STOP.has(t) || has(t));
+  };
+}
 
 export const POINTS = { seul: 15, unique: 10, doublon: 5 } as const;
 
 /** Une contestation l'emporte quand plus de la moitié des AUTRES joueurs humains (les machines ne votent pas) la portent. */
 export function isContested(round: Round, cat: string, author: string, voters: string[]): boolean {
+  return majority(round.contests[cat]?.[author], author, voters);
+}
+
+/** Un mot refusé par le dictionnaire est repêché quand plus de la moitié des autres joueurs humains l'acceptent. */
+export function isRescued(round: Round, cat: string, author: string, voters: string[]): boolean {
+  return majority(round.accepts?.[cat]?.[author], author, voters);
+}
+
+function majority(list: string[] | undefined, author: string, voters: string[]): boolean {
   const others = voters.filter((u) => u !== author);
-  const n = (round.contests[cat]?.[author] ?? []).filter((u) => others.includes(u)).length;
+  const n = (list ?? []).filter((u) => others.includes(u)).length;
   return others.length > 0 && n * 2 > others.length;
 }
 
@@ -91,7 +121,7 @@ export function isContested(round: Round, cat: string, author: string, voters: s
  * parmi les mots valides, le même mot chez plusieurs joueurs vaut 5 chacun, un mot différent des autres 10,
  * et le seul mot valide de la catégorie 15. `humans` : les joueurs qui peuvent contester (par défaut tous).
  */
-export function scoreRound(round: Round, uids: string[], categories: string[], humans: string[] = uids): { cells: Record<string, Record<string, Cell>>; totals: Record<string, number> } {
+export function scoreRound(round: Round, uids: string[], categories: string[], humans: string[] = uids, known?: Known): { cells: Record<string, Record<string, Cell>>; totals: Record<string, number> } {
   const cells: Record<string, Record<string, Cell>> = {};
   const totals: Record<string, number> = Object.fromEntries(uids.map((u) => [u, 0]));
   for (const cat of categories) {
@@ -101,6 +131,7 @@ export function scoreRound(round: Round, uids: string[], categories: string[], h
       const word = (round.answers[uid]?.[cat] ?? '').trim();
       if (!word) row[uid] = { word, status: 'vide', pts: 0 };
       else if (!startsWithLetter(word, round.letter)) row[uid] = { word, status: 'faux', pts: 0 };
+      else if (known && !known(cat, word) && !isRescued(round, cat, uid, humans)) row[uid] = { word, status: 'inconnu', pts: 0 };
       else if (isContested(round, cat, uid, humans)) row[uid] = { word, status: 'conteste', pts: 0 };
       else { row[uid] = { word, status: 'unique', pts: 0 }; valid.push({ uid, key: core(word) }); }
     }

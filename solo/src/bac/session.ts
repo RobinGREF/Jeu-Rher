@@ -1,6 +1,7 @@
 import type { Backend } from '../duel/online/backend';
 import { DEFAULT_CATEGORIES, drawLetter, MAX_CATEGORIES, MAX_PLAYERS, MIN_CATEGORIES, scoreRound, type Cell, type Round } from './engine';
 import { botAnswers, BOT_NAMES } from './bots';
+import type { Known } from './engine';
 
 export { MAX_PLAYERS };
 
@@ -30,6 +31,7 @@ export type Intent =
   | { t: 'stop' }
   | { t: 'answers'; answers: Record<string, string> }
   | { t: 'contest'; cat: string; target: string; on: boolean }
+  | { t: 'accept'; cat: string; target: string; on: boolean }
   | { t: 'ready' };
 
 export type LobbyPlayer = { uid: string; name: string; joinedAt: number };
@@ -61,7 +63,7 @@ const ordered = (players: LobbyPlayer[], hostUid?: string) =>
   [...players].sort((a, b) => Number(b.uid === hostUid) - Number(a.uid === hostUid) || a.joinedAt - b.joinedAt || a.uid.localeCompare(b.uid));
 
 /** `collectMs` : attente des réponses après l'arrêt ; `spinMs` : durée du tirage de la lettre (la roue tourne, le chrono n'a pas commencé). */
-export type Timing = { collectMs: number; spinMs: number };
+export type Timing = { collectMs: number; spinMs: number; /** Contrôle d'existence des mots (dictionnaire), s'il est chargé. */ known?: () => Known | null };
 const DEFAULT_TIMING: Timing = { collectMs: 4000, spinMs: 3600 };
 
 /** Réglages valides (bornes), même si un appareil envoie n'importe quoi. */
@@ -243,7 +245,7 @@ export class BacSession {
 
   private async toScores() {
     if (this.phase !== 'vote') return;
-    const { cells, totals } = scoreRound(this.round, this.seats.map((s) => s.uid), this.settings.categories, this.humans().map((s) => s.uid));
+    const { cells, totals } = scoreRound(this.round, this.seats.map((s) => s.uid), this.settings.categories, this.humans().map((s) => s.uid), this.timing.known?.() ?? undefined);
     this.cells = cells; this.roundPts = totals;
     for (const [u, p] of Object.entries(totals)) this.totals[u] = (this.totals[u] ?? 0) + p;
     this.phase = 'scores';
@@ -292,6 +294,13 @@ export class BacSession {
       } else if (it.t === 'contest') {
         if (this.phase !== 'vote' || uid === it.target || !this.settings.categories.includes(it.cat) || !this.seats.some((s) => s.uid === it.target)) return;
         const byAuthor = (this.round.contests[it.cat] ??= {});
+        const list = (byAuthor[it.target] ?? []).filter((u) => u !== uid);
+        byAuthor[it.target] = it.on ? [...list, uid] : list;
+        await this.publish();
+      } else if (it.t === 'accept') {
+        if (this.phase !== 'vote' || uid === it.target || !this.settings.categories.includes(it.cat) || !this.seats.some((s) => s.uid === it.target)) return;
+        const acc = (this.round.accepts ??= {});
+        const byAuthor = (acc[it.cat] ??= {});
         const list = (byAuthor[it.target] ?? []).filter((u) => u !== uid);
         byAuthor[it.target] = it.on ? [...list, uid] : list;
         await this.publish();

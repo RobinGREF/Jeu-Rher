@@ -131,3 +131,25 @@ test('machines : la partie ne démarre pas au-delà de 8 places et un seul humai
   await wait(30);
   assert.equal(host.snapshot.bots.length, 7, '1 humain + 7 machines = 8 places');
 });
+
+test('dictionnaire : le mot inconnu est refusé aux points, puis repêché par un accord', async () => {
+  const store = new MemoryStore();
+  const known = makeKnown((w) => w.startsWith('a') && w.length < 8);
+  const t = { collectMs: 60, spinMs: 0, known: () => known };
+  const host = await BacSession.create(new StoreBackend(store, 'h0'), 'Robin', t);
+  const g = await BacSession.join(new StoreBackend(store, 'g1'), host.snapshot.code, 'Marie', t);
+  await until(() => host.snapshot.players.length === 2);
+  await host.start({ rounds: 1, seconds: 30, categories: ['animal', 'objet', 'metier'] });
+  await until(() => view(g).phase === 'write');
+  const L = view(host).letter;
+  await host.act({ t: 'stop' });
+  await host.act({ t: 'answers', answers: { animal: `${L}rrrrrrrrrrrr`, objet: `${L}aa`, metier: '' } });
+  await g.act({ t: 'answers', answers: { animal: `${L}bb`, objet: '', metier: '' } });
+  await until(() => view(host).phase === 'vote');
+  await host.act({ t: 'ready' }); await g.act({ t: 'ready' });
+  await until(() => view(host).phase === 'scores');
+  const bad = view(host).cells!.animal[host.snapshot.uid];
+  assert.equal(bad.status, 'inconnu', 'mot trop long : absent de ce faux dictionnaire');
+});
+
+import { makeKnown } from './engine';

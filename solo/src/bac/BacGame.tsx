@@ -7,7 +7,7 @@ import { ShareRoom } from '../ShareRoom';
 import { MusicButton, useMusicChoice } from '../MusicButton';
 import { TRACKS_BAC } from '../tracks';
 import { loadJson, saveJson } from '../storage';
-import { CATEGORIES, labelOf, LETTERS, MAX_CATEGORIES, MIN_CATEGORIES, ranking, startsWithLetter, type Cell, type Status } from './engine';
+import { CATEGORIES, isRescued, labelOf, LETTERS, MAX_CATEGORIES, MIN_CATEGORIES, ranking, startsWithLetter, type Cell, type Status } from './engine';
 import { DEFAULT_SETTINGS, normalizeCode, type Settings } from './session';
 import { useBacOnline } from './useBacOnline';
 import { LetterWheel } from './LetterWheel';
@@ -20,7 +20,7 @@ const SECONDS_CHOICES = [60, 90, 120];
 type Best = { games: number; wins: number; record: number };
 
 const STATUS_TXT: Record<Status, string> = {
-  vide: 'vide', faux: 'mauvaise lettre', conteste: 'contesté', seul: 'seul : 15 pts', unique: 'unique : 10 pts', doublon: 'même mot : 5 pts',
+  vide: 'vide', faux: 'mauvaise lettre', inconnu: 'mot inconnu', conteste: 'contesté', seul: 'seul : 15 pts', unique: 'unique : 10 pts', doublon: 'même mot : 5 pts',
 };
 
 export function BacGame({ onHome }: { onHome: () => void }) {
@@ -246,8 +246,8 @@ export function BacGame({ onHome }: { onHome: () => void }) {
     return wrap(
       <>
         {header}
-        <Text style={[st.title, { color: letterColor(view.letter) }]}>🗳️ Vote · lettre {view.letter}</Text>
-        <Text style={st.sub}>Touche ✗ sous un mot que tu trouves faux. Il saute si plus de la moitié des autres joueurs (les machines ne votent pas) le contestent.</Text>
+        <Text style={[st.title, { color: letterColor(view.letter, 65) }]}>🗳️ Vote · lettre {view.letter}</Text>
+        <Text style={st.sub}>Touche ✗ sous un mot que tu trouves faux. Les mots que le dictionnaire ne connaît pas sont barrés : touche ✓ pour en défendre un. Il saute si plus de la moitié des autres joueurs (les machines ne votent pas) le contestent.</Text>
         {cats.map((c) => {
           const cat = labelOf(c);
           return (
@@ -256,9 +256,13 @@ export function BacGame({ onHome }: { onHome: () => void }) {
               {view.seats.map((p) => {
                 const word = (round.answers[p.uid]?.[c] ?? '').trim();
                 const mineWord = p.uid === me;
-                const auto = !word ? 'vide' : !startsWithLetter(word, view.letter) ? 'mauvaise lettre' : null;
+                const humans = view.seats.filter((x) => !x.bot).map((x) => x.uid);
+                const unknown = !!word && !!onl.known && startsWithLetter(word, view.letter) && !onl.known(c, word) && !isRescued(round, c, p.uid, humans);
+                const auto = !word ? 'vide' : !startsWithLetter(word, view.letter) ? 'mauvaise lettre' : unknown ? 'mot inconnu du dictionnaire' : null;
                 const contests = round.contests[c]?.[p.uid] ?? [];
+                const accepts = round.accepts?.[c]?.[p.uid] ?? [];
                 const iContest = contests.includes(me);
+                const iAccept = accepts.includes(me);
                 return (
                   <View key={p.uid} style={st.voteRow}>
                     <View style={{ flex: 1 }}>
@@ -267,6 +271,13 @@ export function BacGame({ onHome }: { onHome: () => void }) {
                       {!!auto && word ? <Text style={st.badTxt}>{auto}</Text> : null}
                     </View>
                     {contests.length > 0 && <Text style={st.contestCount}>✗ {contests.length}</Text>}
+                    {accepts.length > 0 && unknown && <Text style={st.acceptCount}>✓ {accepts.length}</Text>}
+                    {seated && !mineWord && unknown && (
+                      <Pressable onPress={() => act({ t: 'accept', cat: c, target: p.uid, on: !iAccept })} style={[st.acceptBtn, iAccept && st.acceptOn]}
+                        accessibilityLabel={iAccept ? `Retirer mon accord pour ${word}` : `Accepter ${word} malgré le dictionnaire`}>
+                        <Text style={[st.contestTxt, iAccept && st.contestTxtOn]}>✓</Text>
+                      </Pressable>
+                    )}
                     {seated && !mineWord && !!word && !auto && (
                       <Pressable onPress={() => act({ t: 'contest', cat: c, target: p.uid, on: !iContest })} style={[st.contestBtn, iContest && st.contestOn]}
                         accessibilityLabel={iContest ? `Retirer ma contestation de ${word}` : `Contester ${word}`}>
@@ -292,7 +303,7 @@ export function BacGame({ onHome }: { onHome: () => void }) {
     return wrap(
       <>
         {header}
-        <Text style={[st.title, { color: letterColor(view.letter) }]}>🎯 Points · lettre {view.letter}</Text>
+        <Text style={[st.title, { color: letterColor(view.letter, 65) }]}>🎯 Points · lettre {view.letter}</Text>
         {cats.map((c) => {
           const cat = labelOf(c);
           return (
@@ -337,7 +348,7 @@ export function BacGame({ onHome }: { onHome: () => void }) {
   );
 }
 
-const letterColor = (l: string) => `hsl(${Math.round((Math.max(0, LETTERS.indexOf(l)) * 360) / LETTERS.length)}, 70%, 38%)`;
+const letterColor = (l: string, light = 38) => `hsl(${Math.round((Math.max(0, LETTERS.indexOf(l)) * 360) / LETTERS.length)}, 70%, ${light}%)`;
 const RAINBOW = ['#f97316', '#eab308', '#22c55e', '#06b6d4', '#8b5cf6', '#ec4899'];
 
 /** Titre dont chaque lettre a sa couleur. */
@@ -454,6 +465,9 @@ const st = StyleSheet.create({
   voteName: { color: '#94a3b8', fontSize: 13, fontWeight: '700' },
   voteWord: { color: '#f8fafc', fontSize: 18, fontWeight: '800' },
   voteBad: { color: '#64748b', textDecorationLine: 'line-through' },
+  acceptCount: { color: '#86efac', fontSize: 15, fontWeight: '900' },
+  acceptBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#22c55e', alignItems: 'center', justifyContent: 'center' },
+  acceptOn: { backgroundColor: '#22c55e' },
   contestCount: { color: '#fca5a5', fontSize: 15, fontWeight: '900' },
   contestBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#64748b', alignItems: 'center', justifyContent: 'center' },
   contestOn: { backgroundColor: '#ef4444', borderColor: '#ef4444' },

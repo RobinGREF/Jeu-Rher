@@ -91,3 +91,31 @@ test('contestation : seuls les joueurs humains votent', () => {
   const none = scoreRound({ ...r, contests: { animal: { h: ['b'] } } }, ['h', 'b'], ['animal'], ['h']);
   assert.equal(none.cells.animal.h.pts, 10, 'une machine ne contestera jamais');
 });
+
+import { isRescued, makeKnown } from './engine';
+
+test('dictionnaire : noms communs vérifiés, noms propres jamais, articles et mots composés tolérés', () => {
+  const dict = new Set(['chat', 'ane', 'pomme', 'terre', 'aspirateur']);
+  const known = makeKnown((w) => dict.has(w));
+  assert.ok(known('animal', 'Âne') && known('animal', "l'âne") && known('animal', 'le chat'));
+  assert.ok(!known('animal', 'Anhuzb'), 'un mot qui n\'existe pas');
+  assert.ok(known('fruitleg', 'pomme de terre'), 'mot composé : chaque morceau existe');
+  assert.ok(!known('fruitleg', 'pomme de zork'));
+  assert.ok(known('prenom', 'Zorglub') && known('pays', 'Atlantis') && known('marque', 'Xyz'), 'noms propres : au vote seulement');
+  assert.ok(makeKnown((w) => dict.has(w), (cat, f) => cat === 'objet' && f === 'agrafeuse')('objet', 'Agrafeuse'), 'la réserve des machines compte');
+});
+
+test('dictionnaire : un mot inconnu vaut 0, sauf si plus de la moitié des autres humains l\'acceptent', () => {
+  const known = makeKnown((w) => ['aspirateur', 'ane'].includes(w));
+  const base = { letter: 'A', answers: { a: { objet: 'Aspirateur', animal: 'Agzzu' }, b: { objet: 'Aqzqz', animal: 'Ane' }, c: { objet: '', animal: '' } }, contests: {} };
+  const s = scoreRound(base, ['a', 'b', 'c'], ['objet', 'animal'], ['a', 'b', 'c'], known);
+  assert.equal(s.cells.animal.a.status, 'inconnu'); assert.equal(s.cells.animal.a.pts, 0);
+  assert.equal(s.cells.objet.b.status, 'inconnu');
+  assert.equal(s.cells.objet.a.status, 'seul', 'le mot inconnu des autres ne compte pas comme concurrent');
+  const rescued = { ...base, accepts: { animal: { a: ['b', 'c'] } } };
+  assert.ok(isRescued(rescued, 'animal', 'a', ['a', 'b', 'c']));
+  const r = scoreRound(rescued, ['a', 'b', 'c'], ['objet', 'animal'], ['a', 'b', 'c'], known);
+  assert.equal(r.cells.animal.a.pts, 10, 'repêché par les deux autres joueurs');
+  const half = scoreRound({ ...base, accepts: { animal: { a: ['b'] } } }, ['a', 'b', 'c'], ['animal'], ['a', 'b', 'c'], known);
+  assert.equal(half.cells.animal.a.status, 'inconnu', 'un accord sur deux ne suffit pas');
+});
