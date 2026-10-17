@@ -167,6 +167,14 @@ export function BacGame({ onHome }: { onHome: () => void }) {
             <Pressable onPress={() => { void onl.session.current?.addBot(); }} style={st.addBot} accessibilityLabel="Ajouter une machine"><Text style={st.addBotTxt}>🤖 Ajouter une machine</Text></Pressable>
           )}
         </View>
+        <View style={st.card}>
+          <Text style={st.head}>💡 Idées de mots en fin de manche</Text>
+          <Text style={st.muted}>Ton réglage à toi : les autres joueurs gardent le leur.</Text>
+          <View style={st.row}>
+            <Chip on={ideas} label="Oui, les voir" onPress={() => { if (!ideas) toggleIdeas(); }} />
+            <Chip on={!ideas} label="Non, je cherche seul" onPress={() => { if (ideas) toggleIdeas(); }} />
+          </View>
+        </View>
         {snap.isHost ? (
           <>
             <Text style={st.label}>Nombre de manches</Text>
@@ -321,6 +329,9 @@ export function BacGame({ onHome }: { onHome: () => void }) {
             </View>
           );
         })}
+        <Pressable onPress={toggleIdeas} style={[st.btn, st.btnGhost]} accessibilityRole="button" accessibilityLabel="Afficher ou masquer les idées de mots">
+          <Text style={[st.btnTxt, st.btnGhostTxt]}>{ideas ? '🙈 Masquer les idées de mots' : '💡 Voir des idées de mots'}</Text>
+        </Pressable>
         <View style={st.card}>
           <Text style={st.head}>Classement</Text>
           {rank.map((r) => (
